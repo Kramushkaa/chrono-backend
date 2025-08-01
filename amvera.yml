@@ -1,0 +1,12 @@
+meta:
+  environment: node
+  toolchain:
+    name: npm
+    version: 18
+build:
+  artifacts:
+    '*': /
+run:
+  scriptName: simple-server.js
+  persistenceMount: /data
+  containerPort: 3001
