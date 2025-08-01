@@ -1,9 +1,17 @@
+---
+version: null
 meta:
   environment: node
   toolchain:
     name: npm
     version: 18
 build:
+<<<<<<< HEAD
+=======
+  skip: false
+  additionalCommands:
+  - npm install
+>>>>>>> 3565301c95a76ade7c1a5dfab90a3f063f9b3255
   artifacts:
     '*': /
 run:
