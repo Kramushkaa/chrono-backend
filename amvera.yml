@@ -1,0 +1,30 @@
+meta:
+  environment: node
+  toolchain:
+    name: npm
+    version: "18"
+
+build:
+  skip: false
+  additionalCommands:
+    - npm install
+  artifacts:
+    "*": /
+
+run:
+  scriptName: simple-server.js
+  scriptArguments: null
+  nodeArguments: null
+  command: npm run start
+  persistenceMount: /data
+  containerPort: "3001"
+  servicePort: "80"
+
+env:
+  NODE_ENV: production
+  PORT: 3001
+  DB_HOST: amvera-kramushka-cnpg-chronoline-rw
+  DB_PORT: 5432
+  DB_NAME: chronoline
+  DB_USER: Kramushka
+  DB_PASSWORD: 1qwertyu

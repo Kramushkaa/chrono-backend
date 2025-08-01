@@ -23,8 +23,12 @@ const pool = new Pool({
 });
 
 const server = http.createServer(async (req, res) => {
+  // Определяем CORS origin в зависимости от окружения
+  const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+  const corsOrigin = isLocal ? 'http://localhost:3000' : '*';
+  
   // Устанавливаем CORS заголовки
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000'); // Разрешаем доступ для вашего frontend-приложения
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Content-Type', 'application/json');
@@ -249,7 +253,9 @@ async function startServer() {
       console.log(`🚀 Сервер запущен на порту ${PORT}`);
       console.log(`📊 API доступен по адресу: http://localhost:${PORT}`);
       // Логгирование CORS
-      console.log('🔗 CORS настроен для: http://localhost:3000');
+      const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+      const corsInfo = isLocal ? 'http://localhost:3000' : 'все домены (*)';
+      console.log(`🔗 CORS настроен для: ${corsInfo}`);
     });
   } catch (error) {
     console.error('❌ Ошибка при запуске сервера:', error);
