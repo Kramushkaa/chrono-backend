@@ -1,0 +1,38 @@
+{
+  "name": "chronoline-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Chronoline - Interactive timeline of historical figures",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "node simple-server.js",
+    "dev": "node simple-server.js",
+    "init-db": "ts-node src/db/init.ts",
+    "seed": "ts-node src/db/seed.ts",
+    "setup": "npm run init-db && npm run seed",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "timeline",
+    "history",
+    "api",
+    "postgresql",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^5.1.0",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "nodemon": "^3.0.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
+}
