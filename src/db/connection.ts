@@ -11,8 +11,11 @@ interface DatabaseConfig {
   password: string;
 }
 
+// Определяем, какое подключение использовать
+const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+
 const dbConfig: DatabaseConfig = {
-  host: process.env.DB_HOST || 'amvera-kramushka-cnpg-chronoline-rw',
+  host: process.env.DB_HOST || (isLocal ? 'chronoline-kramushka.db-msk0.amvera.tech' : 'amvera-kramushka-cnpg-chronoline-rw'),
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'chronoline',
   user: process.env.DB_USER || 'Kramushka',
@@ -23,7 +26,10 @@ const poolConfig: PoolConfig = {
   ...dbConfig,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,
+  ssl: {
+    rejectUnauthorized: false
+  }
 };
 
 const pool = new Pool(poolConfig);

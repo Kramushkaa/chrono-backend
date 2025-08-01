@@ -6,9 +6,8 @@
   "scripts": {
     "start": "node simple-server.js",
     "dev": "node simple-server.js",
-    "init-db": "ts-node src/db/init.ts",
     "seed": "ts-node src/db/seed.ts",
-    "setup": "npm run init-db && npm run seed",
+
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

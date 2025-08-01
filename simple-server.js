@@ -4,16 +4,22 @@ require('dotenv').config();
 
 const PORT = process.env.PORT || 3001;
 
+// Определяем, какое подключение использовать
+const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+
 // Настройка подключения к базе данных
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || (isLocal ? 'chronoline-kramushka.db-msk0.amvera.tech' : 'amvera-kramushka-cnpg-chronoline-rw'),
   port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'chronoline_db',
-  user: process.env.DB_USER || 'postgres',
+  database: process.env.DB_NAME || 'chronoline',
+  user: process.env.DB_USER || 'Kramushka',
   password: process.env.DB_PASSWORD || '1qwertyu',
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 const server = http.createServer(async (req, res) => {
