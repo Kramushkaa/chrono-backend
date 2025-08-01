@@ -2,11 +2,13 @@
   "name": "chronoline-backend",
   "version": "1.0.0",
   "description": "Backend API for Chronoline - Interactive timeline of historical figures",
-  "main": "dist/server.js",
+  "main": "simple-server.js",
   "scripts": {
     "start": "node simple-server.js",
     "dev": "node simple-server.js",
     "seed": "ts-node src/db/seed.ts",
+    "migrate": "ts-node src/db/migrate.ts",
+    "test-db": "ts-node src/db/test-connection.ts",
 
     "test": "echo \"Error: no test specified\" && exit 1"
   },

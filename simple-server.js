@@ -23,12 +23,8 @@ const pool = new Pool({
 });
 
 const server = http.createServer(async (req, res) => {
-  // Определяем CORS origin в зависимости от окружения
-  const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
-  const corsOrigin = isLocal ? 'http://localhost:3000' : '*';
-  
-  // Устанавливаем CORS заголовки
-  res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+  // Устанавливаем CORS заголовки для работы с любым origin
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Content-Type', 'application/json');
