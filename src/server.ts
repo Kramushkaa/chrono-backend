@@ -152,6 +152,14 @@ app.get('/api/persons', async (req, res) => {
 app.get('/api/persons/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    if (!id) {
+      res.status(400).json({
+        error: 'ID не указан'
+      });
+      return;
+    }
+    
     const query = 'SELECT * FROM persons WHERE id = $1';
     
     const result = await pool.query(query, [id]);
@@ -310,25 +318,49 @@ app.use('*', (req, res) => {
   });
 });
 
-// Запуск сервера
-app.listen(PORT, () => {
-  console.log(`🚀 Хроно ниндзя API сервер запущен на порту ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
-  console.log(`👥 Persons API: http://localhost:${PORT}/api/persons`);
-  console.log(`📈 Stats API: http://localhost:${PORT}/api/stats`);
-});
+// Функция запуска сервера
+async function startServer() {
+  try {
+    // Проверка подключения к базе данных
+    const client = await pool.connect();
+    console.log('✅ Подключение к базе данных установлено');
+    client.release();
+    
+    // Запуск сервера
+    app.listen(PORT, () => {
+      console.log(`🚀 Хроно ниндзя API сервер запущен на порту ${PORT}`);
+      console.log(`📊 API доступен по адресу: http://localhost:${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
+      console.log(`👥 Persons API: http://localhost:${PORT}/api/persons`);
+      console.log(`📈 Stats API: http://localhost:${PORT}/api/stats`);
+      
+      // Логгирование CORS
+      const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+      const corsInfo = isLocal ? 'http://localhost:3000' : 'все домены (*)';
+      console.log(`🔗 CORS настроен для: ${corsInfo}`);
+    });
+  } catch (error) {
+    console.error('❌ Ошибка при запуске сервера:', error);
+    process.exit(1);
+  }
+}
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  pool.end();
+// Запускаем сервер
+startServer();
+
+// Обработка завершения работы
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Получен сигнал завершения работы');
+  await pool.end();
+  console.log('✅ Подключения к базе данных закрыты');
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  pool.end();
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 Получен сигнал завершения работы');
+  await pool.end();
+  console.log('✅ Подключения к базе данных закрыты');
   process.exit(0);
 });
 
