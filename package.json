@@ -1,7 +1,7 @@
 {
-  "name": "chronoline-backend",
+  "name": "chrononinja-backend",
   "version": "1.0.0",
-  "description": "Backend API for Chronoline - Interactive timeline of historical figures",
+  "description": "Backend API for Хроно ниндзя - Interactive timeline of historical figures",
   "main": "simple-server.js",
   "scripts": {
     "start": "node simple-server.js",

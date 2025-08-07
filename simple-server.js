@@ -47,7 +47,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/' && req.method === 'GET') {
       res.writeHead(200);
       res.end(JSON.stringify({
-        message: 'Chronoline API',
+        message: 'Хроно ниндзя API',
         version: '1.0.0',
         endpoints: {
           persons: '/api/persons',
