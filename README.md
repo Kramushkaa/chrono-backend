@@ -1,3 +1,22 @@
+## Docker
+
+Build image:
+
+```
+docker build -t chrononinja-backend .
+```
+
+Run (with env):
+
+```
+docker run --rm -p 3001:3001 \
+  -e DB_HOST=... -e DB_PORT=5432 -e DB_NAME=chrononinja -e DB_USER=postgres -e DB_PASSWORD=... \
+  -e DB_SSL=false \
+  -e JWT_SECRET=... -e JWT_EXPIRES_IN=24h -e REFRESH_TOKEN_EXPIRES_IN=7d \
+  -e CORS_ORIGINS=chrono.ninja,*.chrono.ninja,http://localhost:3000 \
+  --name chrononinja-backend chrononinja-backend
+```
+
 # Хроно ниндзя Backend
 
 Backend API для проекта Хроно ниндзя - интерактивной временной шкалы исторических личностей.
