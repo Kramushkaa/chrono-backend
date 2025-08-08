@@ -53,14 +53,15 @@ export class AuthService {
     
     // Генерация токена для подтверждения email
     const emailVerificationToken = generateEmailVerificationToken();
+    const emailVerificationExpires = addDays(new Date(), 2);
 
     const query = `
-      INSERT INTO users (email, password_hash, username, full_name, email_verification_token)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO users (email, password_hash, username, full_name, email_verification_token, email_verification_expires)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
 
-    const values = [data.email, passwordHash, data.username, data.full_name, emailVerificationToken];
+    const values = [data.email, passwordHash, data.username, data.full_name, emailVerificationToken, emailVerificationExpires];
     
     try {
       const result = await this.pool.query(query, values);
@@ -299,9 +300,10 @@ export class AuthService {
     if (user.email_verified) throw new Error('Email уже подтвержден');
 
     const token = generateEmailVerificationToken();
+    const expires = addDays(new Date(), 2);
     await this.pool.query(
-      'UPDATE users SET email_verification_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [token, userId]
+      'UPDATE users SET email_verification_token = $1, email_verification_expires = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [token, expires, userId]
     );
     return { email: user.email, token };
   }
@@ -312,10 +314,13 @@ export class AuthService {
     if (!user) {
       throw new Error('Недействительный токен подтверждения email');
     }
+    if (user.email_verification_expires && new Date() > new Date(user.email_verification_expires)) {
+      throw new Error('Срок действия токена подтверждения истек');
+    }
 
     const query = `
       UPDATE users 
-      SET email_verified = true, email_verification_token = NULL, updated_at = CURRENT_TIMESTAMP
+      SET email_verified = true, email_verification_token = NULL, email_verification_expires = NULL, updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
     `;
 

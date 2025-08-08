@@ -10,6 +10,7 @@ export interface User {
   is_active: boolean;
   email_verified: boolean;
   email_verification_token?: string;
+  email_verification_expires?: Date;
   created_at: Date;
   updated_at: Date;
 }

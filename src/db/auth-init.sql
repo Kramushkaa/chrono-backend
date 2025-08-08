@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   is_active BOOLEAN DEFAULT true,
   email_verified BOOLEAN DEFAULT false,
   email_verification_token VARCHAR(255),
+  email_verification_expires TIMESTAMP,
   password_reset_token VARCHAR(255),
   password_reset_expires TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
