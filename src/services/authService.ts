@@ -64,7 +64,10 @@ export class AuthService {
     
     try {
       const result = await this.pool.query(query, values);
-      return this.mapUserFromDb(result.rows[0]);
+      const created = result.rows[0];
+      // Пробрасываем токен наружу для отправки письма
+      (created as any).email_verification_token = emailVerificationToken;
+      return this.mapUserFromDb(created);
     } catch (error) {
       throw new Error(`Ошибка при создании пользователя: ${error}`);
     }

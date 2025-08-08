@@ -23,6 +23,28 @@ export class AuthController {
       const userData: RegisterRequest = req.body;
       const user = await this.authService.registerUser(userData);
 
+      // Отправка письма с подтверждением email (best-effort)
+      try {
+        const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
+        const verifyToken = user.email_verification_token as any; // поле заполняется в сервисе
+        const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(verifyToken)}`;
+        const html = `
+          <div style="font-family: Arial, sans-serif;">
+            <h2>Подтверждение email</h2>
+            <p>Здравствуйте, ${user.full_name || user.username || user.email}!</p>
+            <p>Для завершения регистрации подтвердите вашу почту, нажав на кнопку ниже.</p>
+            <p>
+              <a href="${verifyUrl}" style="display:inline-block;padding:10px 16px;background:#2d7; color:#fff; text-decoration:none; border-radius:6px;">Подтвердить email</a>
+            </p>
+            <p>Если кнопка не работает, перейдите по ссылке: <br/> ${verifyUrl}</p>
+          </div>
+        `;
+        const { sendEmail } = await import('../utils/email');
+        await sendEmail(user.email, 'Подтверждение email — Хронониндзя', html);
+      } catch (err) {
+        console.warn('Email verification send failed:', err);
+      }
+
       res.status(201).json({
         success: true,
         message: 'Пользователь успешно зарегистрирован',

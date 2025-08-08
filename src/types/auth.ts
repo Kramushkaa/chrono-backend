@@ -9,6 +9,7 @@ export interface User {
   role: 'user' | 'moderator' | 'admin';
   is_active: boolean;
   email_verified: boolean;
+  email_verification_token?: string;
   created_at: Date;
   updated_at: Date;
 }
