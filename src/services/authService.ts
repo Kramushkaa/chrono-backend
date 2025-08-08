@@ -99,7 +99,7 @@ export class AuthService {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken();
 
-    // Сохранение refresh токена в базе
+    // Сохранение refresh токена в базе (хеш)
     await this.saveRefreshToken(user.id, refreshToken);
 
     return {
@@ -110,7 +110,7 @@ export class AuthService {
   }
 
   // Обновление токена доступа
-  async refreshAccessToken(refreshToken: string): Promise<{ user: User; accessToken: string }> {
+  async refreshAccessToken(refreshToken: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     const session = await this.getSessionByToken(refreshToken);
     if (!session) {
       throw new Error('Недействительный refresh токен');
@@ -127,10 +127,15 @@ export class AuthService {
     }
 
     const accessToken = generateAccessToken(user);
-    
+    // Ротация refresh-токена: удаляем старый, создаем новый
+    await this.deleteSession(session.id);
+    const newRefreshToken = generateRefreshToken();
+    await this.saveRefreshToken(user.id, newRefreshToken);
+
     return {
       user: this.mapUserFromDb(user),
-      accessToken
+      accessToken,
+      refreshToken: newRefreshToken
     };
   }
 
@@ -342,7 +347,7 @@ export class AuthService {
   // Сохранение refresh токена
   private async saveRefreshToken(userId: number, token: string): Promise<void> {
     const expiresAt = addDays(new Date(), 7); // 7 дней
-    const tokenHash = token; // В реальном проекте нужно хешировать
+    const tokenHash = require('../utils/auth').hashToken(token);
 
     const query = `
       INSERT INTO user_sessions (user_id, token_hash, expires_at)
@@ -354,7 +359,7 @@ export class AuthService {
 
   // Получение сессии по токену
   private async getSessionByToken(token: string): Promise<any> {
-    const tokenHash = token; // В реальном проекте нужно хешировать
+    const tokenHash = require('../utils/auth').hashToken(token);
     const query = 'SELECT * FROM user_sessions WHERE token_hash = $1';
     const result = await this.pool.query(query, [tokenHash]);
     return result.rows[0] || null;
@@ -368,7 +373,7 @@ export class AuthService {
 
   // Удаление сессии по токену
   private async deleteSessionByToken(token: string): Promise<void> {
-    const tokenHash = token; // В реальном проекте нужно хешировать
+    const tokenHash = require('../utils/auth').hashToken(token);
     const query = 'DELETE FROM user_sessions WHERE token_hash = $1';
     await this.pool.query(query, [tokenHash]);
   }

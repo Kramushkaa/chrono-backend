@@ -109,6 +109,7 @@ export class AuthController {
             email_verified: result.user.email_verified
           },
           access_token: result.accessToken,
+          refresh_token: result.refreshToken,
           expires_in: 24 * 60 * 60 // 24 часа в секундах
         }
       });
