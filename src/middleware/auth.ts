@@ -164,8 +164,11 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
 
 // Middleware для CORS
 export const corsMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  const allowed = (process.env.CORS_ORIGIN || '*');
-  res.header('Access-Control-Allow-Origin', allowed);
+  const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
+  const allowed = raw.split(',').map(o => o.trim());
+  const origin = req.headers.origin as string | undefined;
+  const value = allowed.includes('*') ? '*' : (origin && allowed.includes(origin) ? origin : '');
+  if (value) res.header('Access-Control-Allow-Origin', value);
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
