@@ -46,6 +46,14 @@ export function createAuthRoutes(authController: AuthController): Router {
   router.post('/verify-email', async (req, res) => {
     await authController.verifyEmail(req, res);
   });
+  router.get('/verify-email', async (req, res) => {
+    await authController.verifyEmail(req, res);
+  });
+
+  // Повторная отправка письма подтверждения
+  router.post('/resend-verification', authenticateToken, async (req, res) => {
+    await authController.resendVerification(req, res);
+  });
 
   // Защищенные маршруты (требуют аутентификации)
   

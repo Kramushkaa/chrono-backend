@@ -26,8 +26,8 @@ export class AuthController {
       // Отправка письма с подтверждением email (best-effort)
       try {
         const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
-        const verifyToken = user.email_verification_token as any; // поле заполняется в сервисе
-        const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(verifyToken)}`;
+        const verifyToken = (user as any).email_verification_token as string; // заполнено в сервисе
+        const verifyUrl = `${baseUrl}/profile?verify_token=${encodeURIComponent(verifyToken)}`;
         const html = `
           <div style="font-family: Arial, sans-serif;">
             <h2>Подтверждение email</h2>
@@ -350,7 +350,7 @@ export class AuthController {
   // Подтверждение email
   async verifyEmail(req: Request, res: Response): Promise<void> {
     try {
-      const { token }: VerifyEmailRequest = req.body;
+      const token = (req.body && (req.body as any).token) || (req.query && (req.query as any).token);
 
       if (!token) {
         res.status(400).json({
@@ -373,6 +373,39 @@ export class AuthController {
         error: 'Email verification failed',
         message: error instanceof Error ? error.message : 'Ошибка при подтверждении email'
       });
+    }
+  }
+
+  // Повторная отправка письма с подтверждением
+  async resendVerification(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.sub;
+      if (!userId) {
+        res.status(401).json({ success: false, error: 'Unauthorized', message: 'Требуется аутентификация' });
+        return;
+      }
+      const { email, token } = await this.authService.resendEmailVerification(userId);
+
+      try {
+        const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
+        const verifyUrl = `${baseUrl}/profile?verify_token=${encodeURIComponent(token)}`;
+        const html = `
+          <div style="font-family: Arial, sans-serif;">
+            <h2>Подтверждение email</h2>
+            <p>Здравствуйте!</p>
+            <p>Для подтверждения почты нажмите на кнопку:</p>
+            <p><a href="${verifyUrl}" style="display:inline-block;padding:10px 16px;background:#2d7; color:#fff; text-decoration:none; border-radius:6px;">Подтвердить email</a></p>
+            <p>Или перейдите по ссылке: ${verifyUrl}</p>
+          </div>`;
+        const { sendEmail } = await import('../utils/email');
+        await sendEmail(email, 'Подтверждение email — Хронониндзя', html);
+      } catch (err) {
+        console.warn('Resend verification send failed:', err);
+      }
+
+      res.status(200).json({ success: true, message: 'Письмо отправлено повторно' });
+    } catch (error) {
+      res.status(400).json({ success: false, error: 'Resend failed', message: error instanceof Error ? error.message : 'Ошибка' });
     }
   }
 

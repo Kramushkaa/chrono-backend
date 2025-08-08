@@ -292,6 +292,20 @@ export class AuthService {
     }
   }
 
+  // Повторная отправка письма подтверждения email (генерация нового токена)
+  async resendEmailVerification(userId: number): Promise<{ email: string; token: string }> {
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error('Пользователь не найден');
+    if (user.email_verified) throw new Error('Email уже подтвержден');
+
+    const token = generateEmailVerificationToken();
+    await this.pool.query(
+      'UPDATE users SET email_verification_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [token, userId]
+    );
+    return { email: user.email, token };
+  }
+
   // Подтверждение email
   async verifyEmail(token: string): Promise<void> {
     const user = await this.getUserByVerificationToken(token);
@@ -392,6 +406,7 @@ export class AuthService {
       role: dbUser.role,
       is_active: dbUser.is_active,
       email_verified: dbUser.email_verified,
+      email_verification_token: dbUser.email_verification_token,
       created_at: new Date(dbUser.created_at),
       updated_at: new Date(dbUser.updated_at)
     };
