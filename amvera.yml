@@ -4,9 +4,12 @@ meta:
     name: npm
     version: 18
 build:
+  steps:
+    - npm ci
+    - npm run build
   artifacts:
-    '*': /
+    dist: /dist
 run:
-  scriptName: simple-server.js
+  scriptName: dist/server.js
   persistenceMount: /data
   containerPort: 3001
