@@ -20,7 +20,7 @@ async function main() {
     const resSessions = await client.query("SELECT to_regclass('public.user_sessions') as sessions_reg");
     console.log('tables:', resUsers.rows[0], resSessions.rows[0]);
 
-    const admin = await client.query('SELECT id, email, role, is_active, password_hash IS NOT NULL as has_hash FROM users WHERE email = $1', ['admin@chrononinja.app']);
+  const admin = await client.query('SELECT id, email, role, is_active, password_hash IS NOT NULL as has_hash FROM users WHERE email = $1', ['admin@chrono.ninja']);
     console.log('admin:', admin.rows[0] || null);
   } catch (e) {
     console.error('❌ DB check error:', e);

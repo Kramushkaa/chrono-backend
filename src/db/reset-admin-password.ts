@@ -22,7 +22,7 @@ async function resetAdminPassword() {
     console.log('🔑 Сброс пароля администратора...');
     const res = await pool.query(
       `UPDATE users SET password_hash = $1, is_active = true, updated_at = CURRENT_TIMESTAMP WHERE email = $2 RETURNING id, email`,
-      [newHash, 'admin@chrononinja.app']
+      [newHash, 'admin@chrono.ninja']
     );
     if (res.rowCount === 0) {
       console.log('Администратор не найден, создаю...');
@@ -30,7 +30,7 @@ async function resetAdminPassword() {
         `INSERT INTO users (email, password_hash, username, full_name, role, email_verified, is_active)
          VALUES ($1, $2, 'admin', 'Системный администратор', 'admin', true, true)
          ON CONFLICT (email) DO NOTHING`,
-        ['admin@chrononinja.app', newHash]
+        ['admin@chrono.ninja', newHash]
       );
     }
     console.log(`✅ Пароль администратора установлен на ${password}`);

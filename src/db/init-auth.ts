@@ -36,7 +36,7 @@ async function initAuthTables() {
     console.log('   - role_permissions (связи ролей и разрешений)');
     console.log('');
     console.log('👤 Создан администратор по умолчанию:');
-    console.log('   Email: admin@chrononinja.app');
+  console.log('   Email: admin@chrono.ninja');
     console.log('   Пароль: admin123');
     console.log('   Роль: admin');
     console.log('');

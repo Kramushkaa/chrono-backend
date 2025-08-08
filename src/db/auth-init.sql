@@ -99,5 +99,5 @@ ON CONFLICT DO NOTHING;
 -- Создание пользователя-администратора по умолчанию (пароль: admin123)
 -- В реальном проекте пароль должен быть изменен после первого входа
 INSERT INTO users (email, password_hash, username, full_name, role, email_verified) VALUES
-  ('admin@chrononinja.app', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/5Qq8K8e', 'admin', 'Системный администратор', 'admin', true)
+  ('admin@chrono.ninja', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/5Qq8K8e', 'admin', 'Системный администратор', 'admin', true)
 ON CONFLICT (email) DO NOTHING; 

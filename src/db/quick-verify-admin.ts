@@ -15,7 +15,7 @@ async function main() {
   });
 
   try {
-    const res = await pool.query('SELECT id, email, password_hash FROM users WHERE email=$1', ['admin@chrononinja.app']);
+  const res = await pool.query('SELECT id, email, password_hash FROM users WHERE email=$1', ['admin@chrono.ninja']);
     const row = res.rows[0];
     if (!row) {
       console.log('admin not found');

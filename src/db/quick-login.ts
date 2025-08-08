@@ -15,7 +15,7 @@ async function main() {
   });
   const service = new AuthService(pool);
   try {
-    const result = await service.loginUser({ email: 'admin@chrononinja.app', password: 'admin123' });
+  const result = await service.loginUser({ email: 'admin@chrono.ninja', password: 'admin123' });
     console.log('login ok:', {
       user: { id: result.user.id, email: result.user.email, role: result.user.role },
       accessTokenLen: result.accessToken.length,
