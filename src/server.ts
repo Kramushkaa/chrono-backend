@@ -36,15 +36,38 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-// CORS: поддержка списка доменов через запятую
+// CORS: поддержка списка доменов (через запятую) и шаблонов вида *.chrono.ninja или голых доменов
 const rawOrigins = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
-const allowedOrigins = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
+const allowedOriginPatterns = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
+
+function isOriginAllowed(origin: string, patterns: string[]): boolean {
+  try {
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
+
+    for (const pat of patterns) {
+      if (pat === '*') return true;
+      if (pat.startsWith('http://') || pat.startsWith('https://')) {
+        if (origin === pat) return true;
+        continue;
+      }
+      // Голодомен или подстановочный *.domain
+      const p = pat.toLowerCase();
+      if (p.startsWith('*.')) {
+        const base = p.slice(2);
+        if (host === base || host.endsWith(`.${base}`)) return true;
+      } else {
+        if (host === p || host.endsWith(`.${p}`)) return true; // разрешаем и поддомены для голодомена
+      }
+    }
+  } catch {}
+  return false;
+}
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // curl / same-origin
-    if (allowedOrigins.includes('*')) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin) return callback(null, true);
+    if (isOriginAllowed(origin, allowedOriginPatterns)) return callback(null, true);
     return callback(new Error(`CORS: Origin ${origin} is not allowed`));
   },
   credentials: true

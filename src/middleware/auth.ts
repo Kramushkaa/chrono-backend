@@ -165,10 +165,23 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
 // Middleware для CORS
 export const corsMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
-  const allowed = raw.split(',').map(o => o.trim());
+  const patterns = raw.split(',').map(o => o.trim());
   const origin = req.headers.origin as string | undefined;
-  const value = allowed.includes('*') ? '*' : (origin && allowed.includes(origin) ? origin : '');
-  if (value) res.header('Access-Control-Allow-Origin', value);
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      const host = url.hostname.toLowerCase();
+      let allowed = false;
+      for (const pat of patterns) {
+        if (pat === '*') { allowed = true; break; }
+        if (pat.startsWith('http://') || pat.startsWith('https://')) { if (origin === pat) { allowed = true; break; } continue; }
+        const p = pat.toLowerCase();
+        if (p.startsWith('*.')) { const base = p.slice(2); if (host === base || host.endsWith(`.${base}`)) { allowed = true; break; } }
+        else { if (host === p || host.endsWith(`.${p}`)) { allowed = true; break; } }
+      }
+      if (allowed) res.header('Access-Control-Allow-Origin', origin);
+    } catch {}
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
