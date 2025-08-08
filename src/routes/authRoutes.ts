@@ -205,8 +205,8 @@ export function createAuthRoutes(authController: AuthController): Router {
     }
   );
 
-  // Обработка ошибок 404 для неизвестных маршрутов
-  router.use('*', (req, res) => {
+  // Обработка ошибок 404 для неизвестных маршрутов (Express 5 совместимо)
+  router.use((req, res) => {
     res.status(404).json({
       success: false,
       error: 'Not found',

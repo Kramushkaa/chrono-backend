@@ -79,7 +79,7 @@ export class AuthService {
     }
 
     // Поиск пользователя
-    const user = await this.getUserByEmail(data.email);
+    const user = await this.getUserByEmail(data.email.toLowerCase());
     if (!user) {
       throw new Error('Неверный email или пароль');
     }

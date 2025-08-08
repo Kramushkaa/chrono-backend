@@ -10,6 +10,10 @@
     "seed": "ts-node src/db/seed.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "init-auth": "ts-node src/db/init-auth.ts",
+    "reset-admin": "ts-node src/db/reset-admin-password.ts",
+    "quick-check": "ts-node src/db/quick-check.ts",
+    "quick-login": "ts-node src/db/quick-login.ts",
+    "quick-verify-admin": "ts-node src/db/quick-verify-admin.ts",
     "test-db": "ts-node src/db/test-connection.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

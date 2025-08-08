@@ -1,4 +1,5 @@
 import express from 'express';
+import dotenv from 'dotenv';
 import cors from 'cors';
 import { Pool } from 'pg';
 import { AuthService } from './services/authService';
@@ -6,21 +7,22 @@ import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler } from './middleware/auth';
 
+// Загрузка переменных окружения
+dotenv.config();
+
 // Конфигурация базы данных
 const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 
 const pool = new Pool({
-  host: process.env.DB_HOST || (isLocal ? 'chronoline-kramushka.db-msk0.amvera.tech' : 'amvera-kramushka-cnpg-chronoline-rw'),
+  host: process.env.DB_HOST || (isLocal ? 'localhost' : 'amvera-kramushka-cnpg-chronoline-rw'),
   port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'chronoline',
-  user: process.env.DB_USER || 'Kramushka',
-  password: process.env.DB_PASSWORD || '1qwertyu',
+  database: process.env.DB_NAME || 'chrononinja',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'password',
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined as any,
 });
 
 // Создание сервисов и контроллеров
@@ -309,8 +311,8 @@ app.get('/api/stats', async (req, res) => {
 // Обработка ошибок
 app.use(errorHandler);
 
-// Обработка 404
-app.use('*', (req, res) => {
+// Обработка 404 (Express 5: без шаблона пути)
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     error: 'Not found',

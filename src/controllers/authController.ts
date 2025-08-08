@@ -49,6 +49,7 @@ export class AuthController {
   // Вход пользователя
   async login(req: Request, res: Response): Promise<void> {
     try {
+      console.log('🔐 Login attempt:', { email: (req.body && req.body.email) || 'no-body', bodyType: typeof req.body });
       const loginData: LoginRequest = req.body;
       const result = await this.authService.loginUser(loginData);
 
@@ -70,6 +71,7 @@ export class AuthController {
         }
       });
     } catch (error) {
+      console.error('🔐 Login error:', error);
       res.status(401).json({
         success: false,
         error: 'Authentication failed',

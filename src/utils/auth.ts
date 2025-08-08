@@ -20,15 +20,13 @@ export const comparePassword = async (password: string, hash: string): Promise<b
 
 // Генерация токенов
 export const generateAccessToken = (user: User): string => {
-  const payload: JWTPayload = {
+  const payload = {
     sub: user.id,
     email: user.email,
-    role: user.role,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 часа
+    role: user.role
   };
   
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
 };
 
 export const generateRefreshToken = (): string => {
@@ -46,7 +44,12 @@ export const generatePasswordResetToken = (): string => {
 // Верификация токенов
 export const verifyAccessToken = (token: string): JWTPayload | null => {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    return {
+      sub: decoded.sub,
+      email: decoded.email,
+      role: decoded.role
+    };
   } catch (error) {
     return null;
   }

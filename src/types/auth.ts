@@ -102,8 +102,6 @@ export interface JWTPayload {
   sub: number; // user_id
   email: string;
   role: string;
-  iat: number;
-  exp: number;
 }
 
 // Типы для middleware

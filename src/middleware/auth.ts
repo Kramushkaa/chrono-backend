@@ -128,7 +128,7 @@ export const logRequest = (req: Request, res: Response, next: NextFunction): voi
   const method = req.method;
   const url = req.url;
   const userAgent = req.headers['user-agent'];
-  const ip = req.ip || req.connection.remoteAddress;
+  const ip = (req.ip as any) || (req as any).socket?.remoteAddress || (req as any).connection?.remoteAddress || 'unknown';
   const userId = req.user?.sub || 'anonymous';
 
   console.log(`[${timestamp}] ${method} ${url} - User: ${userId} - IP: ${ip} - UA: ${userAgent}`);
@@ -182,7 +182,7 @@ export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number
   const requests = new Map<string, { count: number; resetTime: number }>();
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    const ip = (req.ip as any) || (req as any).socket?.remoteAddress || (req as any).connection?.remoteAddress || 'unknown';
     const now = Date.now();
     const windowStart = now - windowMs;
 
