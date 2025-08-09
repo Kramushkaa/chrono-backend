@@ -18,7 +18,12 @@ async function main() {
 
     const resUsers = await client.query("SELECT to_regclass('public.users') as users_reg");
     const resSessions = await client.query("SELECT to_regclass('public.user_sessions') as sessions_reg");
-    console.log('tables:', resUsers.rows[0], resSessions.rows[0]);
+    const resAchievements = await client.query("SELECT to_regclass('public.achievements') as achievements_reg");
+    console.log('tables:', { users: resUsers.rows[0]?.users_reg, user_sessions: resSessions.rows[0]?.sessions_reg, achievements: resAchievements.rows[0]?.achievements_reg });
+    if (resAchievements.rows[0]?.achievements_reg) {
+      const count = await client.query('SELECT COUNT(*)::int AS n FROM achievements');
+      console.log('achievements count:', count.rows[0]?.n);
+    }
 
   const admin = await client.query('SELECT id, email, role, is_active, password_hash IS NOT NULL as has_hash FROM users WHERE email = $1', ['admin@chrono.ninja']);
     console.log('admin:', admin.rows[0] || null);

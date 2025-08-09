@@ -11,6 +11,7 @@
     "seed": "ts-node src/db/seed.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "init-auth": "ts-node src/db/init-auth.ts",
+    "init-achievements": "ts-node src/db/init-achievements.ts",
     "reset-admin": "ts-node src/db/reset-admin-password.ts",
     "quick-check": "ts-node src/db/quick-check.ts",
     "quick-login": "ts-node src/db/quick-login.ts",
