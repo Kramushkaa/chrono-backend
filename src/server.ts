@@ -154,36 +154,43 @@ app.get('/api/persons', async (req, res) => {
     
     const result = await pool.query(query, params);
     
-    const persons = await Promise.all(result.rows.map(async row => {
-      // Загружаем достижения для персоны из нормализованной таблицы
-      let achievements: string[] = [];
-      let achievementYears: number[] = [];
-      try {
-        const achRes = await pool.query(
-          'SELECT year, description FROM achievements WHERE person_id = $1 ORDER BY year ASC',
-          [row.id]
-        );
-        achievements = achRes.rows.map((r: any) => r.description).slice(0, 3);
-        achievementYears = achRes.rows.map((r: any) => r.year).filter((y: any) => typeof y === 'number').slice(0, 3);
-      } catch {}
+    // Собираем достижения сразу для всех персон (без N+1)
+    const personIds: string[] = result.rows.map((r: any) => String(r.id));
+    let achievementsByPerson: Record<string, Array<{ year: number; description: string }>> = {};
+    if (personIds.length > 0) {
+      const achRes = await pool.query(
+        'SELECT person_id, year, description FROM achievements WHERE person_id = ANY($1::text[]) ORDER BY year ASC',
+        [personIds]
+      );
+      for (const r of achRes.rows) {
+        const pid = String(r.person_id);
+        if (!achievementsByPerson[pid]) achievementsByPerson[pid] = [];
+        achievementsByPerson[pid].push({ year: r.year, description: r.description });
+      }
+    }
 
-      const [y1, y2, y3] = achievementYears;
+    const persons = result.rows.map((row: any) => {
+      const ach = achievementsByPerson[String(row.id)] || [];
+      const achievements = ach.map(a => a.description).slice(0, 3);
+      const years = ach.map(a => a.year).slice(0, 3);
+      const [y1, y2, y3] = years;
       return {
-      id: row.id,
-      name: row.name,
-      birthYear: row.birth_year,
-      deathYear: row.death_year,
-      reignStart: row.reign_start,
-      reignEnd: row.reign_end,
-      category: row.category,
-      country: row.country,
-      description: row.description,
-      achievements: achievements.length ? achievements : row.achievements,
-      achievementYear1: y1 ?? row.achievement_year_1,
-      achievementYear2: y2 ?? row.achievement_year_2,
-      achievementYear3: y3 ?? row.achievement_year_3,
-      imageUrl: row.image_url
-    }}));
+        id: row.id,
+        name: row.name,
+        birthYear: row.birth_year,
+        deathYear: row.death_year,
+        reignStart: row.reign_start,
+        reignEnd: row.reign_end,
+        category: row.category,
+        country: row.country,
+        description: row.description,
+        achievements,
+        achievementYear1: y1,
+        achievementYear2: y2,
+        achievementYear3: y3,
+        imageUrl: row.image_url
+      };
+    });
     
     res.json(persons);
   } catch (error) {
@@ -222,19 +229,13 @@ app.get('/api/persons/:id', async (req, res) => {
     }
     
     const row = result.rows[0];
-    // Загружаем достижения для персоны
-    let achievements: string[] = [];
-    let achievementYears: number[] = [];
-    try {
-      const achRes = await pool.query(
-        'SELECT year, description FROM achievements WHERE person_id = $1 ORDER BY year ASC',
-        [row.id]
-      );
-      achievements = achRes.rows.map((r: any) => r.description).slice(0, 3);
-      achievementYears = achRes.rows.map((r: any) => r.year).filter((y: any) => typeof y === 'number').slice(0, 3);
-    } catch {}
-
-    const [y1, y2, y3] = achievementYears;
+    // Загружаем достижения для персоны (только из нормализованной таблицы)
+    const achRes = await pool.query(
+      'SELECT year, description FROM achievements WHERE person_id = $1 ORDER BY year ASC',
+      [row.id]
+    );
+    const achievements: string[] = achRes.rows.map((r: any) => r.description).slice(0, 3);
+    const [y1, y2, y3] = achRes.rows.map((r: any) => r.year).slice(0, 3);
     const person = {
       id: row.id,
       name: row.name,
@@ -245,10 +246,10 @@ app.get('/api/persons/:id', async (req, res) => {
       category: row.category,
       country: row.country,
       description: row.description,
-      achievements: achievements.length ? achievements : row.achievements,
-      achievementYear1: y1 ?? row.achievement_year_1,
-      achievementYear2: y2 ?? row.achievement_year_2,
-      achievementYear3: y3 ?? row.achievement_year_3,
+      achievements,
+      achievementYear1: y1,
+      achievementYear2: y2,
+      achievementYear3: y3,
       imageUrl: row.image_url
     };
     
