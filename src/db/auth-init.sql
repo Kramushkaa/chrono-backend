@@ -1,7 +1,10 @@
--- Миграция для аутентификации и авторизации
--- Создание таблиц для пользователей, сессий и ролей
+-- =============================================================
+-- Schema: Authentication & Authorization
+-- Project: Хронониндзя (Chrononinja)
+-- Purpose: Users, sessions, roles, permissions
+-- =============================================================
 
--- Таблица пользователей
+-- TABLE: users
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
@@ -20,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Таблица сессий/токенов
+-- TABLE: user_sessions
 CREATE TABLE IF NOT EXISTS user_sessions (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -29,7 +32,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Таблица ролей
+-- TABLE: roles
 CREATE TABLE IF NOT EXISTS roles (
   id SERIAL PRIMARY KEY,
   name VARCHAR(50) UNIQUE NOT NULL,
@@ -37,7 +40,7 @@ CREATE TABLE IF NOT EXISTS roles (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Таблица разрешений
+-- TABLE: permissions
 CREATE TABLE IF NOT EXISTS permissions (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) UNIQUE NOT NULL,
@@ -45,7 +48,7 @@ CREATE TABLE IF NOT EXISTS permissions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Таблица связи ролей и разрешений
+-- TABLE: role_permissions
 CREATE TABLE IF NOT EXISTS role_permissions (
   role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
   permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
@@ -53,7 +56,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   PRIMARY KEY (role_id, permission_id)
 );
 
--- Индексы для оптимизации
+-- INDEXES
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);

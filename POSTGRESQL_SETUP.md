@@ -51,7 +51,7 @@ psql -U postgres -h localhost
 psql -U postgres -h localhost
 
 # Создание базы данных
-CREATE DATABASE chronoline_db;
+CREATE DATABASE chrononinja;
 
 # Проверка создания
 \l
@@ -63,7 +63,7 @@ CREATE DATABASE chronoline_db;
 ### Через pgAdmin 4:
 1. Правый клик на "Databases"
 2. "Create" → "Database"
-3. Введите имя: `chronoline_db`
+3. Введите имя: `chrononinja`
 4. Нажмите "Save"
 
 ## 5. Настройка проекта
@@ -78,7 +78,7 @@ CREATE DATABASE chronoline_db;
    ```env
    DB_HOST=localhost
    DB_PORT=5432
-   DB_NAME=chronoline_db
+   DB_NAME=chrononinja
    DB_USER=postgres
    DB_PASSWORD=ваш_пароль_от_postgres
    ```
@@ -100,7 +100,7 @@ CREATE DATABASE chronoline_db;
 - Убедитесь, что используете правильного пользователя (postgres)
 
 ### Ошибка "database does not exist":
-- Создайте базу данных: `CREATE DATABASE chronoline_db;`
+- Создайте базу данных: `CREATE DATABASE chrononinja;`
 
 ## 7. Полезные команды
 
@@ -112,7 +112,7 @@ net start postgresql-x64-15
 net stop postgresql-x64-15
 
 # Подключение к конкретной базе данных
-psql -U postgres -d chronoline_db
+psql -U postgres -d chrononinja
 
 # Список всех баз данных
 \l
@@ -128,4 +128,4 @@ psql -U postgres -d chronoline_db
 
 - [Официальная документация PostgreSQL](https://www.postgresql.org/docs/)
 - [pgAdmin документация](https://www.pgadmin.org/docs/)
-- [PostgreSQL для Windows](https://www.postgresql.org/download/windows/) 
+- [PostgreSQL для Windows](https://www.postgresql.org/download/windows/)

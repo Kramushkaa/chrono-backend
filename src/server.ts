@@ -5,16 +5,19 @@ import { Pool } from 'pg';
 import { AuthService } from './services/authService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
-import { logRequest, errorHandler } from './middleware/auth';
+import { logRequest, errorHandler, authenticateToken, requireRoleMiddleware } from './middleware/auth';
+import { validateConfig } from './config';
 
 // Загрузка переменных окружения
 dotenv.config();
+// Валидация обязательных настроек окружения
+validateConfig();
 
 // Конфигурация базы данных
 const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 
 const pool = new Pool({
-  host: process.env.DB_HOST || (isLocal ? 'localhost' : 'amvera-kramushka-cnpg-chronoline-rw'),
+  host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'chrononinja',
   user: process.env.DB_USER || 'postgres',
@@ -82,7 +85,7 @@ app.use('/api/auth', createAuthRoutes(authController));
 // Корневой маршрут
 app.get('/', (req, res) => {
   res.json({
-    message: 'Хроно ниндзя API',
+    message: 'Хронониндзя API',
     version: '1.0.0',
     endpoints: {
       persons: '/api/persons',
@@ -99,7 +102,7 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
-    message: 'Хроно ниндзя API работает',
+    message: 'Хронониндзя API работает',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });
@@ -110,7 +113,7 @@ app.get('/api/persons', async (req, res) => {
   try {
     const { category, country, startYear, endYear } = req.query;
     
-    let query = 'SELECT * FROM persons WHERE 1=1';
+    let query = 'SELECT * FROM v_api_persons WHERE 1=1';
     const params: any[] = [];
     let paramIndex = 1;
     
@@ -154,27 +157,7 @@ app.get('/api/persons', async (req, res) => {
     
     const result = await pool.query(query, params);
     
-    // Собираем достижения сразу для всех персон (без N+1)
-    const personIds: string[] = result.rows.map((r: any) => String(r.id));
-    let achievementsByPerson: Record<string, Array<{ year: number; description: string }>> = {};
-    if (personIds.length > 0) {
-      const achRes = await pool.query(
-        'SELECT person_id, year, description FROM achievements WHERE person_id = ANY($1::text[]) ORDER BY year ASC',
-        [personIds]
-      );
-      for (const r of achRes.rows) {
-        const pid = String(r.person_id);
-        if (!achievementsByPerson[pid]) achievementsByPerson[pid] = [];
-        achievementsByPerson[pid].push({ year: r.year, description: r.description });
-      }
-    }
-
-    const persons = result.rows.map((row: any) => {
-      const ach = achievementsByPerson[String(row.id)] || [];
-      const achievements = ach.map(a => a.description).slice(0, 3);
-      const years = ach.map(a => a.year).slice(0, 3);
-      const [y1, y2, y3] = years;
-      return {
+    const persons = result.rows.map((row: any) => ({
         id: row.id,
         name: row.name,
         birthYear: row.birth_year,
@@ -184,13 +167,20 @@ app.get('/api/persons', async (req, res) => {
         category: row.category,
         country: row.country,
         description: row.description,
-        achievements,
-        achievementYear1: y1,
-        achievementYear2: y2,
-        achievementYear3: y3,
+        achievements: row.achievements || [],
+        achievementYear1: row.achievement_year_1 || null,
+        achievementYear2: row.achievement_year_2 || null,
+        achievementYear3: row.achievement_year_3 || null,
+        rulerPeriods: Array.isArray(row.ruler_periods)
+          ? row.ruler_periods.map((p: any) => ({
+              startYear: p.start_year,
+              endYear: p.end_year,
+              countryId: p.country_id,
+              countryName: p.country_name,
+            }))
+          : [],
         imageUrl: row.image_url
-      };
-    });
+      }));
     
     res.json(persons);
   } catch (error) {
@@ -215,7 +205,7 @@ app.get('/api/persons/:id', async (req, res) => {
       return;
     }
     
-    const query = 'SELECT * FROM persons WHERE id = $1';
+    const query = 'SELECT * FROM v_api_persons WHERE id = $1';
     
     const result = await pool.query(query, [id]);
     
@@ -229,13 +219,9 @@ app.get('/api/persons/:id', async (req, res) => {
     }
     
     const row = result.rows[0];
-    // Загружаем достижения для персоны (только из нормализованной таблицы)
-    const achRes = await pool.query(
-      'SELECT year, description FROM achievements WHERE person_id = $1 ORDER BY year ASC',
-      [row.id]
-    );
-    const achievements: string[] = achRes.rows.map((r: any) => r.description).slice(0, 3);
-    const [y1, y2, y3] = achRes.rows.map((r: any) => r.year).slice(0, 3);
+    // Подтягиваем агрегированные периоды
+    const periodsRes = await pool.query('SELECT periods FROM v_person_periods WHERE person_id = $1', [row.id]);
+    const periods = periodsRes.rows[0]?.periods || [];
     const person = {
       id: row.id,
       name: row.name,
@@ -246,10 +232,19 @@ app.get('/api/persons/:id', async (req, res) => {
       category: row.category,
       country: row.country,
       description: row.description,
-      achievements,
-      achievementYear1: y1,
-      achievementYear2: y2,
-      achievementYear3: y3,
+      achievements: row.achievements || [],
+      achievementYear1: row.achievement_year_1 || null,
+      achievementYear2: row.achievement_year_2 || null,
+      achievementYear3: row.achievement_year_3 || null,
+      periods,
+      rulerPeriods: Array.isArray(row.ruler_periods)
+        ? row.ruler_periods.map((p: any) => ({
+            startYear: p.start_year,
+            endYear: p.end_year,
+            countryId: p.country_id,
+            countryName: p.country_name,
+          }))
+        : [],
       imageUrl: row.image_url
     };
     
@@ -279,7 +274,7 @@ app.get('/api/persons/:id/achievements', async (req, res) => {
   }
 });
 
-app.post('/api/persons/:id/achievements', async (req, res) => {
+app.post('/api/persons/:id/achievements', authenticateToken, requireRoleMiddleware(['moderator', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const { year, description, wikipedia_url, image_url } = req.body || {};
@@ -302,7 +297,7 @@ app.post('/api/persons/:id/achievements', async (req, res) => {
   }
 });
 
-// Маршрут для получения категорий
+    // Маршрут для получения категорий
 app.get('/api/categories', async (req, res) => {
   try {
     // Пробуем сначала использовать таблицу unique_categories, если она существует
@@ -335,22 +330,8 @@ app.get('/api/categories', async (req, res) => {
 // Маршрут для получения стран
 app.get('/api/countries', async (req, res) => {
   try {
-    // Пробуем сначала использовать таблицу unique_countries, если она существует
-    let query = 'SELECT country FROM unique_countries';
-    let result = await pool.query(query);
-    
-    // Если таблица не существует, используем DISTINCT
-    if (result.rows.length === 0) {
-      query = `
-        SELECT DISTINCT country 
-        FROM persons 
-        WHERE country IS NOT NULL 
-        ORDER BY country
-      `;
-      result = await pool.query(query);
-    }
-    
-    const countries = result.rows.map(row => row.country);
+    const result = await pool.query('SELECT name FROM v_countries ORDER BY name');
+    const countries = result.rows.map(r => r.name);
     res.json(countries);
   } catch (error) {
     console.error('Error fetching countries:', error);
@@ -371,30 +352,29 @@ app.get('/api/stats', async (req, res) => {
         MIN(birth_year) as earliest_birth,
         MAX(death_year) as latest_death,
         COUNT(DISTINCT category) as unique_categories,
-        COUNT(DISTINCT country) as unique_countries
+        (SELECT COUNT(*) FROM v_countries) as unique_countries
       FROM persons
     `);
-    
+
     const categoryStatsResult = await pool.query(`
       SELECT category, COUNT(*) as count
       FROM persons
       GROUP BY category
       ORDER BY count DESC
     `);
-    
+
     const countryStatsResult = await pool.query(`
-      SELECT country, COUNT(*) as count
-      FROM persons
-      GROUP BY country
+      SELECT name AS country, persons_with_periods AS count
+      FROM v_country_stats
       ORDER BY count DESC
     `);
-    
+
     const stats = {
       overview: statsResult.rows[0],
       categories: categoryStatsResult.rows,
       countries: countryStatsResult.rows
     };
-    
+
     res.json(stats);
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -428,7 +408,7 @@ async function startServer() {
     
     // Запуск сервера
     app.listen(PORT, () => {
-      console.log(`🚀 Хроно ниндзя API сервер запущен на порту ${PORT}`);
+      console.log(`🚀 Хронониндзя API сервер запущен на порту ${PORT}`);
       console.log(`📊 API доступен по адресу: http://localhost:${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
       console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);

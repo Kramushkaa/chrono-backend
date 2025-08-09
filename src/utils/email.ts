@@ -6,7 +6,7 @@ const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Chrononinja Profiles <profiles@chrono.ninja>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Хронониндзя Профили <profiles@chrono.ninja>';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 
 let transporter: nodemailer.Transporter | null = null;

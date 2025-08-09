@@ -3,31 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-interface DatabaseConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-}
-
-// Конфигурация исходной базы данных (локальная)
-const sourceConfig: DatabaseConfig = {
-  host: 'localhost',
-  port: 5432,
-  database: 'chronoline_db',
-  user: 'postgres',
-  password: '1qwertyu'
-};
-
-// Конфигурация целевой базы данных (удаленная)
-const targetConfig: DatabaseConfig = {
-  host: 'chronoline-kramushka.db-msk0.amvera.tech',
-  port: 5432,
-  database: 'chronoline',
-  user: 'Kramushka',
-  password: '1qwertyu'
-};
+type DatabaseConfig = Pick<PoolConfig, 'host' | 'port' | 'database' | 'user' | 'password' | 'ssl'>;
 
 const createPool = (config: DatabaseConfig): Pool => {
   const poolConfig: PoolConfig = {
@@ -35,10 +11,7 @@ const createPool = (config: DatabaseConfig): Pool => {
     max: 5,
     idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 5000,
-    ssl: {
-      rejectUnauthorized: false
-    }
-  };
+  } as PoolConfig;
 
   const pool = new Pool(poolConfig);
 
@@ -53,12 +26,21 @@ async function testConnections() {
   console.log('🔍 Тестирование подключений к базам данных...\n');
 
   // Тестируем исходную базу данных
+  // Источник: SRC_DB_* или DB_*
+  const sourceConfig: DatabaseConfig = {
+    host: process.env.SRC_DB_HOST || process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.SRC_DB_PORT || process.env.DB_PORT || '5432'),
+    database: process.env.SRC_DB_NAME || process.env.DB_NAME || 'chrononinja',
+    user: process.env.SRC_DB_USER || process.env.DB_USER || 'postgres',
+    password: process.env.SRC_DB_PASSWORD || process.env.DB_PASSWORD || 'password',
+    ssl: (process.env.SRC_DB_SSL || process.env.DB_SSL) === 'true' ? { rejectUnauthorized: false } : undefined as any,
+  };
+
   console.log('📊 Исходная база данных:');
   console.log(`   Host: ${sourceConfig.host}`);
   console.log(`   Port: ${sourceConfig.port}`);
   console.log(`   Database: ${sourceConfig.database}`);
   console.log(`   User: ${sourceConfig.user}`);
-  
   const sourcePool = createPool(sourceConfig);
   
   try {
@@ -72,12 +54,21 @@ async function testConnections() {
     await sourcePool.end();
   }
 
+  // Цель: TGT_DB_* или DB_*
+  const targetConfig: DatabaseConfig = {
+    host: process.env.TGT_DB_HOST || process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.TGT_DB_PORT || process.env.DB_PORT || '5432'),
+    database: process.env.TGT_DB_NAME || process.env.DB_NAME || 'chrononinja',
+    user: process.env.TGT_DB_USER || process.env.DB_USER || 'postgres',
+    password: process.env.TGT_DB_PASSWORD || process.env.DB_PASSWORD || 'password',
+    ssl: (process.env.TGT_DB_SSL || process.env.DB_SSL) === 'true' ? { rejectUnauthorized: false } : undefined as any,
+  };
+
   console.log('\n📊 Целевая база данных:');
   console.log(`   Host: ${targetConfig.host}`);
   console.log(`   Port: ${targetConfig.port}`);
   console.log(`   Database: ${targetConfig.database}`);
   console.log(`   User: ${targetConfig.user}`);
-  
   const targetPool = createPool(targetConfig);
   
   try {

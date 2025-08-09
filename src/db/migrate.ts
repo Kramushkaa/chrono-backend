@@ -3,30 +3,25 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-interface DatabaseConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-}
+type DatabaseConfig = Pick<PoolConfig, 'host' | 'port' | 'database' | 'user' | 'password' | 'ssl'>;
 
-// Конфигурация исходной базы данных (локальная)
+// Конфигурации читаем из ENV, без хардкодов
 const sourceConfig: DatabaseConfig = {
-  host: 'localhost',
-  port: 5432,
-  database: 'chronoline_db',
-  user: 'postgres',
-  password: '1qwertyu'
+  host: process.env.SRC_DB_HOST || process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.SRC_DB_PORT || process.env.DB_PORT || '5432'),
+  database: process.env.SRC_DB_NAME || process.env.DB_NAME || 'chrononinja',
+  user: process.env.SRC_DB_USER || process.env.DB_USER || 'postgres',
+  password: process.env.SRC_DB_PASSWORD || process.env.DB_PASSWORD || 'password',
+  ssl: (process.env.SRC_DB_SSL || process.env.DB_SSL) === 'true' ? { rejectUnauthorized: false } : undefined as any,
 };
 
-// Конфигурация целевой базы данных (удаленная)
 const targetConfig: DatabaseConfig = {
-  host: 'chronoline-kramushka.db-msk0.amvera.tech',
-  port: 5432,
-  database: 'chronoline',
-  user: 'Kramushka',
-  password: '1qwertyu'
+  host: process.env.TGT_DB_HOST || process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.TGT_DB_PORT || process.env.DB_PORT || '5432'),
+  database: process.env.TGT_DB_NAME || process.env.DB_NAME || 'chrononinja',
+  user: process.env.TGT_DB_USER || process.env.DB_USER || 'postgres',
+  password: process.env.TGT_DB_PASSWORD || process.env.DB_PASSWORD || 'password',
+  ssl: (process.env.TGT_DB_SSL || process.env.DB_SSL) === 'true' ? { rejectUnauthorized: false } : undefined as any,
 };
 
 const createPool = (config: DatabaseConfig): Pool => {
@@ -35,11 +30,7 @@ const createPool = (config: DatabaseConfig): Pool => {
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
-    // SSL только для удаленной базы данных
-    ssl: config.host !== 'localhost' ? {
-      rejectUnauthorized: false
-    } : false
-  };
+  } as PoolConfig;
 
   const pool = new Pool(poolConfig);
 

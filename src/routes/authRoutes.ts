@@ -4,15 +4,13 @@ import {
   authenticateToken, 
   requireRoleMiddleware, 
   requirePermission,
-  rateLimit,
-  corsMiddleware 
+  rateLimit
 } from '../middleware/auth';
 
 export function createAuthRoutes(authController: AuthController): Router {
   const router = Router();
 
-  // Применяем CORS и rate limiting ко всем маршрутам
-  router.use(corsMiddleware);
+  // Применяем rate limiting ко всем маршрутам
   router.use(rateLimit(15 * 60 * 1000, 100)); // 100 запросов за 15 минут
 
   // Публичные маршруты (не требуют аутентификации)

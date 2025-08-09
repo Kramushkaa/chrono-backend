@@ -2,12 +2,13 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User, JWTPayload, ValidationResult, ValidationError } from '../types/auth';
+import { config as appConfig } from '../config';
 
-// Конфигурация
-const SALT_ROUNDS = 12;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
-const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+// Конфигурация (централизовано)
+const SALT_ROUNDS = appConfig.security.bcryptRounds;
+const JWT_SECRET = appConfig.jwt.secret;
+const JWT_EXPIRES_IN = appConfig.jwt.expiresIn;
+const REFRESH_TOKEN_EXPIRES_IN = appConfig.jwt.refreshExpiresIn;
 
 // Хеширование паролей
 export const hashPassword = async (password: string): Promise<string> => {

@@ -17,9 +17,9 @@ docker run --rm -p 3001:3001 \
   --name chrononinja-backend chrononinja-backend
 ```
 
-# Хроно ниндзя Backend
+# Хронониндзя Backend
 
-Backend API для проекта Хроно ниндзя - интерактивной временной шкалы исторических личностей.
+Backend API для проекта Хронониндзя — интерактивной временной шкалы исторических личностей.
 
 ## Технологии
 
@@ -42,7 +42,7 @@ npm install
 1. Установите PostgreSQL на вашу систему
 2. Создайте базу данных:
    ```sql
-   CREATE DATABASE chronoline_db;
+   CREATE DATABASE chrononinja;
    ```
 3. Скопируйте файл `env.example` в `.env` и настройте параметры подключения:
    ```bash
@@ -57,7 +57,7 @@ npm install
 # Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=chronoline_db
+DB_NAME=chrononinja
 DB_USER=postgres
 DB_PASSWORD=your_password
 
@@ -66,20 +66,13 @@ PORT=3001
 NODE_ENV=development
 
 # CORS Configuration
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGINS=http://localhost:3000
 ```
 
-### 4. Инициализация базы данных
+### 4. Структура базы данных
 
-1. Выполните SQL скрипт для создания таблиц:
-   ```bash
-   psql -d chronoline_db -f src/db/init.sql
-   ```
-
-2. Заполните базу данных начальными данными:
-   ```bash
-   npm run seed
-   ```
+- Фактическая схема описана в `DB_SCHEMA.md` (генерируется из текущей БД).
+- Для регенерации файла используйте: `npm run db:schema`.
 
 ### 5. Запуск сервера
 
@@ -88,10 +81,29 @@ npm start
 # или
 npm run dev
 # или
-node simple-server.js
+node dist/server.js
 ```
 
-**Примечание:** `npm run dev` в корне проекта запускает фронтенд, а в папке `backend/` - бэкенд.
+**Примечание:** `npm run dev` в корне проекта запускает фронтенд, а в папке `backend/` — бэкенд.
+
+### Переменные окружения для миграций/тестов (опционально)
+
+В дополнение к `DB_*` можно задавать отдельные параметры источника/цели:
+
+```
+SRC_DB_HOST=...
+SRC_DB_PORT=5432
+SRC_DB_NAME=...
+SRC_DB_USER=...
+SRC_DB_PASSWORD=...
+SRC_DB_SSL=false
+TGT_DB_HOST=...
+TGT_DB_PORT=5432
+TGT_DB_NAME=...
+TGT_DB_USER=...
+TGT_DB_PASSWORD=...
+TGT_DB_SSL=false
+```
 
 ## API Endpoints
 
@@ -130,7 +142,6 @@ GET /api/persons?category=Ученый&country=Англия&startYear=1600&endYe
 
 ```
 backend/
-├── simple-server.js         # Основной сервер
 ├── src/
 │   ├── db/
 │   │   ├── connection.ts    # Подключение к базе данных

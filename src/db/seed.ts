@@ -1062,9 +1062,10 @@ export async function seedDatabase() {
     await client.query('DELETE FROM persons');
     
     for (const person of sampleData) {
+      // Вставка персоны без legacy полей достижений
       await client.query(
-        `INSERT INTO persons (id, name, birth_year, death_year, reign_start, reign_end, category, country, description, achievements, achievement_year_1, achievement_year_2, achievement_year_3, image_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        `INSERT INTO persons (id, name, birth_year, death_year, reign_start, reign_end, category, country, description, image_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           person.id,
           person.name,
@@ -1075,13 +1076,23 @@ export async function seedDatabase() {
           person.category,
           person.country,
           person.description,
-          person.achievements,
-          person.achievementYear1 || null,
-          person.achievementYear2 || null,
-          person.achievementYear3 || null,
           person.imageUrl || null
         ]
       );
+
+      // Вставка достижений в нормализованную таблицу (только если есть год)
+      const years = [person.achievementYear1, person.achievementYear2, person.achievementYear3];
+      for (let i = 0; i < Math.min(person.achievements.length, 3); i++) {
+        const desc = person.achievements[i];
+        const yr = years[i];
+        if (typeof yr === 'number' && Number.isInteger(yr) && desc && desc.trim().length > 0) {
+          await client.query(
+            `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url)
+             VALUES ($1, $2, $3, NULL, NULL)`,
+            [person.id, yr, desc.trim()]
+          );
+        }
+      }
     }
     
     await client.query('COMMIT');

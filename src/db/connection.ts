@@ -3,33 +3,16 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-interface DatabaseConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-}
-
-// Определяем, какое подключение использовать
-const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
-
-const dbConfig: DatabaseConfig = {
-  host: process.env.DB_HOST || (isLocal ? 'chronoline-kramushka.db-msk0.amvera.tech' : 'amvera-kramushka-cnpg-chronoline-rw'),
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'chronoline',
-  user: process.env.DB_USER || 'Kramushka',
-  password: process.env.DB_PASSWORD || '1qwertyu'
-};
-
 const poolConfig: PoolConfig = {
-  ...dbConfig,
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME || 'chrononinja',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'password',
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined as any,
 };
 
 const pool = new Pool(poolConfig);

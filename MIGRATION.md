@@ -7,7 +7,7 @@
 ### 🔄 Перенесенные функции:
 
 #### 1. **Конфигурация базы данных**
-- ✅ Настройки для Amvera
+- ✅ Настройки через переменные окружения (без хардкодов)
 - ✅ SSL конфигурация
 - ✅ Пул соединений с таймаутами
 - ✅ Проверка подключения при запуске
@@ -82,7 +82,7 @@ npm install
 npm run dev
 ```
 
-### 4. **Удалите старый файл**
+### 4. **Удалите старый файл** (если ещё остался)
 ```bash
 rm simple-server.js
 ```
@@ -97,11 +97,11 @@ PORT=3001
 NODE_ENV=development
 
 # Настройки базы данных
-DB_HOST=chronoline-kramushka.db-msk0.amvera.tech
+DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=chronoline
-DB_USER=Kramushka
-DB_PASSWORD=1qwertyu
+DB_NAME=chrononinja
+DB_USER=postgres
+DB_PASSWORD=your_password
 
 # Настройки JWT (новые)
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
@@ -109,7 +109,7 @@ JWT_EXPIRES_IN=24h
 REFRESH_TOKEN_EXPIRES_IN=7d
 
 # Настройки CORS
-CORS_ORIGIN=*
+CORS_ORIGINS=*
 ```
 
 ## 📊 Тестирование совместимости

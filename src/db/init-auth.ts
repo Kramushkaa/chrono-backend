@@ -22,22 +22,14 @@ async function initAuthTables() {
     
     // Читаем SQL файлы
     const authSqlPath = path.join(__dirname, 'auth-init.sql');
-    const authSqlContent = fs.readFileSync(authSqlPath, 'utf8');
-    
-    // Выполняем SQL запросы (auth)
-    await pool.query(authSqlContent);
-
-    // Инициализация таблицы достижений (при наличии файла)
-    try {
-      const achievementsSqlPath = path.join(__dirname, 'achievements-init.sql');
-      if (fs.existsSync(achievementsSqlPath)) {
-        const achievementsSqlContent = fs.readFileSync(achievementsSqlPath, 'utf8');
-        await pool.query(achievementsSqlContent);
-        console.log('✅ Таблица achievements создана/актуализирована');
-      }
-    } catch (e) {
-      console.warn('⚠️ Не удалось инициализировать таблицу achievements:', e);
+    if (fs.existsSync(authSqlPath)) {
+      const authSqlContent = fs.readFileSync(authSqlPath, 'utf8');
+      await pool.query(authSqlContent);
+    } else {
+      console.log('ℹ️  auth-init.sql отсутствует — пропускаем инициализацию auth (схема уже применена)');
     }
+
+    // Инициализация achievements/countries/periods перенесена в миграции, файлы могут отсутствовать
     
     console.log('✅ Таблицы аутентификации успешно созданы!');
     console.log('📋 Созданы таблицы:');
