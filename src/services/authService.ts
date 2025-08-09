@@ -41,8 +41,9 @@ export class AuthService {
       throw new Error('Пользователь с таким email уже существует');
     }
 
-    if (data.username) {
-      const existingUsername = await this.getUserByUsername(data.username);
+    const desiredUsername = (data.login || data.username || undefined)?.trim();
+    if (desiredUsername) {
+      const existingUsername = await this.getUserByUsername(desiredUsername);
       if (existingUsername) {
         throw new Error('Пользователь с таким именем уже существует');
       }
@@ -61,7 +62,7 @@ export class AuthService {
       RETURNING *
     `;
 
-    const values = [data.email, passwordHash, data.username, data.full_name, emailVerificationToken, emailVerificationExpires];
+    const values = [data.email.toLowerCase(), passwordHash, desiredUsername, data.full_name, emailVerificationToken, emailVerificationExpires];
     
     try {
       const result = await this.pool.query(query, values);
@@ -82,8 +83,12 @@ export class AuthService {
       throw new Error(`Validation error: ${validation.errors.map(e => e.message).join(', ')}`);
     }
 
-    // Поиск пользователя
-    const user = await this.getUserByEmail(data.email.toLowerCase());
+    // Поиск пользователя по email или username
+    const loginIdentifier = data.login.trim();
+    const isEmail = /@/.test(loginIdentifier);
+    const user = isEmail
+      ? await this.getUserByEmail(loginIdentifier.toLowerCase())
+      : await this.getUserByUsername(loginIdentifier);
     if (!user) {
       throw new Error('Неверный email или пароль');
     }
@@ -164,16 +169,17 @@ export class AuthService {
     const values: any[] = [];
     let paramIndex = 1;
 
-    if (data.username !== undefined) {
+    const desiredLogin = (data.login !== undefined) ? (data.login ?? '') : (data.username !== undefined ? data.username ?? '' : undefined);
+    if (desiredLogin !== undefined) {
       // Проверка уникальности username
-      if (data.username) {
-        const existingUser = await this.getUserByUsername(data.username);
+      if (desiredLogin) {
+        const existingUser = await this.getUserByUsername(desiredLogin);
         if (existingUser && existingUser.id !== userId) {
           throw new Error('Пользователь с таким именем уже существует');
         }
       }
       updateFields.push(`username = $${paramIndex++}`);
-      values.push(data.username);
+      values.push(desiredLogin);
     }
 
     if (data.full_name !== undefined) {

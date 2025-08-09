@@ -154,7 +154,21 @@ app.get('/api/persons', async (req, res) => {
     
     const result = await pool.query(query, params);
     
-    const persons = result.rows.map(row => ({
+    const persons = await Promise.all(result.rows.map(async row => {
+      // Загружаем достижения для персоны из нормализованной таблицы
+      let achievements: string[] = [];
+      let achievementYears: number[] = [];
+      try {
+        const achRes = await pool.query(
+          'SELECT year, description FROM achievements WHERE person_id = $1 ORDER BY year ASC',
+          [row.id]
+        );
+        achievements = achRes.rows.map((r: any) => r.description).slice(0, 3);
+        achievementYears = achRes.rows.map((r: any) => r.year).filter((y: any) => typeof y === 'number').slice(0, 3);
+      } catch {}
+
+      const [y1, y2, y3] = achievementYears;
+      return {
       id: row.id,
       name: row.name,
       birthYear: row.birth_year,
@@ -164,12 +178,12 @@ app.get('/api/persons', async (req, res) => {
       category: row.category,
       country: row.country,
       description: row.description,
-      achievements: row.achievements,
-      achievementYear1: row.achievement_year_1,
-      achievementYear2: row.achievement_year_2,
-      achievementYear3: row.achievement_year_3,
+      achievements: achievements.length ? achievements : row.achievements,
+      achievementYear1: y1 ?? row.achievement_year_1,
+      achievementYear2: y2 ?? row.achievement_year_2,
+      achievementYear3: y3 ?? row.achievement_year_3,
       imageUrl: row.image_url
-    }));
+    }}));
     
     res.json(persons);
   } catch (error) {
@@ -208,6 +222,19 @@ app.get('/api/persons/:id', async (req, res) => {
     }
     
     const row = result.rows[0];
+    // Загружаем достижения для персоны
+    let achievements: string[] = [];
+    let achievementYears: number[] = [];
+    try {
+      const achRes = await pool.query(
+        'SELECT year, description FROM achievements WHERE person_id = $1 ORDER BY year ASC',
+        [row.id]
+      );
+      achievements = achRes.rows.map((r: any) => r.description).slice(0, 3);
+      achievementYears = achRes.rows.map((r: any) => r.year).filter((y: any) => typeof y === 'number').slice(0, 3);
+    } catch {}
+
+    const [y1, y2, y3] = achievementYears;
     const person = {
       id: row.id,
       name: row.name,
@@ -218,10 +245,10 @@ app.get('/api/persons/:id', async (req, res) => {
       category: row.category,
       country: row.country,
       description: row.description,
-      achievements: row.achievements,
-      achievementYear1: row.achievement_year_1,
-      achievementYear2: row.achievement_year_2,
-      achievementYear3: row.achievement_year_3,
+      achievements: achievements.length ? achievements : row.achievements,
+      achievementYear1: y1 ?? row.achievement_year_1,
+      achievementYear2: y2 ?? row.achievement_year_2,
+      achievementYear3: y3 ?? row.achievement_year_3,
       imageUrl: row.image_url
     };
     
@@ -233,6 +260,44 @@ app.get('/api/persons/:id', async (req, res) => {
       error: 'Database error',
       message: 'Ошибка при получении данных'
     });
+  }
+});
+
+// CRUD для достижений (минимально: список по персоне и создание)
+app.get('/api/persons/:id/achievements', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT id, person_id, year, description, wikipedia_url, image_url FROM achievements WHERE person_id = $1 ORDER BY year ASC',
+      [id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error fetching achievements:', error);
+    res.status(500).json({ success: false, message: 'Ошибка при получении достижений' });
+  }
+});
+
+app.post('/api/persons/:id/achievements', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { year, description, wikipedia_url, image_url } = req.body || {};
+    if (!description || description.length < 2) {
+      res.status(400).json({ success: false, message: 'Описание достижения обязательно' });
+      return;
+    }
+    if (typeof year !== 'number' || !Number.isInteger(year)) {
+      res.status(400).json({ success: false, message: 'Год достижения обязателен и должен быть целым числом' });
+      return;
+    }
+    const result = await pool.query(
+      'INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [id, year, description, wikipedia_url ?? null, image_url ?? null]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating achievement:', error);
+    res.status(500).json({ success: false, message: 'Ошибка при создании достижения' });
   }
 });
 

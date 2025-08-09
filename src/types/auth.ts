@@ -47,17 +47,20 @@ export interface RolePermission {
 export interface RegisterRequest {
   email: string;
   password: string;
-  username?: string;
+  username?: string; // legacy alias, keep for backward compatibility
+  login?: string;    // preferred alias for username
   full_name?: string;
 }
 
 export interface LoginRequest {
-  email: string;
+  // Single field that may contain either email or username
+  login: string;
   password: string;
 }
 
 export interface UpdateProfileRequest {
-  username?: string;
+  username?: string; // legacy alias, keep for backward compatibility
+  login?: string;    // preferred alias for username
   full_name?: string;
   avatar_url?: string;
 }

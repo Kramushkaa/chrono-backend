@@ -117,6 +117,7 @@ export const validateRegisterData = (data: {
   email: string;
   password: string;
   username?: string;
+  login?: string;
   full_name?: string;
 }): ValidationResult => {
   const errors: ValidationError[] = [];
@@ -134,9 +135,10 @@ export const validateRegisterData = (data: {
     errors.push(...passwordValidation.errors);
   }
   
-  // Валидация username (если предоставлен)
-  if (data.username) {
-    const usernameValidation = validateUsername(data.username);
+  // Валидация username/login (если предоставлен)
+  const providedLogin = data.login || data.username;
+  if (providedLogin) {
+    const usernameValidation = validateUsername(providedLogin);
     if (!usernameValidation.isValid) {
       errors.push(...usernameValidation.errors);
     }
@@ -144,7 +146,7 @@ export const validateRegisterData = (data: {
   
   // Валидация full_name (если предоставлен)
   if (data.full_name && data.full_name.length > 255) {
-    errors.push({ field: 'full_name', message: 'Полное имя не должно превышать 255 символов' });
+    errors.push({ field: 'full_name', message: 'Имя пользователя не должно превышать 255 символов' });
   }
   
   return {
@@ -155,13 +157,13 @@ export const validateRegisterData = (data: {
 
 // Валидация входа
 export const validateLoginData = (data: {
-  email: string;
+  login: string; // may be email or username
   password: string;
 }): ValidationResult => {
   const errors: ValidationError[] = [];
   
-  if (!data.email) {
-    errors.push({ field: 'email', message: 'Email обязателен' });
+  if (!data.login) {
+    errors.push({ field: 'login', message: 'Логин обязателен' });
   }
   
   if (!data.password) {

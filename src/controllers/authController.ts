@@ -71,8 +71,12 @@ export class AuthController {
   // Вход пользователя
   async login(req: Request, res: Response): Promise<void> {
     try {
-      console.log('🔐 Login attempt:', { email: (req.body && req.body.email) || 'no-body', bodyType: typeof req.body });
-      const loginData: LoginRequest = req.body;
+      console.log('🔐 Login attempt:', { login: (req.body && (req.body.login || req.body.email)) || 'no-body', bodyType: typeof req.body });
+      // Support legacy { email, password } and new { login, password }
+      const loginData: LoginRequest = {
+        login: (req.body && (req.body.login || req.body.email)) || '',
+        password: (req.body && req.body.password) || ''
+      };
       const result = await this.authService.loginUser(loginData);
 
       res.status(200).json({
