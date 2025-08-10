@@ -7,6 +7,7 @@ import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler, authenticateToken, requireRoleMiddleware } from './middleware/auth';
 import { validateConfig } from './config';
+import { createPersonRoutes } from './routes/personRoutes';
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -81,6 +82,8 @@ app.use(logRequest);
 
 // Маршруты аутентификации
 app.use('/api/auth', createAuthRoutes(authController));
+// Маршруты управления персонами (создание/модерация)
+app.use('/api', createPersonRoutes(pool));
 
 // Корневой маршрут
 app.get('/', (req, res) => {
