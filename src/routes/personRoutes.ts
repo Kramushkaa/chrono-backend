@@ -76,7 +76,7 @@ export function createPersonRoutes(pool: Pool) {
            updated_by=$10,
            reviewed_at=NOW(),
            reviewed_by=$10`,
-        [id, name, birthYear, deathYear, category, country, description, imageUrl ?? null, wikiLink ?? null, req.user!.userId]
+        [id, name, birthYear, deathYear, category, country, description, imageUrl ?? null, wikiLink ?? null, (req as any).user!.sub]
       );
       res.json({ success: true });
     } catch (e) {
@@ -109,7 +109,7 @@ export function createPersonRoutes(pool: Pool) {
            status='pending',
            updated_by=$10,
            submitted_at=NOW()`,
-        [id, name, birthYear, deathYear, category, country, description, imageUrl ?? null, wikiLink ?? null, req.user!.userId]
+        [id, name, birthYear, deathYear, category, country, description, imageUrl ?? null, wikiLink ?? null, (req as any).user!.sub]
       );
       res.json({ success: true });
     } catch (e) {
@@ -130,12 +130,12 @@ export function createPersonRoutes(pool: Pool) {
       if (action === 'approve') {
         await pool.query(
           `UPDATE persons SET status='approved', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
-          [id, req.user!.userId, comment ?? null]
+          [id, (req as any).user!.sub, comment ?? null]
         );
       } else if (action === 'reject') {
         await pool.query(
           `UPDATE persons SET status='rejected', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
-          [id, req.user!.userId, comment ?? null]
+          [id, (req as any).user!.sub, comment ?? null]
         );
       } else {
         res.status(400).json({ success: false, message: 'action должен быть approve или reject' });
@@ -161,7 +161,7 @@ export function createPersonRoutes(pool: Pool) {
       const result = await pool.query(
         `INSERT INTO person_edits (person_id, proposer_user_id, payload, status)
          VALUES ($1,$2,$3,'pending') RETURNING id, created_at`,
-        [id, (req as any).user!.userId, payload]
+        [id, (req as any).user!.sub, payload]
       );
       res.status(201).json({ success: true, data: result.rows[0] });
     } catch (e) {
@@ -246,7 +246,7 @@ export function createPersonRoutes(pool: Pool) {
       const result = await pool.query(
         `SELECT id, status, created_at, reviewed_at, review_comment
            FROM person_edits WHERE person_id=$1 AND proposer_user_id=$2 ORDER BY created_at DESC`,
-        [id, (req as any).user!.userId]
+        [id, (req as any).user!.sub]
       );
       res.json({ success: true, data: result.rows });
     } catch (e) {
