@@ -28,6 +28,7 @@
     "email:test": "ts-node src/utils/send-test-email.ts",
     "db:schema": "ts-node src/db/introspect.ts",
     "db:fix": "ts-node src/db/fix-inconsistencies.ts",
+    "migrate:add-wiki": "ts-node src/db/migrate-add-wiki-link.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

@@ -113,7 +113,7 @@ app.get('/api/persons', async (req, res) => {
   try {
     const { category, country, startYear, endYear } = req.query;
     
-    let query = 'SELECT * FROM v_api_persons WHERE 1=1';
+    let query = 'SELECT vap.*, p.wiki_link FROM v_api_persons vap JOIN persons p ON p.id = vap.id WHERE 1=1';
     const params: any[] = [];
     let paramIndex = 1;
     
@@ -167,6 +167,7 @@ app.get('/api/persons', async (req, res) => {
         category: row.category,
         country: row.country,
         description: row.description,
+        wikiLink: row.wiki_link || null,
         achievements: row.achievements || [],
         achievementYear1: row.achievement_year_1 || null,
         achievementYear2: row.achievement_year_2 || null,
@@ -205,7 +206,7 @@ app.get('/api/persons/:id', async (req, res) => {
       return;
     }
     
-    const query = 'SELECT * FROM v_api_persons WHERE id = $1';
+    const query = 'SELECT vap.*, p.wiki_link FROM v_api_persons vap JOIN persons p ON p.id = vap.id WHERE vap.id = $1';
     
     const result = await pool.query(query, [id]);
     
@@ -232,6 +233,7 @@ app.get('/api/persons/:id', async (req, res) => {
       category: row.category,
       country: row.country,
       description: row.description,
+      wikiLink: row.wiki_link || null,
       achievements: row.achievements || [],
       achievementYear1: row.achievement_year_1 || null,
       achievementYear2: row.achievement_year_2 || null,
