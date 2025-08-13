@@ -172,7 +172,7 @@ app.get('/api/persons', asyncHandler(async (req: any, res: any) => {
     let query = `SELECT v.* FROM v_api_persons v JOIN persons p2 ON p2.id = v.id AND p2.status = 'approved'` + where;
 
     // Сортировка и пагинация (единый формат ответа)
-    query += ' ORDER BY birth_year ASC';
+    query += ' ORDER BY v.birth_year ASC, v.id ASC';
     const limitParam = Math.min(parseInt((req.query.limit as string) || '100'), 1000);
     const offsetParam = Math.max(parseInt((req.query.offset as string) || '0'), 0);
     query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
@@ -873,7 +873,8 @@ app.get('/api/persons/lookup/by-ids', asyncHandler(async (req: any, res: any) =>
   const ids = raw.split(',').map((s: string) => s.trim()).filter(Boolean);
   const sql = `
     WITH req_ids AS (
-      SELECT UNNEST($1::text[]) WITH ORDINALITY AS id, ord
+      SELECT ($1::text[])[g.ord] AS id, g.ord
+        FROM generate_series(1, COALESCE(array_length($1::text[], 1), 0)) AS g(ord)
     )
     SELECT v.*
       FROM req_ids r
@@ -915,7 +916,8 @@ app.get('/api/achievements/lookup/by-ids', asyncHandler(async (req: any, res: an
   if (ids.length === 0) { res.json({ success: true, data: [] }); return; }
   const sql = `
     WITH req_ids AS (
-      SELECT UNNEST($1::int[]) WITH ORDINALITY AS id, ord
+      SELECT ($1::int[])[g.ord] AS id, g.ord
+        FROM generate_series(1, COALESCE(array_length($1::int[], 1), 0)) AS g(ord)
     )
     SELECT a.id,
            a.person_id,
@@ -947,7 +949,8 @@ app.get('/api/periods/lookup/by-ids', asyncHandler(async (req: any, res: any) =>
   if (ids.length === 0) { res.json({ success: true, data: [] }); return; }
   const sql = `
     WITH req_ids AS (
-      SELECT UNNEST($1::int[]) WITH ORDINALITY AS id, ord
+      SELECT ($1::int[])[g.ord] AS id, g.ord
+        FROM generate_series(1, COALESCE(array_length($1::int[], 1), 0)) AS g(ord)
     )
     SELECT pr.id,
            pr.person_id,
