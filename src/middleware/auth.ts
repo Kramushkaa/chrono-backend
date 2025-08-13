@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ApiError } from '../utils/errors';
 import { verifyAccessToken, hasPermission, requireRole } from '../utils/auth';
 import { JWTPayload } from '../types/auth';
 
@@ -139,27 +140,19 @@ export const logRequest = (req: Request, res: Response, next: NextFunction): voi
 // Middleware для обработки ошибок
 export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction): void => {
   console.error('Error:', err);
-
-  if (err.name === 'ValidationError') {
-    res.status(400).json({ 
-      error: 'Validation Error', 
-      message: err.message 
-    });
+  if (err instanceof ApiError) {
+    res.status(err.status).json({ success: false, code: err.code, message: err.message, details: err.details })
+    return
+  }
+  if ((err as any)?.name === 'ValidationError') {
+    res.status(400).json({ success: false, code: 'validation_error', message: err.message });
     return;
   }
-
-  if (err.name === 'UnauthorizedError') {
-    res.status(401).json({ 
-      error: 'Unauthorized', 
-      message: 'Недействительный токен' 
-    });
+  if ((err as any)?.name === 'UnauthorizedError') {
+    res.status(401).json({ success: false, code: 'unauthorized', message: 'Недействительный токен' });
     return;
   }
-
-  res.status(500).json({ 
-    error: 'Internal Server Error', 
-    message: 'Внутренняя ошибка сервера' 
-  });
+  res.status(500).json({ success: false, code: 'internal_error', message: 'Внутренняя ошибка сервера' });
 };
 
 // Middleware для CORS

@@ -1,0 +1,32 @@
+{
+  "name": "@chronoline/dto",
+  "version": "0.1.0",
+  "description": "Shared DTO schemas and types for Chronoline FE/BE",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas.d.ts",
+      "default": "./dist/schemas.js"
+    },
+    "./types": "./dist/types.d.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p .",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.2",
+    "rimraf": "^5.0.5"
+  }
+}
+
+
