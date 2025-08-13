@@ -117,7 +117,8 @@ app.get('/api/persons', asyncHandler(async (req: any, res: any) => {
     const startYear = (req.query.startYear ?? req.query.year_from) as any;
     const endYear = (req.query.endYear ?? req.query.year_to) as any;
     
-    let query = 'SELECT * FROM v_api_persons WHERE 1=1';
+    // Build WHERE conditions against alias `v` to avoid ambiguity after JOIN
+    let where = ' WHERE 1=1';
     const params: any[] = [];
     let paramIndex = 1;
     
@@ -126,7 +127,7 @@ app.get('/api/persons', asyncHandler(async (req: any, res: any) => {
       const categoryArray = Array.isArray(category) 
         ? category 
         : category.toString().split(',');
-      query += ` AND category = ANY($${paramIndex}::text[])`;
+      where += ` AND v.category = ANY($${paramIndex}::text[])`;
       params.push(categoryArray);
       paramIndex++;
     }
@@ -136,10 +137,10 @@ app.get('/api/persons', asyncHandler(async (req: any, res: any) => {
       const countryArray = Array.isArray(country) 
         ? (country as string[])
         : country.toString().split(',').map((c: string) => c.trim());
-      query += ` AND (
-        (country_names IS NOT NULL AND country_names && $${paramIndex}::text[])
-        OR (country_names IS NULL AND EXISTS (
-          SELECT 1 FROM unnest(string_to_array(country, '/')) AS c
+      where += ` AND (
+        (v.country_names IS NOT NULL AND v.country_names && $${paramIndex}::text[])
+        OR (v.country_names IS NULL AND EXISTS (
+          SELECT 1 FROM unnest(string_to_array(v.country, '/')) AS c
           WHERE trim(c) = ANY($${paramIndex}::text[])
         ))
       )`;
@@ -149,26 +150,26 @@ app.get('/api/persons', asyncHandler(async (req: any, res: any) => {
     
     // Фильтрация по годам
     if (startYear) {
-      query += ` AND death_year >= $${paramIndex}`;
+      where += ` AND v.death_year >= $${paramIndex}`;
       params.push(parseInt(startYear.toString()));
       paramIndex++;
     }
     
     if (endYear) {
-      query += ` AND birth_year <= $${paramIndex}`;
+      where += ` AND v.birth_year <= $${paramIndex}`;
       params.push(parseInt(endYear.toString()));
       paramIndex++;
     }
     // Поиск (имя/категория/страна/описание)
     const search = (q || '').toString().trim();
     if (search.length > 0) {
-      query += ` AND (name ILIKE $${paramIndex} OR category ILIKE $${paramIndex} OR country ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`;
+      where += ` AND (v.name ILIKE $${paramIndex} OR v.category ILIKE $${paramIndex} OR v.country ILIKE $${paramIndex} OR v.description ILIKE $${paramIndex})`;
       params.push(`%${search}%`);
       paramIndex++;
     }
 
     // Только одобренные по умолчанию (используем JOIN для оптимизации)
-    query = `SELECT v.* FROM v_api_persons v JOIN persons p2 ON p2.id = v.id AND p2.status = 'approved' WHERE 1=1` + query.slice('SELECT * FROM v_api_persons WHERE 1=1'.length);
+    let query = `SELECT v.* FROM v_api_persons v JOIN persons p2 ON p2.id = v.id AND p2.status = 'approved'` + where;
 
     // Сортировка и пагинация (единый формат ответа)
     query += ' ORDER BY birth_year ASC';
