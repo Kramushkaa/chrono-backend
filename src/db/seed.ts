@@ -1074,7 +1074,7 @@ export async function seedDatabase() {
     await client.query('DELETE FROM persons');
     
     for (const person of sampleData) {
-      // Вставка персоны без legacy полей достижений
+      // Вставка Личности без legacy полей достижений
       await client.query(
         `INSERT INTO persons (id, name, birth_year, death_year, reign_start, reign_end, category, country, description, image_url)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,

@@ -1,7 +1,7 @@
 {
-  "name": "@chronoline/dto",
+  "name": "@chrononinja/dto",
   "version": "0.1.0",
-  "description": "Shared DTO schemas and types for Chronoline FE/BE",
+  "description": "Shared DTO schemas and types for Chrononinja FE/BE",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
