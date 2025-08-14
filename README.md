@@ -13,7 +13,7 @@ docker run --rm -p 3001:3001 \
   -e DB_HOST=... -e DB_PORT=5432 -e DB_NAME=chrononinja -e DB_USER=postgres -e DB_PASSWORD=... \
   -e DB_SSL=false \
   -e JWT_SECRET=... -e JWT_EXPIRES_IN=24h -e REFRESH_TOKEN_EXPIRES_IN=7d \
-  -e CORS_ORIGINS=chrono.ninja,*.chrono.ninja,http://localhost:3000 \
+  -e CORS="https://chrono.ninja,.chrono.ninja,http://localhost:3000" \
   --name chrononinja-backend chrononinja-backend
 ```
 
@@ -65,8 +65,8 @@ DB_PASSWORD=your_password
 PORT=3001
 NODE_ENV=development
 
-# CORS Configuration
-CORS_ORIGINS=http://localhost:3000
+# CORS Configuration (supports patterns like *.domain and .domain)
+CORS=http://localhost:3000
 ```
 
 ### 4. Структура базы данных

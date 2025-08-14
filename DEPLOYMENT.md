@@ -16,7 +16,7 @@
 ### 2. Структура проекта
 
 ```
-chronoline-backend-only/
+chrononinja-backend/
 ├── Dockerfile           # Сборка контейнера
 ├── dist/server.js       # Скомпилированный сервер (после npm run build)
 ├── package.json         # Зависимости/скрипты
@@ -34,7 +34,7 @@ chronoline-backend-only/
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` — доступ к БД
 - `DB_SSL` — `true/false` (включить SSL, если требуется)
 - `JWT_SECRET`, `JWT_EXPIRES_IN`, `REFRESH_TOKEN_EXPIRES_IN`
-- `CORS_ORIGINS` — список доменов (через запятую), для которых разрешён доступ
+- `CORS` — список доменов (через запятую), для которых разрешён доступ (поддерживаются шаблоны `*.domain` и `.domain`)
 
 ## Процесс развертывания
 

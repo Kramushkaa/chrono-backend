@@ -4,6 +4,7 @@ import { UpsertPersonSchema, LifePeriodsSchema, PersonEditPayloadSchema, Achieve
 import { Pool } from 'pg';
 import { authenticateToken, requireRoleMiddleware } from '../middleware/auth';
 import { ApiError, errors, mapPgError, asyncHandler } from '../utils/errors';
+import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../utils/api'
 
 export function createPersonRoutes(pool: Pool) {
   const router = Router();
@@ -58,7 +59,7 @@ export function createPersonRoutes(pool: Pool) {
   // Admin/Moderator: create or upsert person immediately (approved)
   router.post('/admin/persons', authenticateToken, requireRoleMiddleware(['admin', 'moderator']), asyncHandler(async (req: Request, res: Response) => {
       const parsed = UpsertPersonSchema.safeParse(req.body || {})
-      if (!parsed.success) throw errors.badRequest('Некорректные данные персоны', 'validation_error', parsed.error.flatten())
+      if (!parsed.success) throw errors.badRequest('Некорректные данные Личности', 'validation_error', parsed.error.flatten())
       const { id, name, birthYear, deathYear, category, description, imageUrl, wikiLink } = parsed.data
       await pool.query(
       `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by)
@@ -80,10 +81,143 @@ export function createPersonRoutes(pool: Pool) {
       res.json({ success: true });
   }))
 
+  // --- Public persons listing with filters/pagination ---
+  router.get('/persons', asyncHandler(async (req: any, res: any) => {
+    const { category, country, q } = req.query as any;
+    const startYear = (req.query.startYear ?? req.query.year_from) as any;
+    const endYear = (req.query.endYear ?? req.query.year_to) as any;
+    let where = ' WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
+    if (category) {
+      const categoryArray = Array.isArray(category) ? category : category.toString().split(',');
+      where += ` AND v.category = ANY($${paramIndex}::text[])`;
+      params.push(categoryArray);
+      paramIndex++;
+    }
+    if (country) {
+      const countryArray = Array.isArray(country) ? (country as string[]) : country.toString().split(',').map((c: string) => c.trim());
+      where += ` AND (
+        (v.country_names IS NOT NULL AND v.country_names && $${paramIndex}::text[])
+        OR (v.country_names IS NULL AND EXISTS (
+          SELECT 1 FROM unnest(string_to_array(v.country, '/')) AS c
+          WHERE trim(c) = ANY($${paramIndex}::text[])
+        ))
+      )`;
+      params.push(countryArray);
+      paramIndex++;
+    }
+    if (startYear) { where += ` AND v.death_year >= $${paramIndex}`; params.push(parseInt(startYear.toString())); paramIndex++; }
+    if (endYear) { where += ` AND v.birth_year <= $${paramIndex}`; params.push(parseInt(endYear.toString())); paramIndex++; }
+    const search = (q || '').toString().trim();
+    if (search.length > 0) {
+      where += ` AND (v.name ILIKE $${paramIndex} OR v.category ILIKE $${paramIndex} OR v.country ILIKE $${paramIndex} OR v.description ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+    let query = `SELECT v.* FROM v_api_persons v JOIN persons p2 ON p2.id = v.id AND p2.status = 'approved'` + where;
+    query += ' ORDER BY v.birth_year ASC, v.id ASC';
+    const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 100, maxLimit: 1000 });
+    query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limitParam + 1, offsetParam);
+    const result = await pool.query(query, params);
+    const persons = result.rows.map(mapApiPersonRow);
+    const { data, meta } = paginateRows(persons, limitParam, offsetParam);
+    res.json({ success: true, data, meta });
+  }))
+
+  // Moderation queue for persons
+  router.get('/admin/persons/moderation', authenticateToken, requireRoleMiddleware(['moderator', 'admin']), asyncHandler(async (req: any, res: any) => {
+    const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 200, maxLimit: 500 });
+    const countOnly = String(req.query.count || 'false') === 'true';
+    const baseTargetsSql = `
+      WITH targets AS (
+        SELECT p.id FROM persons p WHERE p.status = 'pending'
+        UNION
+        SELECT DISTINCT pr.person_id FROM periods pr WHERE pr.status = 'pending' AND pr.person_id IS NOT NULL
+        UNION
+        SELECT DISTINCT pe.person_id FROM person_edits pe WHERE pe.status = 'pending'
+      )`;
+    if (countOnly) {
+      const result = await pool.query(`${baseTargetsSql} SELECT COUNT(*)::int AS cnt FROM targets`);
+      res.json({ success: true, data: { count: result.rows[0]?.cnt || 0 } });
+      return;
+    }
+    const sql = `${baseTargetsSql}
+      SELECT v.*
+        FROM v_api_persons v
+        JOIN targets t ON t.id = v.id
+       ORDER BY v.name ASC
+       LIMIT $1 OFFSET $2`;
+    const result = await pool.query(sql, [limitParam + 1, offsetParam]);
+    const persons = result.rows.map(mapApiPersonRow);
+    const { data, meta } = paginateRows(persons, limitParam, offsetParam);
+    res.json({ success: true, data, meta });
+  }))
+
+  // Persons created by current user
+  router.get('/persons/mine', authenticateToken, asyncHandler(async (req: any, res: any) => {
+    const userId = req.user?.sub;
+    if (!userId) { throw errors.unauthorized('Требуется аутентификация'); }
+    const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 200, maxLimit: 500 });
+    const countOnly = String(req.query.count || 'false') === 'true';
+    if (countOnly) {
+      const c = await pool.query(`SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1`, [userId]);
+      res.json({ success: true, data: { count: c.rows[0]?.cnt || 0 } });
+      return;
+    }
+    const sql = `
+      SELECT v.*
+        FROM v_api_persons v
+        JOIN persons p ON p.id = v.id
+       WHERE p.created_by = $1
+       ORDER BY p.created_at DESC NULLS LAST
+       LIMIT $2 OFFSET $3`;
+    const result = await pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const persons = result.rows.map(mapApiPersonRow);
+    const { data, meta } = paginateRows(persons, limitParam, offsetParam);
+    res.json({ success: true, data, meta });
+  }))
+
+  // Person details
+  router.get('/persons/:id', asyncHandler(async (req: any, res: any) => {
+    const { id } = req.params;
+    if (!id) { throw errors.badRequest('ID не указан') }
+    const result = await pool.query('SELECT * FROM v_api_persons WHERE id = $1', [id]);
+    if (result.rows.length === 0) { throw errors.notFound('Историческая Личность не найдена') }
+    const row = result.rows[0];
+    const periodsRes = await pool.query('SELECT periods FROM v_person_periods WHERE person_id = $1', [row.id]);
+    const periods = periodsRes.rows[0]?.periods || [];
+    const person = {
+      ...mapApiPersonRow(row),
+      periods,
+    };
+    res.json({ success: true, data: person });
+  }))
+
+  // Persons lookup by ids (ordered)
+  router.get('/persons/lookup/by-ids', asyncHandler(async (req: any, res: any) => {
+    const raw = (req.query.ids || '').toString().trim();
+    if (!raw) { res.json({ success: true, data: [] }); return; }
+    const ids = raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+    const sql = `
+      WITH req_ids AS (
+        SELECT ($1::text[])[g.ord] AS id, g.ord
+          FROM generate_series(1, COALESCE(array_length($1::text[], 1), 0)) AS g(ord)
+      )
+      SELECT v.*
+        FROM req_ids r
+        JOIN v_api_persons v ON v.id = r.id
+       ORDER BY r.ord ASC`;
+    const result = await pool.query(sql, [ids]);
+    const persons = result.rows.map(mapApiPersonRow);
+    res.json({ success: true, data: persons });
+  }))
+
   // User: propose person (pending review)
   router.post('/persons/propose', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
       const parsed = UpsertPersonSchema.safeParse(req.body || {})
-      if (!parsed.success) throw errors.badRequest('Некорректные данные персоны', 'validation_error', parsed.error.flatten())
+      if (!parsed.success) throw errors.badRequest('Некорректные данные Личности', 'validation_error', parsed.error.flatten())
       const { id, name, birthYear, deathYear, category, description, imageUrl, wikiLink } = parsed.data
     // создаем запись/обновляем как pending
       await pool.query(
@@ -181,18 +315,15 @@ export function createPersonRoutes(pool: Pool) {
       const periods: Array<{ country_id: number; start_year: number; end_year: number; period_type?: string }> = parsed.data.periods
       const personRes = await client.query('SELECT birth_year, death_year FROM persons WHERE id=$1', [id]);
       if (personRes.rowCount === 0) {
-        res.status(404).json({ success: false, message: 'Персона не найдена' });
-        return;
+        throw errors.notFound('Личность не найдена')
       }
       const birth: number = Number(personRes.rows[0].birth_year);
       const death: number = Number(personRes.rows[0].death_year);
       if (!Number.isInteger(birth) || !Number.isInteger(death) || birth > death) {
-        res.status(400).json({ success: false, message: 'Некорректные годы жизни персоны' });
-        return;
+        throw errors.badRequest('Некорректные годы жизни Личности')
       }
       if (periods.length === 0) {
-        res.status(400).json({ success: false, message: 'Нужно передать хотя бы одну страну' });
-        return;
+        throw errors.badRequest('Нужно передать хотя бы одну страну')
       }
       // Normalize: when only one country, fill full lifespan
       let norm = periods.map(p => ({ country_id: Number(p.country_id), start_year: Number(p.start_year), end_year: Number(p.end_year) }));
@@ -203,33 +334,28 @@ export function createPersonRoutes(pool: Pool) {
       // Validate countries and years
       for (const p of norm) {
         if (!Number.isInteger(p.country_id) || p.country_id <= 0) {
-          res.status(400).json({ success: false, message: 'Некорректная страна' });
-          return;
+          throw errors.badRequest('Некорректная страна')
         }
         if (!Number.isInteger(p.start_year) || !Number.isInteger(p.end_year) || p.start_year > p.end_year) {
-          res.status(400).json({ success: false, message: 'Некорректный период проживания' });
-          return;
+          throw errors.badRequest('Некорректный период проживания')
         }
       }
       // Sort by start_year
       norm.sort((a, b) => a.start_year - b.start_year || a.end_year - b.end_year);
       // Check coverage and overlap (no overlaps allowed)
       if (norm[0].start_year > birth || norm[norm.length - 1].end_year < death) {
-        res.status(400).json({ success: false, message: 'Периоды должны покрывать все годы жизни' });
-        return;
+        throw errors.badRequest('Периоды должны покрывать все годы жизни')
       }
       for (let i = 1; i < norm.length; i++) {
         const prev = norm[i - 1];
         const cur = norm[i];
         // Allow shared boundary, forbid overlap
         if (cur.start_year < prev.end_year) {
-          res.status(400).json({ success: false, message: 'Периоды стран не должны пересекаться' });
-          return;
+          throw errors.badRequest('Периоды стран не должны пересекаться')
         }
         // Ensure no gaps in coverage
         if (cur.start_year > prev.end_year + 1) {
-          res.status(400).json({ success: false, message: 'Периоды стран должны покрывать все годы жизни без пропусков' });
-          return;
+          throw errors.badRequest('Периоды стран должны покрывать все годы жизни без пропусков')
         }
       }
       await client.query('BEGIN');

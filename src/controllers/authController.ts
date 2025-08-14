@@ -9,6 +9,7 @@ import {
   ResetPasswordRequest,
   VerifyEmailRequest
 } from '../types/auth';
+import { errors } from '../utils/errors';
 
 export class AuthController {
   private authService: AuthService;
@@ -18,7 +19,7 @@ export class AuthController {
   }
 
   // Регистрация пользователя
-  async register(req: Request, res: Response): Promise<void> {
+  async register(req: Request, res: Response, next: any): Promise<void> {
     try {
       const userData: RegisterRequest = req.body;
       const user = await this.authService.registerUser(userData);
@@ -60,16 +61,12 @@ export class AuthController {
         }
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        error: 'Registration failed',
-        message: error instanceof Error ? error.message : 'Ошибка при регистрации'
-      });
+      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при регистрации'));
     }
   }
 
   // Вход пользователя
-  async login(req: Request, res: Response): Promise<void> {
+  async login(req: Request, res: Response, next: any): Promise<void> {
     try {
       console.log('🔐 Login attempt:', { login: (req.body && (req.body.login || req.body.email)) || 'no-body', bodyType: typeof req.body });
       // Support legacy { email, password } and new { login, password }
@@ -98,26 +95,17 @@ export class AuthController {
       });
     } catch (error) {
       console.error('🔐 Login error:', error);
-      res.status(401).json({
-        success: false,
-        error: 'Authentication failed',
-        message: error instanceof Error ? error.message : 'Ошибка при входе'
-      });
+      next(errors.unauthorized(error instanceof Error ? error.message : 'Ошибка при входе'));
     }
   }
 
   // Обновление токена доступа
-  async refreshToken(req: Request, res: Response): Promise<void> {
+  async refreshToken(req: Request, res: Response, next: any): Promise<void> {
     try {
       const { refresh_token } = req.body;
       
       if (!refresh_token) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing refresh token',
-          message: 'Refresh токен обязателен'
-        });
-        return;
+        return next(errors.badRequest('Refresh токен обязателен', 'missing_refresh_token'));
       }
 
       const result = await this.authService.refreshAccessToken(refresh_token);
@@ -140,27 +128,18 @@ export class AuthController {
         }
       });
     } catch (error) {
-      res.status(401).json({
-        success: false,
-        error: 'Token refresh failed',
-        message: error instanceof Error ? error.message : 'Ошибка при обновлении токена'
-      });
+      next(errors.unauthorized(error instanceof Error ? error.message : 'Ошибка при обновлении токена'));
     }
   }
 
   // Выход пользователя
-  async logout(req: Request, res: Response): Promise<void> {
+  async logout(req: Request, res: Response, next: any): Promise<void> {
     try {
       const { refresh_token } = req.body;
       const userId = req.user?.sub;
 
       if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: 'Unauthorized',
-          message: 'Требуется аутентификация'
-        });
-        return;
+        return next(errors.unauthorized('Требуется аутентификация'));
       }
 
       if (refresh_token) {
@@ -172,26 +151,17 @@ export class AuthController {
         message: 'Успешный выход'
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Logout failed',
-        message: error instanceof Error ? error.message : 'Ошибка при выходе'
-      });
+      next(errors.server(error instanceof Error ? error.message : 'Ошибка при выходе'));
     }
   }
 
   // Получение профиля пользователя
-  async getProfile(req: Request, res: Response): Promise<void> {
+  async getProfile(req: Request, res: Response, next: any): Promise<void> {
     try {
       const userId = req.user?.sub;
       
       if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: 'Unauthorized',
-          message: 'Требуется аутентификация'
-        });
-        return;
+        return next(errors.unauthorized('Требуется аутентификация'));
       }
 
       const user = await this.authService.getUserProfile(userId);
@@ -213,27 +183,18 @@ export class AuthController {
         }
       });
     } catch (error) {
-      res.status(404).json({
-        success: false,
-        error: 'Profile not found',
-        message: error instanceof Error ? error.message : 'Профиль не найден'
-      });
+      next(errors.notFound(error instanceof Error ? error.message : 'Профиль не найден'));
     }
   }
 
   // Обновление профиля пользователя
-  async updateProfile(req: Request, res: Response): Promise<void> {
+  async updateProfile(req: Request, res: Response, next: any): Promise<void> {
     try {
       const userId = req.user?.sub;
       const updateData: UpdateProfileRequest = req.body;
 
       if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: 'Unauthorized',
-          message: 'Требуется аутентификация'
-        });
-        return;
+        return next(errors.unauthorized('Требуется аутентификация'));
       }
 
       const user = await this.authService.updateUserProfile(userId, updateData);
@@ -255,27 +216,18 @@ export class AuthController {
         }
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        error: 'Profile update failed',
-        message: error instanceof Error ? error.message : 'Ошибка при обновлении профиля'
-      });
+      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при обновлении профиля'));
     }
   }
 
   // Изменение пароля
-  async changePassword(req: Request, res: Response): Promise<void> {
+  async changePassword(req: Request, res: Response, next: any): Promise<void> {
     try {
       const userId = req.user?.sub;
       const passwordData: ChangePasswordRequest = req.body;
 
       if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: 'Unauthorized',
-          message: 'Требуется аутентификация'
-        });
-        return;
+        return next(errors.unauthorized('Требуется аутентификация'));
       }
 
       await this.authService.changePassword(userId, passwordData);
@@ -285,26 +237,17 @@ export class AuthController {
         message: 'Пароль успешно изменен'
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        error: 'Password change failed',
-        message: error instanceof Error ? error.message : 'Ошибка при изменении пароля'
-      });
+      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при изменении пароля'));
     }
   }
 
   // Запрос на восстановление пароля
-  async forgotPassword(req: Request, res: Response): Promise<void> {
+  async forgotPassword(req: Request, res: Response, next: any): Promise<void> {
     try {
       const { email }: ForgotPasswordRequest = req.body;
 
       if (!email) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing email',
-          message: 'Email обязателен'
-        });
-        return;
+        return next(errors.badRequest('Email обязателен', 'missing_email'));
       }
 
       await this.authService.forgotPassword(email);
@@ -314,26 +257,17 @@ export class AuthController {
         message: 'Если пользователь с таким email существует, инструкции по восстановлению пароля будут отправлены'
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Password reset request failed',
-        message: error instanceof Error ? error.message : 'Ошибка при запросе восстановления пароля'
-      });
+      next(errors.server(error instanceof Error ? error.message : 'Ошибка при запросе восстановления пароля'));
     }
   }
 
   // Сброс пароля
-  async resetPassword(req: Request, res: Response): Promise<void> {
+  async resetPassword(req: Request, res: Response, next: any): Promise<void> {
     try {
       const { token, new_password }: ResetPasswordRequest = req.body;
 
       if (!token || !new_password) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing required fields',
-          message: 'Токен и новый пароль обязательны'
-        });
-        return;
+        return next(errors.badRequest('Токен и новый пароль обязательны', 'missing_fields'));
       }
 
       await this.authService.resetPassword(token, new_password);
@@ -343,26 +277,17 @@ export class AuthController {
         message: 'Пароль успешно сброшен'
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        error: 'Password reset failed',
-        message: error instanceof Error ? error.message : 'Ошибка при сбросе пароля'
-      });
+      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при сбросе пароля'));
     }
   }
 
   // Подтверждение email
-  async verifyEmail(req: Request, res: Response): Promise<void> {
+  async verifyEmail(req: Request, res: Response, next: any): Promise<void> {
     try {
       const token = (req.body && (req.body as any).token) || (req.query && (req.query as any).token);
 
       if (!token) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing token',
-          message: 'Токен подтверждения обязателен'
-        });
-        return;
+        return next(errors.badRequest('Токен подтверждения обязателен', 'missing_token'));
       }
 
       await this.authService.verifyEmail(token);
@@ -372,21 +297,16 @@ export class AuthController {
         message: 'Email успешно подтвержден'
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        error: 'Email verification failed',
-        message: error instanceof Error ? error.message : 'Ошибка при подтверждении email'
-      });
+      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при подтверждении email'));
     }
   }
 
   // Повторная отправка письма с подтверждением
-  async resendVerification(req: Request, res: Response): Promise<void> {
+  async resendVerification(req: Request, res: Response, next: any): Promise<void> {
     try {
       const userId = req.user?.sub;
       if (!userId) {
-        res.status(401).json({ success: false, error: 'Unauthorized', message: 'Требуется аутентификация' });
-        return;
+        return next(errors.unauthorized('Требуется аутентификация'));
       }
       const { email, token } = await this.authService.resendEmailVerification(userId);
 
@@ -409,22 +329,17 @@ export class AuthController {
 
       res.status(200).json({ success: true, message: 'Письмо отправлено повторно' });
     } catch (error) {
-      res.status(400).json({ success: false, error: 'Resend failed', message: error instanceof Error ? error.message : 'Ошибка' });
+      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка'));
     }
   }
 
   // Проверка статуса аутентификации
-  async checkAuth(req: Request, res: Response): Promise<void> {
+  async checkAuth(req: Request, res: Response, next: any): Promise<void> {
     try {
       const userId = req.user?.sub;
       
       if (!userId) {
-        res.status(401).json({
-          success: false,
-          authenticated: false,
-          message: 'Пользователь не аутентифицирован'
-        });
-        return;
+        return next(errors.unauthorized('Пользователь не аутентифицирован'));
       }
 
       const user = await this.authService.getUserProfile(userId);
@@ -444,11 +359,7 @@ export class AuthController {
         }
       });
     } catch (error) {
-      res.status(401).json({
-        success: false,
-        authenticated: false,
-        message: 'Пользователь не аутентифицирован'
-      });
+      next(errors.unauthorized('Пользователь не аутентифицирован'));
     }
   }
 } 

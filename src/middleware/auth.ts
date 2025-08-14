@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { ApiError } from '../utils/errors';
+import { ApiError, errors } from '../utils/errors';
 import { verifyAccessToken, hasPermission, requireRole } from '../utils/auth';
 import { JWTPayload } from '../types/auth';
 
@@ -18,30 +18,21 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
-    res.status(401).json({ 
-      error: 'Access denied', 
-      message: 'Токен доступа не предоставлен' 
-    });
+    next(errors.unauthorized('Токен доступа не предоставлен', 'token_missing'));
     return;
   }
 
   try {
     const decoded = verifyAccessToken(token);
     if (!decoded) {
-      res.status(403).json({ 
-        error: 'Invalid token', 
-        message: 'Недействительный токен доступа' 
-      });
+      next(errors.unauthorized('Недействительный токен доступа', 'invalid_token'));
       return;
     }
 
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(403).json({ 
-      error: 'Invalid token', 
-      message: 'Недействительный токен доступа' 
-    });
+    next(errors.unauthorized('Недействительный токен доступа', 'invalid_token'));
   }
 };
 
@@ -49,19 +40,13 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 export const requireRoleMiddleware = (roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'Требуется аутентификация' 
-      });
+      next(errors.unauthorized('Требуется аутентификация'));
       return;
     }
 
     const hasRequiredRole = requireRole(roles)(req.user.role);
     if (!hasRequiredRole) {
-      res.status(403).json({ 
-        error: 'Forbidden', 
-        message: 'Недостаточно прав для выполнения операции' 
-      });
+      next(errors.forbidden('Недостаточно прав для выполнения операции'));
       return;
     }
 
@@ -73,19 +58,13 @@ export const requireRoleMiddleware = (roles: string[]) => {
 export const requirePermission = (permission: string) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'Требуется аутентификация' 
-      });
+      next(errors.unauthorized('Требуется аутентификация'));
       return;
     }
 
     const hasRequiredPermission = hasPermission(req.user.role, permission);
     if (!hasRequiredPermission) {
-      res.status(403).json({ 
-        error: 'Forbidden', 
-        message: 'Недостаточно прав для выполнения операции' 
-      });
+      next(errors.forbidden('Недостаточно прав для выполнения операции'));
       return;
     }
 
@@ -96,10 +75,7 @@ export const requirePermission = (permission: string) => {
 // Middleware для проверки активного пользователя
 export const requireActiveUser = (req: Request, res: Response, next: NextFunction): void => {
   if (!req.user) {
-    res.status(401).json({ 
-      error: 'Unauthorized', 
-      message: 'Требуется аутентификация' 
-    });
+    next(errors.unauthorized('Требуется аутентификация'));
     return;
   }
 
@@ -111,10 +87,7 @@ export const requireActiveUser = (req: Request, res: Response, next: NextFunctio
 // Middleware для проверки подтвержденного email
 export const requireVerifiedEmail = (req: Request, res: Response, next: NextFunction): void => {
   if (!req.user) {
-    res.status(401).json({ 
-      error: 'Unauthorized', 
-      message: 'Требуется аутентификация' 
-    });
+    next(errors.unauthorized('Требуется аутентификация'));
     return;
   }
 
@@ -156,36 +129,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
 };
 
 // Middleware для CORS
-export const corsMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
-  const patterns = raw.split(',').map(o => o.trim());
-  const origin = req.headers.origin as string | undefined;
-  if (origin) {
-    try {
-      const url = new URL(origin);
-      const host = url.hostname.toLowerCase();
-      let allowed = false;
-      for (const pat of patterns) {
-        if (pat === '*') { allowed = true; break; }
-        if (pat.startsWith('http://') || pat.startsWith('https://')) { if (origin === pat) { allowed = true; break; } continue; }
-        const p = pat.toLowerCase();
-        if (p.startsWith('*.')) { const base = p.slice(2); if (host === base || host.endsWith(`.${base}`)) { allowed = true; break; } }
-        else { if (host === p || host.endsWith(`.${p}`)) { allowed = true; break; } }
-      }
-      if (allowed) res.header('Access-Control-Allow-Origin', origin);
-    } catch {}
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-
-  next();
-};
+// removed custom corsMiddleware: using cors() in server.ts with strict patterns
 
 // Middleware для ограничения запросов (rate limiting)
 export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number = 100) => {
@@ -208,10 +152,7 @@ export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number
     if (!current || current.resetTime < windowStart) {
       requests.set(ip, { count: 1, resetTime: now });
     } else if (current.count >= maxRequests) {
-      res.status(429).json({ 
-        error: 'Too Many Requests', 
-        message: 'Слишком много запросов. Попробуйте позже.' 
-      });
+      next(errors.tooMany('Слишком много запросов. Попробуйте позже.'));
       return;
     } else {
       current.count++;
