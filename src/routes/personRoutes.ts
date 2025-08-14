@@ -255,7 +255,7 @@ export function createPersonRoutes(pool: Pool) {
       await client.query('COMMIT');
       res.json({ success: true });
     } catch (e: any) {
-      await (pool as any).query?.('ROLLBACK').catch(() => {});
+      try { await client.query('ROLLBACK'); } catch {}
       const mapped = mapPgError(e)
       if (mapped) throw mapped
       throw e

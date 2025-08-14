@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { AuthService } from './services/authService';
@@ -45,9 +46,16 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Security headers
+app.use(helmet());
 // CORS: поддержка списка доменов (через запятую) и шаблонов вида *.chrono.ninja или голых доменов
 const rawOrigins = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
 const allowedOriginPatterns = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
+const isProd = process.env.NODE_ENV === 'production';
+if (isProd && allowedOriginPatterns.includes('*')) {
+  console.error('❌ В продакшене CORS_ORIGINS не может быть "*". Укажите явные источники.');
+  process.exit(1);
+}
 
 function isOriginAllowed(origin: string, patterns: string[]): boolean {
   try {

@@ -266,8 +266,8 @@ export class AuthService {
 
     try {
       await this.pool.query(query, [resetToken, expiresAt, user.id]);
-      // Здесь должна быть отправка email с токеном
-      console.log(`Password reset token for ${email}: ${resetToken}`);
+      // Здесь должна быть отправка email с токеном (не логируем токен)
+      // Отправка письма выполняется на уровне контроллера/почтового модуля
     } catch (error) {
       throw new Error(`Ошибка при создании токена сброса пароля: ${error}`);
     }
