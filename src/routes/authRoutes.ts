@@ -16,68 +16,68 @@ export function createAuthRoutes(authController: AuthController): Router {
   // Публичные маршруты (не требуют аутентификации)
   
   // Регистрация пользователя
-  router.post('/register', async (req, res) => {
-    await authController.register(req, res);
+  router.post('/register', async (req, res, next) => {
+    await authController.register(req, res, next);
   });
 
   // Вход пользователя
-  router.post('/login', async (req, res) => {
-    await authController.login(req, res);
+  router.post('/login', async (req, res, next) => {
+    await authController.login(req, res, next);
   });
 
   // Обновление токена доступа
-  router.post('/refresh', async (req, res) => {
-    await authController.refreshToken(req, res);
+  router.post('/refresh', async (req, res, next) => {
+    await authController.refreshToken(req, res, next);
   });
 
   // Запрос на восстановление пароля
-  router.post('/forgot-password', async (req, res) => {
-    await authController.forgotPassword(req, res);
+  router.post('/forgot-password', async (req, res, next) => {
+    await authController.forgotPassword(req, res, next);
   });
 
   // Сброс пароля
-  router.post('/reset-password', async (req, res) => {
-    await authController.resetPassword(req, res);
+  router.post('/reset-password', async (req, res, next) => {
+    await authController.resetPassword(req, res, next);
   });
 
   // Подтверждение email
-  router.post('/verify-email', async (req, res) => {
-    await authController.verifyEmail(req, res);
+  router.post('/verify-email', async (req, res, next) => {
+    await authController.verifyEmail(req, res, next);
   });
-  router.get('/verify-email', async (req, res) => {
-    await authController.verifyEmail(req, res);
+  router.get('/verify-email', async (req, res, next) => {
+    await authController.verifyEmail(req, res, next);
   });
 
   // Повторная отправка письма подтверждения
-  router.post('/resend-verification', authenticateToken, async (req, res) => {
-    await authController.resendVerification(req, res);
+  router.post('/resend-verification', authenticateToken, async (req, res, next) => {
+    await authController.resendVerification(req, res, next);
   });
 
   // Защищенные маршруты (требуют аутентификации)
   
   // Выход пользователя
-  router.post('/logout', authenticateToken, async (req, res) => {
-    await authController.logout(req, res);
+  router.post('/logout', authenticateToken, async (req, res, next) => {
+    await authController.logout(req, res, next);
   });
 
   // Получение профиля пользователя
-  router.get('/profile', authenticateToken, async (req, res) => {
-    await authController.getProfile(req, res);
+  router.get('/profile', authenticateToken, async (req, res, next) => {
+    await authController.getProfile(req, res, next);
   });
 
   // Обновление профиля пользователя
-  router.put('/profile', authenticateToken, async (req, res) => {
-    await authController.updateProfile(req, res);
+  router.put('/profile', authenticateToken, async (req, res, next) => {
+    await authController.updateProfile(req, res, next);
   });
 
   // Изменение пароля
-  router.put('/change-password', authenticateToken, async (req, res) => {
-    await authController.changePassword(req, res);
+  router.put('/change-password', authenticateToken, async (req, res, next) => {
+    await authController.changePassword(req, res, next);
   });
 
   // Проверка статуса аутентификации
-  router.get('/check', authenticateToken, async (req, res) => {
-    await authController.checkAuth(req, res);
+  router.get('/check', authenticateToken, async (req, res, next) => {
+    await authController.checkAuth(req, res, next);
   });
 
   // Маршруты для администраторов
