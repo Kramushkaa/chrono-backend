@@ -9,6 +9,7 @@ export const UpsertPersonSchema = z.object({
   description: z.string().trim().max(5000).default(''),
   imageUrl: z.string().trim().url().max(1000).nullable().optional(),
   wikiLink: z.string().trim().url().max(1000).nullable().optional(),
+  saveAsDraft: z.boolean().optional().default(false),
 })
 
 export const LifePeriodItemSchema = z.object({
@@ -45,6 +46,7 @@ export const AchievementPersonSchema = z.object({
   description: z.string().trim().min(2).max(2000),
   wikipedia_url: z.string().trim().url().max(1000).nullable().optional(),
   image_url: z.string().trim().url().max(1000).nullable().optional(),
+  saveAsDraft: z.boolean().optional().default(false),
 })
 
 export type UpsertPersonDTO = z.infer<typeof UpsertPersonSchema>

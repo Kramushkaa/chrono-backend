@@ -17,18 +17,36 @@
 | created_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
 | country_id | integer | YES |  |
+| status | text | NO | 'approved'::text |
+| created_by | integer | YES |  |
+| updated_by | integer | YES |  |
+| submitted_at | timestamp without time zone | YES |  |
+| reviewed_at | timestamp without time zone | YES |  |
+| reviewed_by | integer | YES |  |
+| review_comment | text | YES |  |
+| is_draft | boolean | NO | false |
+| draft_saved_at | timestamp without time zone | YES |  |
+| last_edited_at | timestamp without time zone | YES |  |
 
 - **Первичный ключ**: id
 - **Внешние ключи**:
 - achievements_country_id_fkey: (country_id) → countries(id) ON DELETE SET NULL ON UPDATE NO ACTION
+- fk_achievements_created_by: (created_by) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
 - fk_achievements_person: (person_id) → persons(id) ON DELETE SET NULL ON UPDATE NO ACTION
+- fk_achievements_reviewed_by: (reviewed_by) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
 - **Индексы**:
   - achievements_pkey: CREATE UNIQUE INDEX achievements_pkey ON public.achievements USING btree (id)
   - achievements_unique_country_year_desc: CREATE UNIQUE INDEX achievements_unique_country_year_desc ON public.achievements USING btree (country_id, year, lower(btrim(description))) WHERE ((country_id IS NOT NULL) AND (person_id IS NULL))
   - achievements_unique_global_year_desc: CREATE UNIQUE INDEX achievements_unique_global_year_desc ON public.achievements USING btree (year, lower(btrim(description))) WHERE ((person_id IS NULL) AND (country_id IS NULL))
   - achievements_unique_person_year_desc: CREATE UNIQUE INDEX achievements_unique_person_year_desc ON public.achievements USING btree (person_id, year, lower(btrim(description))) WHERE (person_id IS NOT NULL)
   - idx_achievements_country_id: CREATE INDEX idx_achievements_country_id ON public.achievements USING btree (country_id)
+  - idx_achievements_created_by: CREATE INDEX idx_achievements_created_by ON public.achievements USING btree (created_by)
+  - idx_achievements_description_trgm: CREATE INDEX idx_achievements_description_trgm ON public.achievements USING gin (description gin_trgm_ops)
+  - idx_achievements_draft_saved_at: CREATE INDEX idx_achievements_draft_saved_at ON public.achievements USING btree (draft_saved_at)
+  - idx_achievements_is_draft: CREATE INDEX idx_achievements_is_draft ON public.achievements USING btree (is_draft)
   - idx_achievements_person_id: CREATE INDEX idx_achievements_person_id ON public.achievements USING btree (person_id)
+  - idx_achievements_status: CREATE INDEX idx_achievements_status ON public.achievements USING btree (status)
+  - idx_achievements_submitted_at: CREATE INDEX idx_achievements_submitted_at ON public.achievements USING btree (submitted_at)
   - idx_achievements_year: CREATE INDEX idx_achievements_year ON public.achievements USING btree (year)
   - uniq_achievements_country_year_desc: CREATE UNIQUE INDEX uniq_achievements_country_year_desc ON public.achievements USING btree (country_id, year, lower(btrim(description))) WHERE ((country_id IS NOT NULL) AND (person_id IS NULL))
   - uniq_achievements_person_year_desc: CREATE UNIQUE INDEX uniq_achievements_person_year_desc ON public.achievements USING btree (person_id, year, lower(btrim(description))) WHERE (person_id IS NOT NULL)
@@ -47,6 +65,53 @@
   - countries_pkey: CREATE UNIQUE INDEX countries_pkey ON public.countries USING btree (id)
   - idx_countries_name: CREATE INDEX idx_countries_name ON public.countries USING btree (name)
 
+### list_items
+
+| Колонка | Тип | NULL | По умолчанию |
+|---|---|:--:|---|
+| id | integer | NO | nextval('list_items_id_seq'::regclass) |
+| list_id | integer | NO |  |
+| item_type | text | NO |  |
+| person_id | character varying | YES |  |
+| achievement_id | integer | YES |  |
+| period_id | integer | YES |  |
+| period_json | jsonb | YES |  |
+| position | integer | YES | 0 |
+| created_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
+
+- **Первичный ключ**: id
+- **Внешние ключи**:
+- list_items_achievement_id_fkey: (achievement_id) → achievements(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- list_items_list_id_fkey: (list_id) → lists(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- list_items_period_id_fkey: (period_id) → periods(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- list_items_person_id_fkey: (person_id) → persons(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- **Индексы**:
+  - idx_list_items_list: CREATE INDEX idx_list_items_list ON public.list_items USING btree (list_id)
+  - idx_list_items_list_id: CREATE INDEX idx_list_items_list_id ON public.list_items USING btree (list_id)
+  - idx_list_items_unique_achievement: CREATE INDEX idx_list_items_unique_achievement ON public.list_items USING btree (list_id, item_type, achievement_id)
+  - idx_list_items_unique_period: CREATE INDEX idx_list_items_unique_period ON public.list_items USING btree (list_id, item_type, period_id)
+  - idx_list_items_unique_person: CREATE INDEX idx_list_items_unique_person ON public.list_items USING btree (list_id, item_type, person_id)
+  - list_items_pkey: CREATE UNIQUE INDEX list_items_pkey ON public.list_items USING btree (id)
+  - uq_list_items_achievement: CREATE UNIQUE INDEX uq_list_items_achievement ON public.list_items USING btree (list_id, item_type, achievement_id) WHERE ((item_type = 'achievement'::text) AND (achievement_id IS NOT NULL))
+  - uq_list_items_period: CREATE UNIQUE INDEX uq_list_items_period ON public.list_items USING btree (list_id, item_type, period_id) WHERE ((item_type = 'period'::text) AND (period_id IS NOT NULL))
+  - uq_list_items_person: CREATE UNIQUE INDEX uq_list_items_person ON public.list_items USING btree (list_id, item_type, person_id) WHERE ((item_type = 'person'::text) AND (person_id IS NOT NULL))
+
+### lists
+
+| Колонка | Тип | NULL | По умолчанию |
+|---|---|:--:|---|
+| id | integer | NO | nextval('lists_id_seq'::regclass) |
+| owner_user_id | integer | NO |  |
+| title | text | NO |  |
+| created_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
+| updated_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
+
+- **Первичный ключ**: id
+- **Внешние ключи**:
+- lists_owner_user_id_fkey: (owner_user_id) → users(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- **Индексы**:
+  - lists_pkey: CREATE UNIQUE INDEX lists_pkey ON public.lists USING btree (id)
+
 ### periods
 
 | Колонка | Тип | NULL | По умолчанию |
@@ -60,16 +125,34 @@
 | comment | text | YES |  |
 | created_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
+| status | text | NO | 'approved'::text |
+| created_by | integer | YES |  |
+| updated_by | integer | YES |  |
+| submitted_at | timestamp without time zone | YES |  |
+| reviewed_at | timestamp without time zone | YES |  |
+| reviewed_by | integer | YES |  |
+| review_comment | text | YES |  |
+| is_draft | boolean | NO | false |
+| draft_saved_at | timestamp without time zone | YES |  |
+| last_edited_at | timestamp without time zone | YES |  |
 
 - **Первичный ключ**: id
 - **Внешние ключи**:
 - fk_periods_country: (country_id) → countries(id) ON DELETE SET NULL ON UPDATE NO ACTION
+- fk_periods_created_by: (created_by) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
 - fk_periods_person: (person_id) → persons(id) ON DELETE SET NULL ON UPDATE NO ACTION
+- fk_periods_reviewed_by: (reviewed_by) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
 - **Индексы**:
   - idx_periods_country_id: CREATE INDEX idx_periods_country_id ON public.periods USING btree (country_id)
+  - idx_periods_created_by: CREATE INDEX idx_periods_created_by ON public.periods USING btree (created_by)
+  - idx_periods_draft_saved_at: CREATE INDEX idx_periods_draft_saved_at ON public.periods USING btree (draft_saved_at)
   - idx_periods_end_year: CREATE INDEX idx_periods_end_year ON public.periods USING btree (end_year)
+  - idx_periods_is_draft: CREATE INDEX idx_periods_is_draft ON public.periods USING btree (is_draft)
+  - idx_periods_period_type: CREATE INDEX idx_periods_period_type ON public.periods USING btree (period_type)
   - idx_periods_person_id: CREATE INDEX idx_periods_person_id ON public.periods USING btree (person_id)
   - idx_periods_start_year: CREATE INDEX idx_periods_start_year ON public.periods USING btree (start_year)
+  - idx_periods_status: CREATE INDEX idx_periods_status ON public.periods USING btree (status)
+  - idx_periods_submitted_at: CREATE INDEX idx_periods_submitted_at ON public.periods USING btree (submitted_at)
   - idx_periods_type: CREATE INDEX idx_periods_type ON public.periods USING btree (period_type)
   - periods_no_overlap_per_person_type: CREATE INDEX periods_no_overlap_per_person_type ON public.periods USING gist (person_id, period_type, int4range(start_year, end_year))
   - periods_person_type_end_idx: CREATE INDEX periods_person_type_end_idx ON public.periods USING btree (person_id, period_type, end_year)
@@ -132,15 +215,28 @@
 | reviewed_at | timestamp without time zone | YES |  |
 | reviewed_by | integer | YES |  |
 | review_comment | text | YES |  |
+| is_draft | boolean | NO | false |
+| draft_saved_at | timestamp without time zone | YES |  |
+| last_edited_at | timestamp without time zone | YES |  |
 
 - **Первичный ключ**: id
+- **Внешние ключи**:
+- fk_persons_created_by: (created_by) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
+- fk_persons_reviewed_by: (reviewed_by) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
 - **Индексы**:
   - idx_persons_birth_death_years: CREATE INDEX idx_persons_birth_death_years ON public.persons USING btree (birth_year, death_year)
   - idx_persons_birth_year: CREATE INDEX idx_persons_birth_year ON public.persons USING btree (birth_year)
   - idx_persons_category: CREATE INDEX idx_persons_category ON public.persons USING btree (category)
+  - idx_persons_category_trgm: CREATE INDEX idx_persons_category_trgm ON public.persons USING gin (category gin_trgm_ops)
+  - idx_persons_created_by: CREATE INDEX idx_persons_created_by ON public.persons USING btree (created_by)
   - idx_persons_death_year: CREATE INDEX idx_persons_death_year ON public.persons USING btree (death_year)
+  - idx_persons_description_trgm: CREATE INDEX idx_persons_description_trgm ON public.persons USING gin (description gin_trgm_ops)
+  - idx_persons_draft_saved_at: CREATE INDEX idx_persons_draft_saved_at ON public.persons USING btree (draft_saved_at)
   - idx_persons_id: CREATE INDEX idx_persons_id ON public.persons USING btree (id)
+  - idx_persons_is_draft: CREATE INDEX idx_persons_is_draft ON public.persons USING btree (is_draft)
+  - idx_persons_name_trgm: CREATE INDEX idx_persons_name_trgm ON public.persons USING gin (name gin_trgm_ops)
   - idx_persons_status: CREATE INDEX idx_persons_status ON public.persons USING btree (status)
+  - idx_persons_submitted_at: CREATE INDEX idx_persons_submitted_at ON public.persons USING btree (submitted_at)
   - persons_category_idx: CREATE INDEX persons_category_idx ON public.persons USING btree (category)
   - persons_name_trgm: CREATE INDEX persons_name_trgm ON public.persons USING gin (name gin_trgm_ops)
   - persons_pkey: CREATE UNIQUE INDEX persons_pkey ON public.persons USING btree (id)
@@ -234,18 +330,6 @@ SELECT DISTINCT category
   ORDER BY category;
 ```
 
-### v_achievements_top3
-```sql
-SELECT person_id,
-    (array_agg(description ORDER BY year))[1:3] AS achievements_top3,
-    (array_agg(year ORDER BY year))[1] AS achievement_year_1,
-    (array_agg(year ORDER BY year))[2] AS achievement_year_2,
-    (array_agg(year ORDER BY year))[3] AS achievement_year_3,
-    (array_agg(wikipedia_url ORDER BY year))[1:3] AS achievements_wiki_top3
-   FROM achievements a
-  GROUP BY person_id;
-```
-
 ### v_api_persons
 ```sql
 SELECT p.id,
@@ -256,22 +340,12 @@ SELECT p.id,
     rs.reign_end,
     p.category,
     (cl.countries)::character varying(100) AS country,
+    cl.country_names,
+    cl.country_ids,
     p.description,
     p.image_url,
     COALESCE(a.achievements_all, ARRAY[]::text[]) AS achievements,
     a.achievement_years,
-        CASE
-            WHEN ((a.achievement_years IS NOT NULL) AND (array_length(a.achievement_years, 1) >= 1)) THEN a.achievement_years[1]
-            ELSE NULL::integer
-        END AS achievement_year_1,
-        CASE
-            WHEN ((a.achievement_years IS NOT NULL) AND (array_length(a.achievement_years, 1) >= 2)) THEN a.achievement_years[2]
-            ELSE NULL::integer
-        END AS achievement_year_2,
-        CASE
-            WHEN ((a.achievement_years IS NOT NULL) AND (array_length(a.achievement_years, 1) >= 3)) THEN a.achievement_years[3]
-            ELSE NULL::integer
-        END AS achievement_year_3,
     rp.ruler_periods,
     p.wiki_link,
     COALESCE(a.achievements_wiki_all, ARRAY[]::text[]) AS achievements_wiki
@@ -328,11 +402,14 @@ SELECT person_id,
 
 ### v_person_countries_life
 ```sql
-SELECT person_id,
-    string_agg(DISTINCT country_name, '/'::text ORDER BY country_name) AS countries
-   FROM v_periods_with_names
-  WHERE (((period_type)::text = 'life'::text) AND (country_name IS NOT NULL))
-  GROUP BY person_id;
+SELECT pr.person_id,
+    COALESCE(string_agg(DISTINCT c.name, ' / '::text ORDER BY c.name), ''::text) AS countries,
+    COALESCE(array_agg(DISTINCT c.name ORDER BY c.name), ARRAY[]::text[]) AS country_names,
+    COALESCE(array_agg(DISTINCT c.id ORDER BY c.id), ARRAY[]::integer[]) AS country_ids
+   FROM (periods pr
+     LEFT JOIN countries c ON ((c.id = pr.country_id)))
+  WHERE ((pr.period_type)::text = 'life'::text)
+  GROUP BY pr.person_id;
 ```
 
 ### v_person_periods

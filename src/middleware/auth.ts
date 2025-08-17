@@ -91,8 +91,11 @@ export const requireVerifiedEmail = (req: Request, res: Response, next: NextFunc
     return;
   }
 
-  // Проверка подтверждения email будет происходить в базе данных
-  // Здесь мы просто передаем управление дальше
+  if (!req.user.email_verified) {
+    next(errors.forbidden('Требуется подтверждение email для выполнения этой операции'));
+    return;
+  }
+
   next();
 };
 

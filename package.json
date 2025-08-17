@@ -30,7 +30,9 @@
     "db:fix": "ts-node src/db/fix-inconsistencies.ts",
     "migrate:add-wiki": "ts-node src/db/migrate-add-wiki-link.ts",
     "views:update-wiki": "ts-node src/db/update-views-add-wiki.ts",
-    "migrate:moderation": "ts-node src/db/migrate-moderation-persons.ts",
+    "migrate:moderation": "ts-node src/db/migrate-moderation-periods-achievements.ts",
+    "migrate:achievements-only": "ts-node src/db/migrate-moderation-periods-achievements.ts --achievements-only",
+    "migrate:check": "ts-node src/db/migrate-moderation-periods-achievements.ts --check-only",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

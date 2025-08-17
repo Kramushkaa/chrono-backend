@@ -24,7 +24,8 @@ export const generateAccessToken = (user: User): string => {
   const payload = {
     sub: user.id,
     email: user.email,
-    role: user.role
+    role: user.role,
+    email_verified: user.email_verified
   };
   
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
@@ -54,7 +55,8 @@ export const verifyAccessToken = (token: string): JWTPayload | null => {
     return {
       sub: decoded.sub,
       email: decoded.email,
-      role: decoded.role
+      role: decoded.role,
+      email_verified: decoded.email_verified
     };
   } catch (error) {
     return null;

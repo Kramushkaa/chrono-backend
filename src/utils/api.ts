@@ -1,5 +1,5 @@
 export function mapApiPersonRow(row: any) {
-  return {
+  const result: any = {
     id: row.id,
     name: row.name,
     birthYear: row.birth_year,
@@ -23,6 +23,16 @@ export function mapApiPersonRow(row: any) {
       : [],
     imageUrl: row.image_url,
   };
+  
+  // Добавляем поля модерации, если они есть в исходной строке
+  if (row.status !== undefined) {
+    result.status = row.status;
+  }
+  if (row.is_draft !== undefined) {
+    result.is_draft = row.is_draft;
+  }
+  
+  return result;
 }
 
 export function parseLimitOffset(

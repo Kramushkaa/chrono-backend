@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod'
 import { UpsertPersonSchema, LifePeriodsSchema, PersonEditPayloadSchema, AchievementGenericSchema } from '../dto'
 import { Pool } from 'pg';
-import { authenticateToken, requireRoleMiddleware } from '../middleware/auth';
+import { authenticateToken, requireRoleMiddleware, requireVerifiedEmail } from '../middleware/auth';
 import { ApiError, errors, mapPgError, asyncHandler } from '../utils/errors';
 import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../utils/api'
 
@@ -161,19 +161,44 @@ export function createPersonRoutes(pool: Pool) {
     if (!userId) { throw errors.unauthorized('Требуется аутентификация'); }
     const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 200, maxLimit: 500 });
     const countOnly = String(req.query.count || 'false') === 'true';
+    
+    // Поддержка фильтрации по статусам
+    const statusFilter = req.query.status as string;
+    let statusCondition = '';
+    const queryParams = [userId];
+    
+    if (statusFilter) {
+      // Поддерживаем multiple статусы через запятую
+      const statuses = statusFilter.split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length > 0) {
+        const placeholders = statuses.map((_, i) => `$${queryParams.length + i + 1}`).join(',');
+        statusCondition = ` AND p.status IN (${placeholders})`;
+        queryParams.push(...statuses);
+      }
+    }
+    
     if (countOnly) {
-      const c = await pool.query(`SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1`, [userId]);
+      // Считаем только личности, действительно созданные этим пользователем
+      const countSql = `
+        SELECT COUNT(*)::int AS cnt 
+        FROM persons p
+        WHERE p.created_by = $1${statusCondition}
+      `;
+      const c = await pool.query(countSql, queryParams);
       res.json({ success: true, data: { count: c.rows[0]?.cnt || 0 } });
       return;
     }
+    
     const sql = `
-      SELECT v.*
+      SELECT v.*, p.status, p.is_draft
         FROM v_api_persons v
         JOIN persons p ON p.id = v.id
-       WHERE p.created_by = $1
-       ORDER BY p.created_at DESC NULLS LAST
-       LIMIT $2 OFFSET $3`;
-    const result = await pool.query(sql, [userId, limitParam + 1, offsetParam]);
+       WHERE p.created_by = $1${statusCondition}
+       ORDER BY COALESCE(p.last_edited_at, p.draft_saved_at, p.submitted_at) DESC NULLS LAST, p.id DESC
+       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    
+    queryParams.push(limitParam + 1, offsetParam);
+    const result = await pool.query(sql, queryParams);
     const persons = result.rows.map(mapApiPersonRow);
     const { data, meta } = paginateRows(persons, limitParam, offsetParam);
     res.json({ success: true, data, meta });
@@ -183,15 +208,22 @@ export function createPersonRoutes(pool: Pool) {
   router.get('/persons/:id', asyncHandler(async (req: any, res: any) => {
     const { id } = req.params;
     if (!id) { throw errors.badRequest('ID не указан') }
-    const result = await pool.query('SELECT * FROM v_api_persons WHERE id = $1', [id]);
+    const result = await pool.query(`
+      SELECT v.*, p.status, p.is_draft 
+      FROM v_api_persons v 
+      JOIN persons p ON p.id = v.id 
+      WHERE v.id = $1
+    `, [id]);
     if (result.rows.length === 0) { throw errors.notFound('Историческая Личность не найдена') }
     const row = result.rows[0];
+
     const periodsRes = await pool.query('SELECT periods FROM v_person_periods WHERE person_id = $1', [row.id]);
     const periods = periodsRes.rows[0]?.periods || [];
     const person = {
       ...mapApiPersonRow(row),
       periods,
     };
+    
     res.json({ success: true, data: person });
   }))
 
@@ -214,13 +246,45 @@ export function createPersonRoutes(pool: Pool) {
     res.json({ success: true, data: persons });
   }))
 
-  // User: propose person (pending review)
+  // User: propose person (pending review OR save as draft)
   router.post('/persons/propose', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
       const parsed = UpsertPersonSchema.safeParse(req.body || {})
       if (!parsed.success) throw errors.badRequest('Некорректные данные Личности', 'validation_error', parsed.error.flatten())
-      const { id, name, birthYear, deathYear, category, description, imageUrl, wikiLink } = parsed.data
-    // создаем запись/обновляем как pending
-      await pool.query(
+      const { id, name, birthYear, deathYear, category, description, imageUrl, wikiLink, saveAsDraft = false } = parsed.data
+      
+      // Проверяем наличие периодов жизни
+      const lifePeriods = req.body?.lifePeriods || []
+      if (!saveAsDraft && (!lifePeriods || lifePeriods.length === 0)) {
+        throw errors.badRequest('Для отправки на модерацию необходимо указать хотя бы один период жизни')
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        if (saveAsDraft) {
+          // Сохранение как черновик
+          await client.query(
+          `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by, is_draft, draft_saved_at, last_edited_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$9,true,NOW(),NOW())
+             ON CONFLICT (id) DO UPDATE SET
+               name=EXCLUDED.name,
+               birth_year=EXCLUDED.birth_year,
+               death_year=EXCLUDED.death_year,
+               category=EXCLUDED.category,
+               description=EXCLUDED.description,
+               image_url=EXCLUDED.image_url,
+               wiki_link=EXCLUDED.wiki_link,
+               status='draft',
+               updated_by=$9,
+               is_draft=true,
+               draft_saved_at=NOW(),
+               last_edited_at=NOW()`,
+          [id, name, birthYear, deathYear, category, description, imageUrl ?? null, wikiLink ?? null, (req as any).user!.sub]
+          );
+        } else {
+          // Создание как pending для модерации
+          await client.query(
       `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by, submitted_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$9,NOW())
          ON CONFLICT (id) DO UPDATE SET
@@ -236,7 +300,65 @@ export function createPersonRoutes(pool: Pool) {
            submitted_at=NOW()`,
       [id, name, birthYear, deathYear, category, description, imageUrl ?? null, wikiLink ?? null, (req as any).user!.sub]
       );
+        }
+
+        // Сохраняем периоды жизни, если они указаны
+        if (lifePeriods && lifePeriods.length > 0) {
+          // Преобразуем периоды из frontend формата в backend
+          const normalizedPeriods = lifePeriods.map((lp: any) => ({
+            country_id: Number(lp.countryId),
+            start_year: Number(lp.start),
+            end_year: Number(lp.end)
+          }));
+
+          // Валидация периодов
+          for (const p of normalizedPeriods) {
+            if (!Number.isInteger(p.country_id) || p.country_id <= 0) {
+              throw errors.badRequest('Некорректная страна')
+            }
+            if (!Number.isInteger(p.start_year) || !Number.isInteger(p.end_year) || p.start_year > p.end_year) {
+              throw errors.badRequest('Некорректный период проживания')
+            }
+            if (p.start_year < birthYear || p.end_year > deathYear) {
+              throw errors.badRequest('Периоды должны быть в пределах годов жизни')
+            }
+          }
+
+          // Сортируем по году начала
+          normalizedPeriods.sort((a: any, b: any) => a.start_year - b.start_year || a.end_year - b.end_year);
+
+          // Удаляем существующие периоды для этой персоны (если есть)
+          await client.query(`DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`, [id]);
+
+          // Статус периодов зависит от статуса персоны
+          const periodStatus = saveAsDraft ? 'draft' : 'pending';
+
+          // Вставляем новые периоды
+          for (const p of normalizedPeriods) {
+            if (saveAsDraft) {
+              await client.query(
+                `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by, is_draft, draft_saved_at, last_edited_at)
+                 VALUES ($1, $2, $3, 'life', $4, 'draft', $5, true, NOW(), NOW())`,
+                [id, p.start_year, p.end_year, p.country_id, (req as any).user!.sub]
+              );
+            } else {
+              await client.query(
+                `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by, submitted_at)
+                 VALUES ($1, $2, $3, 'life', $4, 'pending', $5, NOW())`,
+                [id, p.start_year, p.end_year, p.country_id, (req as any).user!.sub]
+              );
+            }
+          }
+        }
+
+        await client.query('COMMIT');
       res.json({ success: true });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
   }))
 
   // Admin/Moderator: review person (approve / reject)
@@ -262,22 +384,270 @@ export function createPersonRoutes(pool: Pool) {
       res.json({ success: true });
   }))
 
-  // User: propose an edit (diff payload) for an existing person
-  router.post('/persons/:id/edits', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  // User: propose an edit for an existing approved person (uses person_edits table)
+  router.post('/persons/:id/edits', authenticateToken, requireVerifiedEmail, asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const rawPayload = req.body?.payload;
       if (!id || !rawPayload || typeof rawPayload !== 'object') {
         throw errors.badRequest('person id и payload обязательны')
       }
+    
       const payload = sanitizePayload(rawPayload);
       const parsed = PersonEditPayloadSchema.safeParse(payload)
       if (!parsed.success) throw errors.badRequest('Некорректные данные правки', 'validation_error', parsed.error.flatten())
+    
+    // Проверяем, что персона существует и одобрена
+    const existingPersonRes = await pool.query(
+      'SELECT id, status FROM persons WHERE id = $1',
+      [id]
+    );
+    
+    if (existingPersonRes.rowCount === 0) {
+      throw errors.notFound('Личность не найдена')
+    }
+    
+    const existingPerson = existingPersonRes.rows[0];
+    if (existingPerson.status !== 'approved') {
+      throw errors.badRequest('Можно предлагать изменения только для одобренных личностей')
+    }
+    
+    const userId = (req as any).user!.sub;
+    
+    // Создаем запись в person_edits для модерации изменений
       const result = await pool.query(
         `INSERT INTO person_edits (person_id, proposer_user_id, payload, status)
-         VALUES ($1,$2,$3,'pending') RETURNING id, created_at`,
-        [id, (req as any).user!.sub, payload]
+       VALUES ($1, $2, $3, 'pending') RETURNING id, created_at`,
+      [id, userId, JSON.stringify(payload)]
+    );
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Предложение изменений отправлено на модерацию',
+      data: result.rows[0] 
+    });
+  }))
+
+  // Update person (for drafts or own persons)
+  router.put('/persons/:id', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const parsed = PersonEditPayloadSchema.safeParse(req.body || {})
+    if (!parsed.success) throw errors.badRequest('Некорректные данные правки', 'validation_error', parsed.error.flatten())
+    
+    // Проверяем наличие периодов жизни
+    const lifePeriods = req.body?.lifePeriods || []
+    
+    // Проверяем, что личность принадлежит пользователю или является черновиком
+    const personRes = await pool.query(
+      'SELECT created_by, is_draft, status, birth_year, death_year FROM persons WHERE id = $1',
+      [id]
+    );
+    
+    if (personRes.rowCount === 0) {
+      throw errors.notFound('Личность не найдена')
+    }
+    
+    const person = personRes.rows[0];
+    const userId = (req as any).user!.sub;
+    
+    if (person.created_by !== userId && person.status !== 'draft') {
+      throw errors.forbidden('Нет прав для редактирования этой личности')
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Обновляем личность
+      const payload = sanitizePayload(parsed.data);
+      const fields: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+      const mapping: Record<string, string> = {
+        name: 'name',
+        birthYear: 'birth_year',
+        deathYear: 'death_year',
+        category: 'category',
+        description: 'description',
+        imageUrl: 'image_url',
+        wikiLink: 'wiki_link',
+      };
+      
+      for (const [k, v] of Object.entries(payload)) {
+        const column = mapping[k as keyof typeof mapping];
+        if (!column) continue;
+        fields.push(`${column} = $${idx++}`);
+        values.push(v);
+      }
+      
+      // Добавляем обновление времени редактирования
+      fields.push(`last_edited_at = NOW()`);
+      
+      if (fields.length > 1) { // больше 1, потому что last_edited_at всегда есть
+        const sql = `UPDATE persons SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
+        values.push(id);
+        
+        const result = await client.query(sql, values);
+      }
+
+      // Обновляем периоды жизни, если они указаны
+      if (lifePeriods && lifePeriods.length > 0) {
+        // Получаем актуальные годы жизни (могли измениться в payload)
+        const currentBirthYear = payload.birthYear ?? person.birth_year;
+        const currentDeathYear = payload.deathYear ?? person.death_year;
+
+        // Преобразуем периоды из frontend формата в backend
+        const normalizedPeriods = lifePeriods.map((lp: any) => ({
+          country_id: Number(lp.countryId),
+          start_year: Number(lp.start),
+          end_year: Number(lp.end)
+        }));
+
+        // Валидация периодов
+        for (const p of normalizedPeriods) {
+          if (!Number.isInteger(p.country_id) || p.country_id <= 0) {
+            throw errors.badRequest('Некорректная страна')
+          }
+          if (!Number.isInteger(p.start_year) || !Number.isInteger(p.end_year) || p.start_year > p.end_year) {
+            throw errors.badRequest('Некорректный период проживания')
+          }
+          if (p.start_year < currentBirthYear || p.end_year > currentDeathYear) {
+            throw errors.badRequest('Периоды должны быть в пределах годов жизни')
+          }
+        }
+
+        // Сортируем по году начала
+        normalizedPeriods.sort((a: any, b: any) => a.start_year - b.start_year || a.end_year - b.end_year);
+
+        // Удаляем существующие периоды для этой персоны
+        await client.query(`DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`, [id]);
+
+        // Вставляем новые периоды (как черновики)
+        for (const p of normalizedPeriods) {
+          await client.query(
+            `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by, is_draft, draft_saved_at, last_edited_at)
+             VALUES ($1, $2, $3, 'life', $4, 'draft', $5, true, NOW(), NOW())`,
+            [id, p.start_year, p.end_year, p.country_id, userId]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      res.json({ success: true, message: 'Черновик обновлен' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }))
+
+  // Submit draft for moderation
+  router.post('/persons/:id/submit', authenticateToken, requireVerifiedEmail, asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    
+    // Проверяем, что личность является черновиком и принадлежит пользователю
+    const personRes = await pool.query(
+      'SELECT created_by, is_draft, status FROM persons WHERE id = $1',
+      [id]
+    );
+    
+    if (personRes.rowCount === 0) {
+      throw errors.notFound('Личность не найдена')
+    }
+    
+    const person = personRes.rows[0];
+    const userId = (req as any).user!.sub;
+    
+    if (person.created_by !== userId) {
+      throw errors.forbidden('Нет прав для отправки этой личности')
+    }
+    
+    if (person.status !== 'draft') {
+      throw errors.badRequest('Можно отправлять на модерацию только черновики')
+    }
+    
+    // Отправляем на модерацию (используем транзакцию)
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Обновляем персону
+      const result = await client.query(
+        `UPDATE persons 
+         SET status = 'pending', 
+             is_draft = false, 
+             submitted_at = NOW(),
+             last_edited_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [id]
       );
-      res.status(201).json({ success: true, data: result.rows[0] });
+      
+      // Также обновляем статус связанных периодов жизни, но только тех, которые являются черновиками
+      await client.query(
+        `UPDATE periods 
+         SET status = 'pending',
+             is_draft = false,
+             submitted_at = NOW(),
+             last_edited_at = NOW()
+         WHERE person_id = $1 AND period_type = 'life' AND status = 'draft' AND is_draft = true`,
+        [id]
+      );
+      
+      await client.query('COMMIT');
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }))
+
+  // Get user's drafts
+  router.get('/persons/drafts', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+    const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 200, maxLimit: 500 });
+    const countOnly = String(req.query.count || 'false') === 'true';
+    
+    if (countOnly) {
+      const cRes = await pool.query(
+        `SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1 AND is_draft = true`, 
+        [(req as any).user!.sub]
+      );
+      res.json({ success: true, data: { count: cRes.rows[0]?.cnt || 0 } });
+      return;
+    }
+    
+    const sql = `
+      SELECT p.id,
+             p.name,
+             p.birth_year,
+             p.death_year,
+             p.category,
+             p.description,
+             p.image_url,
+             p.wiki_link,
+             p.draft_saved_at,
+             p.last_edited_at
+        FROM persons p
+       WHERE p.created_by = $1 AND p.is_draft = true
+       ORDER BY p.last_edited_at DESC NULLS LAST, p.id DESC
+       LIMIT $2 OFFSET $3`;
+    const result = await pool.query(sql, [(req as any).user!.sub, limitParam + 1, offsetParam]);
+    const persons = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      birthYear: row.birth_year,
+      deathYear: row.death_year,
+      category: row.category,
+      description: row.description,
+      imageUrl: row.image_url,
+      wikiLink: row.wiki_link,
+      draftSavedAt: row.draft_saved_at,
+      lastEditedAt: row.last_edited_at,
+    }));
+    const { data, meta } = paginateRows(persons, limitParam, offsetParam);
+    res.json({ success: true, data, meta });
   }))
 
   // Removed legacy admin/persons pending & edits review routes (replaced by /api/admin/persons/moderation)
@@ -380,6 +750,92 @@ export function createPersonRoutes(pool: Pool) {
       }
       await client.query('COMMIT');
       res.json({ success: true });
+    } catch (e: any) {
+      try { await client.query('ROLLBACK'); } catch {}
+      const mapped = mapPgError(e)
+      if (mapped) throw mapped
+      throw e
+    } finally {
+      client.release();
+    }
+  }))
+
+  // Revert person from pending to draft status
+  router.post('/persons/:id/revert-to-draft', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = (req as any).user?.sub;
+    
+
+    
+    if (!userId) {
+      throw errors.unauthorized('Требуется аутентификация');
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Check if person exists and belongs to user
+      const personRes = await client.query(
+        `SELECT id, status, created_by FROM persons WHERE id = $1`,
+        [id]
+      );
+      
+      if (personRes.rows.length === 0) {
+        throw errors.notFound('Личность не найдена');
+      }
+      
+      const person = personRes.rows[0];
+      
+      // Check ownership
+      if (person.created_by !== userId) {
+        throw errors.forbidden('Можно возвращать в черновики только свои личности');
+      }
+      
+      // Check status
+      if (person.status !== 'pending') {
+        throw errors.badRequest('Можно возвращать в черновики только личности на модерации');
+      }
+      
+      // Update person to draft
+      await client.query(
+        `UPDATE persons 
+         SET status = 'draft', 
+             is_draft = true, 
+             draft_saved_at = NOW(), 
+             last_edited_at = NOW(),
+             submitted_at = NULL
+         WHERE id = $1`,
+        [person.id]
+      );
+      
+      // Update related periods to draft
+      await client.query(
+        `UPDATE periods 
+         SET status = 'draft', 
+             is_draft = true, 
+             draft_saved_at = NOW(), 
+             last_edited_at = NOW(),
+             submitted_at = NULL
+         WHERE person_id = $1 AND status = 'pending'`,
+        [person.id]
+      );
+      
+      // Update related achievements to draft
+      await client.query(
+        `UPDATE achievements 
+         SET status = 'draft', 
+             is_draft = true, 
+             draft_saved_at = NOW(), 
+             last_edited_at = NOW(),
+             submitted_at = NULL
+         WHERE person_id = $1 AND status = 'pending'`,
+        [person.id]
+      );
+      
+      await client.query('COMMIT');
+      res.json({ success: true, message: 'Личность и связанные данные возвращены в черновики' });
+      
     } catch (e: any) {
       try { await client.query('ROLLBACK'); } catch {}
       const mapped = mapPgError(e)

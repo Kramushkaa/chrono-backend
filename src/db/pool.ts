@@ -9,8 +9,8 @@ export function createPool(): Pool {
     password: process.env.DB_PASSWORD || 'password',
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : (undefined as any),
+    connectionTimeoutMillis: 30000, // Увеличиваем таймаут для удаленной БД
+    ssl: { rejectUnauthorized: false }, // Включаем SSL для удаленной базы данных
   })
 }
 
