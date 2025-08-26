@@ -106,9 +106,38 @@ export const logRequest = (req: Request, res: Response, next: NextFunction): voi
   const url = req.url;
   const userAgent = req.headers['user-agent'];
   const ip = (req.ip as any) || (req as any).socket?.remoteAddress || (req as any).connection?.remoteAddress || 'unknown';
-  const userId = req.user?.sub || 'anonymous';
+  
+  // Определяем пользователя
+  let userInfo = 'anonymous';
+  if (req.user) {
+    const role = req.user.role || 'user';
+    const userId = req.user.sub;
+    const email = req.user.email;
+    userInfo = `${email} (ID: ${userId}, ${role})`;
+  }
+  
+  // Сокращаем User-Agent для читаемости
+  let shortUA = 'unknown';
+  if (userAgent) {
+    if (userAgent.includes('Chrome')) {
+      shortUA = 'Chrome';
+    } else if (userAgent.includes('Firefox')) {
+      shortUA = 'Firefox';
+    } else if (userAgent.includes('Safari')) {
+      shortUA = 'Safari';
+    } else if (userAgent.includes('Edge')) {
+      shortUA = 'Edge';
+    } else if (userAgent.includes('Postman')) {
+      shortUA = 'Postman';
+    } else if (userAgent.includes('curl')) {
+      shortUA = 'curl';
+    } else {
+      // Берем первые 50 символов для неизвестных браузеров
+      shortUA = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+    }
+  }
 
-  console.log(`[${timestamp}] ${method} ${url} - User: ${userId} - IP: ${ip} - UA: ${userAgent}`);
+  console.log(`[${timestamp}] ${method} ${url} - User: ${userInfo} - IP: ${ip} - UA: ${shortUA}`);
   
   next();
 };

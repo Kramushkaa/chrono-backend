@@ -48,9 +48,7 @@ export function createPersonRoutes(pool: Pool) {
     // Always update audit/status on approve
     fields.push(`status = 'approved'`);
     fields.push(`updated_by = $${idx++}`);
-    fields.push(`reviewed_at = NOW()`);
-    fields.push(`reviewed_by = $${idx++}`);
-    values.push(reviewerUserId, reviewerUserId);
+    values.push(reviewerUserId);
     const sql = `UPDATE persons SET ${fields.join(', ')} WHERE id = $${idx}`;
     values.push(id);
     await pool.query(sql, values);
@@ -73,9 +71,7 @@ export function createPersonRoutes(pool: Pool) {
            image_url=EXCLUDED.image_url,
            wiki_link=EXCLUDED.wiki_link,
            status='approved',
-         updated_by=$9,
-           reviewed_at=NOW(),
-         reviewed_by=$9`,
+         updated_by=$9`,
       [id, name.trim(), Number(birthYear), Number(deathYear), category.trim(), (typeof description === 'string' ? description : ''), imageUrl ?? null, wikiLink ?? null, (req as any).user!.sub]
       );
       res.json({ success: true });
@@ -115,7 +111,7 @@ export function createPersonRoutes(pool: Pool) {
       params.push(`%${search}%`);
       paramIndex++;
     }
-    let query = `SELECT v.* FROM v_api_persons v JOIN persons p2 ON p2.id = v.id AND p2.status = 'approved'` + where;
+    let query = `SELECT v.* FROM v_approved_persons v` + where;
     query += ' ORDER BY v.birth_year ASC, v.id ASC';
     const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 100, maxLimit: 1000 });
     query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
@@ -130,26 +126,23 @@ export function createPersonRoutes(pool: Pool) {
   router.get('/admin/persons/moderation', authenticateToken, requireRoleMiddleware(['moderator', 'admin']), asyncHandler(async (req: any, res: any) => {
     const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 200, maxLimit: 500 });
     const countOnly = String(req.query.count || 'false') === 'true';
-    const baseTargetsSql = `
-      WITH targets AS (
-        SELECT p.id FROM persons p WHERE p.status = 'pending'
-        UNION
-        SELECT DISTINCT pr.person_id FROM periods pr WHERE pr.status = 'pending' AND pr.person_id IS NOT NULL
-        UNION
-        SELECT DISTINCT pe.person_id FROM person_edits pe WHERE pe.status = 'pending'
-      )`;
+    const contentType = req.query.content_type as string;
+    let whereClause = '';
+    const params: any[] = [];
+    
+    if (contentType) {
+      whereClause = ` WHERE content_type = $1`;
+      params.push(contentType);
+    }
+    
     if (countOnly) {
-      const result = await pool.query(`${baseTargetsSql} SELECT COUNT(*)::int AS cnt FROM targets`);
+      const result = await pool.query(`SELECT COUNT(*)::int AS cnt FROM v_pending_moderation${whereClause}`, params);
       res.json({ success: true, data: { count: result.rows[0]?.cnt || 0 } });
       return;
     }
-    const sql = `${baseTargetsSql}
-      SELECT v.*
-        FROM v_api_persons v
-        JOIN targets t ON t.id = v.id
-       ORDER BY v.name ASC
-       LIMIT $1 OFFSET $2`;
-    const result = await pool.query(sql, [limitParam + 1, offsetParam]);
+    const sql = `SELECT * FROM v_pending_moderation${whereClause} ORDER BY created_at DESC, id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limitParam + 1, offsetParam);
+    const result = await pool.query(sql, params);
     const persons = result.rows.map(mapApiPersonRow);
     const { data, meta } = paginateRows(persons, limitParam, offsetParam);
     res.json({ success: true, data, meta });
@@ -178,23 +171,23 @@ export function createPersonRoutes(pool: Pool) {
     }
     
     if (countOnly) {
-      // Считаем только личности, действительно созданные этим пользователем
+      // Используем оптимизированное представление для подсчета
       const countSql = `
-        SELECT COUNT(*)::int AS cnt 
-        FROM persons p
-        WHERE p.created_by = $1${statusCondition}
+        SELECT COALESCE(persons_count, 0) AS cnt 
+        FROM v_user_content_counts 
+        WHERE created_by = $1
       `;
-      const c = await pool.query(countSql, queryParams);
+      const c = await pool.query(countSql, [userId]);
       res.json({ success: true, data: { count: c.rows[0]?.cnt || 0 } });
       return;
     }
     
     const sql = `
-      SELECT v.*, p.status, p.is_draft
+      SELECT v.*, p.status
         FROM v_api_persons v
         JOIN persons p ON p.id = v.id
        WHERE p.created_by = $1${statusCondition}
-       ORDER BY COALESCE(p.last_edited_at, p.draft_saved_at, p.submitted_at) DESC NULLS LAST, p.id DESC
+       ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
        LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
     
     queryParams.push(limitParam + 1, offsetParam);
@@ -209,7 +202,7 @@ export function createPersonRoutes(pool: Pool) {
     const { id } = req.params;
     if (!id) { throw errors.badRequest('ID не указан') }
     const result = await pool.query(`
-      SELECT v.*, p.status, p.is_draft 
+      SELECT v.*, p.status 
       FROM v_api_persons v 
       JOIN persons p ON p.id = v.id 
       WHERE v.id = $1

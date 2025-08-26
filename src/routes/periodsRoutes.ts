@@ -38,8 +38,8 @@ export function createPeriodsRoutes(pool: Pool): Router {
     if (saveAsDraft) {
       // Сохранение как черновик
       result = await pool.query(
-        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by, is_draft, draft_saved_at, last_edited_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, true, NOW(), NOW())
+        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7)
          RETURNING *`,
         [id, start_year, end_year, period_type, country_id ?? null, comment ?? null, (req as any).user!.sub]
       );
@@ -53,8 +53,8 @@ export function createPeriodsRoutes(pool: Pool): Router {
     } else {
       // Обычные пользователи с подтверждённой почтой создают периоды в статусе pending
       result = await pool.query(
-        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by, submitted_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, NOW())
+        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
          RETURNING *`,
         [id, start_year, end_year, period_type, country_id ?? null, comment ?? null, (req as any).user!.sub]
       );
@@ -70,7 +70,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     
     // Проверяем, что период принадлежит пользователю или является черновиком
     const periodRes = await pool.query(
-      'SELECT created_by, is_draft, status FROM periods WHERE id = $1',
+      'SELECT created_by, status FROM periods WHERE id = $1',
       [id]
     );
     
@@ -82,7 +82,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     const userId = (req as any).user!.sub;
     
     if (period.created_by !== userId && period.status !== 'draft') {
-      throw errors.forbidden('Нет прав для редактирования этого периода')
+      throw errors.notFound('Нет прав для редактирования этого периода')
     }
     
     // Обновляем период
@@ -92,8 +92,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
            end_year = COALESCE($3, end_year), 
            period_type = COALESCE($4, period_type), 
            country_id = $5, 
-           comment = $6,
-           last_edited_at = NOW()
+           comment = $6
        WHERE id = $1
        RETURNING *`,
       [id, start_year, end_year, period_type, country_id ?? null, comment ?? null]
@@ -108,7 +107,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     
     // Проверяем, что период является черновиком и принадлежит пользователю
     const periodRes = await pool.query(
-      'SELECT created_by, is_draft, status FROM periods WHERE id = $1',
+      'SELECT created_by, status FROM periods WHERE id = $1',
       [id]
     );
     
@@ -130,10 +129,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     // Отправляем на модерацию
     const result = await pool.query(
       `UPDATE periods 
-       SET status = 'pending', 
-           is_draft = false, 
-           submitted_at = NOW(),
-           last_edited_at = NOW()
+       SET status = 'pending'
        WHERE id = $1
        RETURNING *`,
       [id]
@@ -149,7 +145,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     
     if (countOnly) {
       const cRes = await pool.query(
-        `SELECT COUNT(*)::int AS cnt FROM periods WHERE created_by = $1 AND is_draft = true`, 
+        `SELECT COUNT(*)::int AS cnt FROM periods WHERE created_by = $1 AND status = 'draft'`, 
         [(req as any).user!.sub]
       );
       res.json({ success: true, data: { count: cRes.rows[0]?.cnt || 0 } });
@@ -165,15 +161,14 @@ export function createPeriodsRoutes(pool: Pool): Router {
              pr.period_type,
              pr.comment,
              pr.status,
-             pr.draft_saved_at,
-             pr.last_edited_at,
+             pr.updated_at,
              p.name AS person_name,
              c.name AS country_name
         FROM periods pr
         LEFT JOIN persons   p ON p.id = pr.person_id
         LEFT JOIN countries c ON c.id = pr.country_id
-       WHERE pr.created_by = $1 AND pr.is_draft = true
-       ORDER BY pr.last_edited_at DESC NULLS LAST, pr.id DESC
+       WHERE pr.created_by = $1 AND pr.status = 'draft'
+       ORDER BY pr.updated_at DESC NULLS LAST, pr.id DESC
        LIMIT $2 OFFSET $3`;
     
     const result = await pool.query(sql, [(req as any).user!.sub, limitParam + 1, offsetParam]);
@@ -203,7 +198,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
              pr.comment,
              pr.status,
              pr.created_by,
-             pr.submitted_at,
+             pr.updated_at,
              p.name AS person_name,
              c.name AS country_name,
              u.email AS creator_email,
@@ -213,7 +208,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
         LEFT JOIN countries c ON c.id = pr.country_id
         LEFT JOIN users     u ON u.id = pr.created_by
        WHERE pr.status = 'pending'
-       ORDER BY pr.submitted_at DESC NULLS LAST, pr.id DESC
+       ORDER BY pr.updated_at DESC NULLS LAST, pr.id DESC
        LIMIT $1 OFFSET $2`;
     
     const result = await pool.query(sql, [limitParam + 1, offsetParam]);
@@ -233,12 +228,12 @@ export function createPeriodsRoutes(pool: Pool): Router {
     
     if (action === 'approve') {
       await pool.query(
-        `UPDATE periods SET status='approved', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
+        `UPDATE periods SET status='approved', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
         [id, (req as any).user!.sub, comment ?? null]
       );
     } else if (action === 'reject') {
       await pool.query(
-        `UPDATE periods SET status='rejected', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
+        `UPDATE periods SET status='rejected', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
         [id, (req as any).user!.sub, comment ?? null]
       );
     } else {
@@ -254,7 +249,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     const countOnly = String(req.query.count || 'false') === 'true';
     
     if (countOnly) {
-      const cRes = await pool.query(`SELECT COUNT(*)::int AS cnt FROM periods WHERE created_by = $1`, [(req as any).user!.sub]);
+      const cRes = await pool.query(`SELECT COALESCE(periods_count, 0) AS cnt FROM v_user_content_counts WHERE created_by = $1`, [(req as any).user!.sub]);
       res.json({ success: true, data: { count: cRes.rows[0]?.cnt || 0 } });
       return;
     }
@@ -268,8 +263,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
              pr.period_type,
              pr.comment,
              pr.status,
-             pr.submitted_at,
-             pr.reviewed_at,
+             pr.updated_at,
              pr.review_comment,
              p.name AS person_name,
              c.name AS country_name
@@ -277,7 +271,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
         LEFT JOIN persons   p ON p.id = pr.person_id
         LEFT JOIN countries c ON c.id = pr.country_id
        WHERE pr.created_by = $1
-       ORDER BY pr.submitted_at DESC NULLS LAST, pr.id DESC
+       ORDER BY pr.updated_at DESC NULLS LAST, pr.id DESC
        LIMIT $2 OFFSET $3`;
     
     const result = await pool.query(sql, [(req as any).user!.sub, limitParam + 1, offsetParam]);
@@ -286,7 +280,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     res.json({ success: true, data, meta });
   }))
 
-  // Public periods list
+  // Public periods list (via v_approved_periods)
   router.get('/periods', asyncHandler(async (req: any, res: any) => {
     const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 200, maxLimit: 500 });
     const type = (req.query.type || '').toString().trim().toLowerCase();
@@ -296,28 +290,26 @@ export function createPeriodsRoutes(pool: Pool): Router {
     const yearFromNum = parseInt((req.query.year_from as string) || '');
     const yearToNum = parseInt((req.query.year_to as string) || '');
     const params: any[] = [];
-    let where = ` WHERE pr.status = 'approved'`;
-    if (type === 'life' || type === 'ruler') { where += ` AND pr.period_type = $${params.length + 1}`; params.push(type); }
-    if (q.length > 0) { where += ` AND (p.name ILIKE $${params.length + 1} OR c.name ILIKE $${params.length + 1})`; params.push(`%${q}%`); }
-    if (personId.length > 0) { where += ` AND pr.person_id = $${params.length + 1}`; params.push(personId); }
-    if (Number.isInteger(countryIdNum)) { where += ` AND pr.country_id = $${params.length + 1}`; params.push(countryIdNum); }
-    if (Number.isInteger(yearFromNum)) { where += ` AND pr.start_year >= $${params.length + 1}`; params.push(yearFromNum); }
-    if (Number.isInteger(yearToNum)) { where += ` AND pr.end_year <= $${params.length + 1}`; params.push(yearToNum); }
+    let where = ` WHERE 1=1`;
+    if (type === 'life' || type === 'ruler') { where += ` AND v.period_type = $${params.length + 1}`; params.push(type); }
+    if (q.length > 0) { where += ` AND (v.person_name ILIKE $${params.length + 1} OR v.country_name ILIKE $${params.length + 1})`; params.push(`%${q}%`); }
+    if (personId.length > 0) { where += ` AND v.person_id = $${params.length + 1}`; params.push(personId); }
+    if (Number.isInteger(countryIdNum)) { where += ` AND v.country_id = $${params.length + 1}`; params.push(countryIdNum); }
+    if (Number.isInteger(yearFromNum)) { where += ` AND v.start_year >= $${params.length + 1}`; params.push(yearFromNum); }
+    if (Number.isInteger(yearToNum)) { where += ` AND v.end_year <= $${params.length + 1}`; params.push(yearToNum); }
     params.push(limitParam + 1, offsetParam);
     const sql = `
-      SELECT pr.id,
-             pr.person_id,
-             pr.country_id,
-             pr.start_year,
-             pr.end_year,
-             pr.period_type,
-             p.name  AS person_name,
-             c.name  AS country_name
-        FROM periods pr
-        LEFT JOIN persons   p ON p.id = pr.person_id
-        LEFT JOIN countries c ON c.id = pr.country_id
+      SELECT v.id,
+             v.person_id,
+             v.country_id,
+             v.start_year,
+             v.end_year,
+             v.period_type,
+             v.person_name,
+             v.country_name
+        FROM v_approved_periods v
        ${where}
-       ORDER BY pr.start_year ASC, pr.id ASC
+       ORDER BY v.start_year ASC, v.id ASC
        LIMIT $${params.length - 1} OFFSET $${params.length}`;
     const result = await pool.query(sql, params);
     const rows = result.rows;

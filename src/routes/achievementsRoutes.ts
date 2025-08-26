@@ -26,7 +26,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
              a.image_url,
              a.status,
              a.created_by,
-             a.submitted_at,
+             a.updated_at,
              COALESCE(
                CASE WHEN a.country_id IS NOT NULL THEN c.name
                     WHEN a.person_id IS NOT NULL THEN p.name
@@ -40,7 +40,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
         LEFT JOIN countries c ON c.id = a.country_id
         LEFT JOIN users     u ON u.id = a.created_by
        WHERE a.status = 'pending'
-       ORDER BY a.submitted_at DESC NULLS LAST, a.id DESC
+       ORDER BY a.updated_at DESC NULLS LAST, a.id DESC
        LIMIT $1 OFFSET $2`;
     const result = await pool.query(sql, [limitParam + 1, offsetParam]);
     const rows = result.rows;
@@ -53,7 +53,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
     const { limitParam, offsetParam } = parseLimitOffset(req.query.limit, req.query.offset, { defLimit: 200, maxLimit: 500 });
     const countOnly = String(req.query.count || 'false') === 'true';
     if (countOnly) {
-      const cRes = await pool.query(`SELECT COUNT(*)::int AS cnt FROM achievements WHERE created_by = $1`, [(req as any).user!.sub]);
+      const cRes = await pool.query(`SELECT COALESCE(achievements_count, 0) AS cnt FROM v_user_content_counts WHERE created_by = $1`, [(req as any).user!.sub]);
       res.json({ success: true, data: { count: cRes.rows[0]?.cnt || 0 } });
       return;
     }
@@ -66,8 +66,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
              a.wikipedia_url,
              a.image_url,
              a.status,
-             a.submitted_at,
-             a.reviewed_at,
+             a.updated_at,
              a.review_comment,
              COALESCE(
                CASE WHEN a.country_id IS NOT NULL THEN c.name
@@ -79,7 +78,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
         LEFT JOIN persons   p ON p.id = a.person_id
         LEFT JOIN countries c ON c.id = a.country_id
        WHERE a.created_by = $1
-       ORDER BY a.submitted_at DESC NULLS LAST, a.id DESC
+       ORDER BY a.updated_at DESC NULLS LAST, a.id DESC
        LIMIT $2 OFFSET $3`;
     const result = await pool.query(sql, [(req as any).user!.sub, limitParam + 1, offsetParam]);
     const rows = result.rows;
@@ -98,39 +97,37 @@ export function createAchievementsRoutes(pool: Pool): Router {
     const params: any[] = []
     let paramIndex = 1
     let sql = `
-      SELECT a.id, a.person_id, a.country_id, a.year, a.description, a.wikipedia_url, a.image_url,
-             p.name AS person_name, c.name AS country_name
-        FROM achievements a
-        LEFT JOIN persons p ON p.id = a.person_id
-        LEFT JOIN countries c ON c.id = a.country_id
-       WHERE a.status = 'approved'
+      SELECT v.id, v.person_id, v.country_id, v.year, v.description, v.wikipedia_url, v.image_url,
+             v.person_name, v.country_name
+        FROM v_approved_achievements v
+       WHERE 1=1
     `
     if (q.length > 0) {
-      sql += ` AND (a.description ILIKE $${paramIndex} OR p.name ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex})`
+      sql += ` AND (v.description ILIKE $${paramIndex} OR v.person_name ILIKE $${paramIndex} OR v.country_name ILIKE $${paramIndex})`
       params.push(`%${q}%`)
       paramIndex++
     }
     if (personId.length > 0) {
-      sql += ` AND a.person_id = $${paramIndex}`
+      sql += ` AND v.person_id = $${paramIndex}`
       params.push(personId)
       paramIndex++
     }
     if (Number.isInteger(countryIdNum)) {
-      sql += ` AND a.country_id = $${paramIndex}`
+      sql += ` AND v.country_id = $${paramIndex}`
       params.push(countryIdNum)
       paramIndex++
     }
     if (Number.isInteger(yearFromNum)) {
-      sql += ` AND a.year >= $${paramIndex}`
+      sql += ` AND v.year >= $${paramIndex}`
       params.push(yearFromNum)
       paramIndex++
     }
     if (Number.isInteger(yearToNum)) {
-      sql += ` AND a.year <= $${paramIndex}`
+      sql += ` AND v.year <= $${paramIndex}`
       params.push(yearToNum)
       paramIndex++
     }
-    sql += ` ORDER BY a.year ASC, a.id ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
+    sql += ` ORDER BY v.year ASC, v.id ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
     params.push(limitParam + 1, offsetParam)
     const r = await pool.query(sql, params)
     const rows = r.rows
@@ -142,8 +139,8 @@ export function createAchievementsRoutes(pool: Pool): Router {
   router.get('/persons/:id/achievements', asyncHandler(async (req: any, res: any) => {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT id, person_id, year, description, wikipedia_url, image_url FROM achievements WHERE person_id = $1 AND status = $2 ORDER BY year ASC',
-      [id, 'approved']
+      'SELECT id, person_id, year, description, wikipedia_url, image_url FROM v_approved_achievements WHERE person_id = $1 ORDER BY year ASC',
+      [id]
     );
     res.json({ success: true, data: result.rows });
   }))
@@ -172,8 +169,8 @@ export function createAchievementsRoutes(pool: Pool): Router {
     if (saveAsDraft) {
       // Сохранение как черновик
       result = await pool.query(
-        `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url, status, created_by, is_draft, draft_saved_at, last_edited_at)
-         VALUES ($1, $2, btrim($3), $4, $5, 'draft', $6, true, NOW(), NOW())
+        `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url, status, created_by)
+         VALUES ($1, $2, btrim($3), $4, $5, 'draft', $6)
          RETURNING *`,
         [id, year, description, wikipedia_url ?? null, image_url ?? null, (req as any).user!.sub]
       );
@@ -190,8 +187,8 @@ export function createAchievementsRoutes(pool: Pool): Router {
     } else {
       // Обычные пользователи с подтверждённой почтой создают достижения в статусе pending
       result = await pool.query(
-        `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url, status, created_by, submitted_at)
-         VALUES ($1, $2, btrim($3), $4, $5, 'pending', $6, NOW())
+        `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url, status, created_by)
+         VALUES ($1, $2, btrim($3), $4, $5, 'pending', $6)
          RETURNING *`,
         [id, year, description, wikipedia_url ?? null, image_url ?? null, (req as any).user!.sub]
       );
@@ -206,7 +203,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
     
     // Проверяем, что достижение принадлежит пользователю или является черновиком
     const achievementRes = await pool.query(
-      'SELECT created_by, is_draft, status FROM achievements WHERE id = $1',
+      'SELECT created_by, status FROM achievements WHERE id = $1',
       [id]
     );
     
@@ -227,8 +224,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
        SET year = COALESCE($2, year), 
            description = COALESCE($3, description), 
            wikipedia_url = $4, 
-           image_url = $5,
-           last_edited_at = NOW()
+           image_url = $5
        WHERE id = $1
        RETURNING *`,
       [id, year, description, wikipedia_url ?? null, image_url ?? null]
@@ -243,7 +239,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
     
     // Проверяем, что достижение является черновиком и принадлежит пользователю
     const achievementRes = await pool.query(
-      'SELECT created_by, is_draft, status FROM achievements WHERE id = $1',
+      'SELECT created_by, status FROM achievements WHERE id = $1',
       [id]
     );
     
@@ -265,10 +261,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
     // Отправляем на модерацию
     const result = await pool.query(
       `UPDATE achievements 
-       SET status = 'pending', 
-           is_draft = false, 
-           submitted_at = NOW(),
-           last_edited_at = NOW()
+       SET status = 'pending'
        WHERE id = $1
        RETURNING *`,
       [id]
@@ -284,7 +277,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
     
     if (countOnly) {
       const cRes = await pool.query(
-        `SELECT COUNT(*)::int AS cnt FROM achievements WHERE created_by = $1 AND is_draft = true`, 
+        `SELECT COUNT(*)::int AS cnt FROM achievements WHERE created_by = $1 AND status = 'draft'`, 
         [(req as any).user!.sub]
       );
       res.json({ success: true, data: { count: cRes.rows[0]?.cnt || 0 } });
@@ -300,8 +293,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
              a.wikipedia_url,
              a.image_url,
              a.status,
-             a.draft_saved_at,
-             a.last_edited_at,
+             a.updated_at,
              COALESCE(
                CASE WHEN a.country_id IS NOT NULL THEN c.name
                     WHEN a.person_id IS NOT NULL THEN p.name
@@ -311,8 +303,8 @@ export function createAchievementsRoutes(pool: Pool): Router {
         FROM achievements a
         LEFT JOIN persons   p ON p.id = a.person_id
         LEFT JOIN countries c ON c.id = a.country_id
-       WHERE a.created_by = $1 AND a.is_draft = true
-       ORDER BY a.last_edited_at DESC NULLS LAST, a.id DESC
+       WHERE a.created_by = $1 AND a.status = 'draft'
+       ORDER BY a.updated_at DESC NULLS LAST, a.id DESC
        LIMIT $2 OFFSET $3`;
     
     const result = await pool.query(sql, [(req as any).user!.sub, limitParam + 1, offsetParam]);
@@ -364,12 +356,12 @@ export function createAchievementsRoutes(pool: Pool): Router {
     }
     if (action === 'approve') {
       await pool.query(
-        `UPDATE achievements SET status='approved', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
+        `UPDATE achievements SET status='approved', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
         [id, (req as any).user!.sub, comment ?? null]
       );
     } else if (action === 'reject') {
       await pool.query(
-        `UPDATE achievements SET status='rejected', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
+        `UPDATE achievements SET status='rejected', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
         [id, (req as any).user!.sub, comment ?? null]
       );
     } else {

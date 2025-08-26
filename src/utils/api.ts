@@ -28,9 +28,6 @@ export function mapApiPersonRow(row: any) {
   if (row.status !== undefined) {
     result.status = row.status;
   }
-  if (row.is_draft !== undefined) {
-    result.is_draft = row.is_draft;
-  }
   
   return result;
 }
