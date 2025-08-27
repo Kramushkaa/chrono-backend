@@ -258,8 +258,8 @@ export function createPersonRoutes(pool: Pool) {
         if (saveAsDraft) {
           // Сохранение как черновик
           await client.query(
-          `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by, is_draft, draft_saved_at, last_edited_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$9,true,NOW(),NOW())
+          `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$9)
              ON CONFLICT (id) DO UPDATE SET
                name=EXCLUDED.name,
                birth_year=EXCLUDED.birth_year,
@@ -269,17 +269,14 @@ export function createPersonRoutes(pool: Pool) {
                image_url=EXCLUDED.image_url,
                wiki_link=EXCLUDED.wiki_link,
                status='draft',
-               updated_by=$9,
-               is_draft=true,
-               draft_saved_at=NOW(),
-               last_edited_at=NOW()`,
+               updated_by=$9`,
           [id, name, birthYear, deathYear, category, description, imageUrl ?? null, wikiLink ?? null, (req as any).user!.sub]
           );
         } else {
           // Создание как pending для модерации
           await client.query(
-      `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by, submitted_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$9,NOW())
+      `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$9)
          ON CONFLICT (id) DO UPDATE SET
            name=EXCLUDED.name,
            birth_year=EXCLUDED.birth_year,
@@ -289,8 +286,7 @@ export function createPersonRoutes(pool: Pool) {
            image_url=EXCLUDED.image_url,
            wiki_link=EXCLUDED.wiki_link,
            status='pending',
-         updated_by=$9,
-           submitted_at=NOW()`,
+           updated_by=$9`,
       [id, name, birthYear, deathYear, category, description, imageUrl ?? null, wikiLink ?? null, (req as any).user!.sub]
       );
         }
@@ -330,14 +326,14 @@ export function createPersonRoutes(pool: Pool) {
           for (const p of normalizedPeriods) {
             if (saveAsDraft) {
               await client.query(
-                `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by, is_draft, draft_saved_at, last_edited_at)
-                 VALUES ($1, $2, $3, 'life', $4, 'draft', $5, true, NOW(), NOW())`,
+                `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by)
+                 VALUES ($1, $2, $3, 'life', $4, 'draft', $5)`,
                 [id, p.start_year, p.end_year, p.country_id, (req as any).user!.sub]
               );
             } else {
               await client.query(
-                `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by, submitted_at)
-                 VALUES ($1, $2, $3, 'life', $4, 'pending', $5, NOW())`,
+                `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by)
+                 VALUES ($1, $2, $3, 'life', $4, 'pending', $5)`,
                 [id, p.start_year, p.end_year, p.country_id, (req as any).user!.sub]
               );
             }
@@ -363,12 +359,12 @@ export function createPersonRoutes(pool: Pool) {
       }
       if (action === 'approve') {
         await pool.query(
-          `UPDATE persons SET status='approved', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
+          `UPDATE persons SET status='approved', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
           [id, (req as any).user!.sub, comment ?? null]
         );
       } else if (action === 'reject') {
         await pool.query(
-          `UPDATE persons SET status='rejected', reviewed_at=NOW(), reviewed_by=$2, review_comment=$3 WHERE id=$1`,
+          `UPDATE persons SET status='rejected', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
           [id, (req as any).user!.sub, comment ?? null]
         );
       } else {
@@ -431,7 +427,7 @@ export function createPersonRoutes(pool: Pool) {
     
     // Проверяем, что личность принадлежит пользователю или является черновиком
     const personRes = await pool.query(
-      'SELECT created_by, is_draft, status, birth_year, death_year FROM persons WHERE id = $1',
+      'SELECT created_by, status, birth_year, death_year FROM persons WHERE id = $1',
       [id]
     );
     
@@ -473,9 +469,9 @@ export function createPersonRoutes(pool: Pool) {
       }
       
       // Добавляем обновление времени редактирования
-      fields.push(`last_edited_at = NOW()`);
+      fields.push(`updated_at = NOW()`);
       
-      if (fields.length > 1) { // больше 1, потому что last_edited_at всегда есть
+      if (fields.length > 1) { // больше 1, потому что updated_at всегда есть
         const sql = `UPDATE persons SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
         values.push(id);
         
@@ -517,8 +513,8 @@ export function createPersonRoutes(pool: Pool) {
         // Вставляем новые периоды (как черновики)
         for (const p of normalizedPeriods) {
           await client.query(
-            `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by, is_draft, draft_saved_at, last_edited_at)
-             VALUES ($1, $2, $3, 'life', $4, 'draft', $5, true, NOW(), NOW())`,
+            `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by)
+             VALUES ($1, $2, $3, 'life', $4, 'draft', $5)`,
             [id, p.start_year, p.end_year, p.country_id, userId]
           );
         }
@@ -540,7 +536,7 @@ export function createPersonRoutes(pool: Pool) {
     
     // Проверяем, что личность является черновиком и принадлежит пользователю
     const personRes = await pool.query(
-      'SELECT created_by, is_draft, status FROM persons WHERE id = $1',
+      'SELECT created_by, status FROM persons WHERE id = $1',
       [id]
     );
     
@@ -567,10 +563,7 @@ export function createPersonRoutes(pool: Pool) {
       // Обновляем персону
       const result = await client.query(
         `UPDATE persons 
-         SET status = 'pending', 
-             is_draft = false, 
-             submitted_at = NOW(),
-             last_edited_at = NOW()
+         SET status = 'pending'
          WHERE id = $1
          RETURNING *`,
         [id]
@@ -579,11 +572,8 @@ export function createPersonRoutes(pool: Pool) {
       // Также обновляем статус связанных периодов жизни, но только тех, которые являются черновиками
       await client.query(
         `UPDATE periods 
-         SET status = 'pending',
-             is_draft = false,
-             submitted_at = NOW(),
-             last_edited_at = NOW()
-         WHERE person_id = $1 AND period_type = 'life' AND status = 'draft' AND is_draft = true`,
+         SET status = 'pending'
+         WHERE person_id = $1 AND period_type = 'life' AND status = 'draft'`,
         [id]
       );
       
@@ -604,7 +594,7 @@ export function createPersonRoutes(pool: Pool) {
     
     if (countOnly) {
       const cRes = await pool.query(
-        `SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1 AND is_draft = true`, 
+        `SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1 AND status = 'draft'`, 
         [(req as any).user!.sub]
       );
       res.json({ success: true, data: { count: cRes.rows[0]?.cnt || 0 } });
@@ -620,11 +610,11 @@ export function createPersonRoutes(pool: Pool) {
              p.description,
              p.image_url,
              p.wiki_link,
-             p.draft_saved_at,
-             p.last_edited_at
+             p.created_at,
+             p.updated_at
         FROM persons p
-       WHERE p.created_by = $1 AND p.is_draft = true
-       ORDER BY p.last_edited_at DESC NULLS LAST, p.id DESC
+       WHERE p.created_by = $1 AND p.status = 'draft'
+       ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
        LIMIT $2 OFFSET $3`;
     const result = await pool.query(sql, [(req as any).user!.sub, limitParam + 1, offsetParam]);
     const persons = result.rows.map(row => ({
@@ -636,8 +626,8 @@ export function createPersonRoutes(pool: Pool) {
       description: row.description,
       imageUrl: row.image_url,
       wikiLink: row.wiki_link,
-      draftSavedAt: row.draft_saved_at,
-      lastEditedAt: row.last_edited_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     }));
     const { data, meta } = paginateRows(persons, limitParam, offsetParam);
     res.json({ success: true, data, meta });
@@ -735,8 +725,8 @@ export function createPersonRoutes(pool: Pool) {
       } else {
         for (const p of norm) {
           await client.query(
-            `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by, submitted_at)
-             VALUES ($1, $2, $3, 'life', $4, NULL, 'pending', $5, NOW())`,
+            `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
+             VALUES ($1, $2, $3, 'life', $4, NULL, 'pending', $5)`,
             [id, p.start_year, p.end_year, p.country_id, (req as any).user!.sub]
           );
         }
@@ -793,11 +783,7 @@ export function createPersonRoutes(pool: Pool) {
       // Update person to draft
       await client.query(
         `UPDATE persons 
-         SET status = 'draft', 
-             is_draft = true, 
-             draft_saved_at = NOW(), 
-             last_edited_at = NOW(),
-             submitted_at = NULL
+         SET status = 'draft'
          WHERE id = $1`,
         [person.id]
       );
@@ -805,11 +791,7 @@ export function createPersonRoutes(pool: Pool) {
       // Update related periods to draft
       await client.query(
         `UPDATE periods 
-         SET status = 'draft', 
-             is_draft = true, 
-             draft_saved_at = NOW(), 
-             last_edited_at = NOW(),
-             submitted_at = NULL
+         SET status = 'draft'
          WHERE person_id = $1 AND status = 'pending'`,
         [person.id]
       );
@@ -817,11 +799,7 @@ export function createPersonRoutes(pool: Pool) {
       // Update related achievements to draft
       await client.query(
         `UPDATE achievements 
-         SET status = 'draft', 
-             is_draft = true, 
-             draft_saved_at = NOW(), 
-             last_edited_at = NOW(),
-             submitted_at = NULL
+         SET status = 'draft'
          WHERE person_id = $1 AND status = 'pending'`,
         [person.id]
       );

@@ -7,6 +7,67 @@ import { paginateRows, parseLimitOffset } from '../utils/api'
 export function createPeriodsRoutes(pool: Pool): Router {
   const router = Router()
 
+  // Create standalone period (with person_id)
+  router.post('/periods', authenticateToken, requireVerifiedEmail, asyncHandler(async (req: any, res: any) => {
+    const { name, start_year, end_year, description, type, country_id, person_id, saveAsDraft = false } = req.body || {};
+
+    if (!name || !start_year || !end_year || !description || !type || !person_id) {
+      throw errors.badRequest('name, start_year, end_year, description, type и person_id обязательны')
+    }
+
+    // Для периодов типов "life" и "ruler" обязательно привязка к личности
+    if ((type === 'life' || type === 'ruler') && !person_id) {
+      throw errors.badRequest('Для периодов типов "life" и "ruler" обязательно нужно указать person_id')
+    }
+
+    if (start_year >= end_year) {
+      throw errors.badRequest('start_year должен быть меньше end_year')
+    }
+
+    // Проверяем, что личность существует
+    const personRes = await pool.query('SELECT id, birth_year, death_year FROM persons WHERE id = $1', [person_id]);
+    if (personRes.rowCount === 0) {
+      throw errors.notFound('Личность не найдена')
+    }
+
+    const person = personRes.rows[0];
+    if (person.birth_year != null && person.death_year != null) {
+      if (start_year < Number(person.birth_year) || end_year > Number(person.death_year)) {
+        throw errors.badRequest(`Годы периода (${start_year}–${end_year}) должны входить в годы жизни Личности (${person.birth_year}–${person.death_year})`)
+      }
+    }
+
+    const role = (req as any).user?.role || 'user'
+    let result
+
+    if (saveAsDraft) {
+      // Сохранение как черновик
+      result = await pool.query(
+        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7)
+         RETURNING *`,
+        [person_id, start_year, end_year, type, country_id ?? null, description, (req as any).user!.sub]
+      );
+    } else if (role === 'admin' || role === 'moderator') {
+      result = await pool.query(
+        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'approved', $7)
+         RETURNING *`,
+        [person_id, start_year, end_year, type, country_id ?? null, description, (req as any).user!.sub]
+      );
+    } else {
+      // Обычные пользователи с подтверждённой почтой создают периоды в статусе pending
+      result = await pool.query(
+        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+         RETURNING *`,
+        [person_id, start_year, end_year, type, country_id ?? null, description, (req as any).user!.sub]
+      );
+    }
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  }))
+
   // Create period for person (admin/moderator OR verified user)
   router.post('/persons/:id/periods', authenticateToken, requireVerifiedEmail, asyncHandler(async (req: any, res: any) => {
     const { id } = req.params;
