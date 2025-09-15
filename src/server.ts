@@ -180,16 +180,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Aggregated counts for "mine" (persons, achievements, periods)
-app.get('/api/mine/counts', authenticateToken, asyncHandler(async (req: any, res: any) => {
-  const userId = req.user?.sub;
-  const [pc, ac, prc] = await Promise.all([
-    pool.query(`SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1`, [userId]),
-    pool.query(`SELECT COUNT(*)::int AS cnt FROM achievements WHERE created_by = $1`, [userId]),
-    pool.query(`SELECT COUNT(*)::int AS cnt FROM periods WHERE created_by = $1`, [userId]),
-  ]);
-  res.json({ success: true, data: { persons: pc.rows[0]?.cnt || 0, achievements: ac.rows[0]?.cnt || 0, periods: prc.rows[0]?.cnt || 0 } });
-}));
+// Removed unused endpoint /api/mine/counts (no longer referenced by frontend)
 
 // Обработка ошибок
 app.use(errorHandler);
