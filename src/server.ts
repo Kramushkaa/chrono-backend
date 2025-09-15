@@ -107,36 +107,7 @@ app.use('/api', createMetaRoutes(pool));
 // Lists routes
 app.use('/api', createListsRoutes(pool));
 
-// Health check endpoint
-app.get('/api/health', asyncHandler(async (_req: any, res: any) => {
-  try {
-    // Проверяем подключение к базе данных
-    const client = await pool.connect();
-    client.release();
-    
-    res.json({
-      success: true,
-      data: {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        database: 'connected',
-        uptime: process.uptime()
-      }
-    });
-  } catch (error) {
-    res.status(503).json({
-      success: false,
-      data: {
-        status: 'unhealthy',
-        timestamp: new Date().toISOString(),
-        database: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }
-    });
-  }
-}));
-
-// Backend info endpoint
+// Backend info endpoint (оставляем как отдельный информационный маршрут)
 app.get('/api/backend-info', asyncHandler(async (_req: any, res: any) => {
   res.json({
     success: true,
@@ -209,45 +180,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// DTO version endpoint for drift detection on FE
-app.get('/api/dto-version', asyncHandler(async (_req: any, res: any) => {
-  res.json({ success: true, data: { version: DTO_VERSION_BE } });
-}));
-
-// Маршрут для получения категорий
-app.get('/api/categories', asyncHandler(async (req: any, res: any) => {
-  // Пробуем сначала использовать таблицу unique_categories, если она существует
-  let query = 'SELECT category FROM unique_categories';
-  let result = await pool.query(query);
-  
-  // Если таблица не существует, используем DISTINCT
-  if (result.rows.length === 0) {
-    query = `
-      SELECT DISTINCT category 
-      FROM persons 
-      WHERE category IS NOT NULL 
-      ORDER BY category
-    `;
-    result = await pool.query(query);
-  }
-  
-  const categories = result.rows.map(row => row.category);
-  res.json({ success: true, data: categories });
-}));
-
-// Маршрут для получения стран
-app.get('/api/countries', asyncHandler(async (req: any, res: any) => {
-  const result = await pool.query('SELECT id, name FROM countries ORDER BY name');
-  res.json({ success: true, data: result.rows });
-}));
-
-// Маршрут для получения стран в формате options
-app.get('/api/countries/options', asyncHandler(async (req: any, res: any) => {
-  const result = await pool.query('SELECT id, name FROM countries ORDER BY name');
-  const options = result.rows.map(row => ({ value: row.id, label: row.name }));
-  res.json({ success: true, data: options });
-}));
-
 // Aggregated counts for "mine" (persons, achievements, periods)
 app.get('/api/mine/counts', authenticateToken, asyncHandler(async (req: any, res: any) => {
   const userId = req.user?.sub;
@@ -257,39 +189,6 @@ app.get('/api/mine/counts', authenticateToken, asyncHandler(async (req: any, res
     pool.query(`SELECT COUNT(*)::int AS cnt FROM periods WHERE created_by = $1`, [userId]),
   ]);
   res.json({ success: true, data: { persons: pc.rows[0]?.cnt || 0, achievements: ac.rows[0]?.cnt || 0, periods: prc.rows[0]?.cnt || 0 } });
-}));
-
-// Статистика по базе данных
-app.get('/api/stats', asyncHandler(async (req: any, res: any) => {
-  const statsResult = await pool.query(`
-    SELECT 
-      COUNT(*) AS total_persons,
-      COUNT(*) FILTER (WHERE status = 'approved') AS approved_persons,
-      COUNT(*) FILTER (WHERE status = 'pending') AS pending_persons,
-      COUNT(*) FILTER (WHERE status = 'draft') AS draft_persons
-    FROM persons
-  `);
-
-  const categoryStatsResult = await pool.query(`
-    SELECT category, COUNT(*) as count
-    FROM persons
-    GROUP BY category
-    ORDER BY count DESC
-  `);
-
-  const countryStatsResult = await pool.query(`
-    SELECT name AS country, persons_with_periods AS count
-    FROM v_country_stats
-    ORDER BY count DESC
-  `);
-
-  const stats = {
-    overview: statsResult.rows[0],
-    categories: categoryStatsResult.rows,
-    countries: countryStatsResult.rows
-  };
-
-  res.json({ success: true, data: stats });
 }));
 
 // Обработка ошибок

@@ -233,6 +233,31 @@ export function createAchievementsRoutes(pool: Pool): Router {
     res.json({ success: true, data: result.rows[0] });
   }))
 
+  // Delete achievement (author of draft or moderator/admin)
+  router.delete('/achievements/:id', authenticateToken, asyncHandler(async (req: any, res: any) => {
+    const { id } = req.params
+    const userId = (req as any).user!.sub
+    const role = (req as any).user?.role || 'user'
+
+    const achievementRes = await pool.query(
+      'SELECT created_by, status FROM achievements WHERE id = $1',
+      [id]
+    )
+    if (achievementRes.rowCount === 0) {
+      throw errors.notFound('Достижение не найдено')
+    }
+    const achievement = achievementRes.rows[0]
+
+    const isOwnerDraft = achievement.created_by === userId && achievement.status === 'draft'
+    const isModerator = role === 'admin' || role === 'moderator'
+    if (!isOwnerDraft && !isModerator) {
+      throw errors.forbidden('Нет прав для удаления этого достижения')
+    }
+
+    await pool.query('DELETE FROM achievements WHERE id = $1', [id])
+    res.json({ success: true })
+  }))
+
   // Submit draft for moderation
   router.post('/achievements/:id/submit', authenticateToken, requireVerifiedEmail, asyncHandler(async (req: any, res: any) => {
     const { id } = req.params;

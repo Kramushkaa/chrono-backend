@@ -143,7 +143,7 @@ export function createPeriodsRoutes(pool: Pool): Router {
     const userId = (req as any).user!.sub;
     
     if (period.created_by !== userId && period.status !== 'draft') {
-      throw errors.notFound('Нет прав для редактирования этого периода')
+      throw errors.forbidden('Нет прав для редактирования этого периода')
     }
     
     // Обновляем период
@@ -197,6 +197,31 @@ export function createPeriodsRoutes(pool: Pool): Router {
     );
     
     res.json({ success: true, data: result.rows[0] });
+  }))
+
+  // Delete period (author of draft or moderator/admin)
+  router.delete('/periods/:id', authenticateToken, asyncHandler(async (req: any, res: any) => {
+    const { id } = req.params
+    const userId = (req as any).user!.sub
+    const role = (req as any).user?.role || 'user'
+
+    const periodRes = await pool.query(
+      'SELECT created_by, status FROM periods WHERE id = $1',
+      [id]
+    )
+    if (periodRes.rowCount === 0) {
+      throw errors.notFound('Период не найден')
+    }
+    const period = periodRes.rows[0]
+
+    const isOwnerDraft = period.created_by === userId && period.status === 'draft'
+    const isModerator = role === 'admin' || role === 'moderator'
+    if (!isOwnerDraft && !isModerator) {
+      throw errors.forbidden('Нет прав для удаления этого периода')
+    }
+
+    await pool.query('DELETE FROM periods WHERE id = $1', [id])
+    res.json({ success: true })
   }))
 
   // Get user's drafts
