@@ -38,7 +38,7 @@ async function run() {
     `)
 
     // 3) Main API view: drop and recreate to change column list
-    await pool.query(`DROP VIEW IF EXISTS v_api_persons`)
+    await pool.query(`DROP VIEW IF EXISTS v_api_persons CASCADE`)
     await pool.query(`
       CREATE VIEW v_api_persons AS
       SELECT
@@ -58,12 +58,27 @@ async function run() {
         a.achievement_years,
         rp.ruler_periods,
         p.wiki_link,
-        COALESCE(a.achievements_wiki_all, ARRAY[]::text[]) AS achievements_wiki
+        COALESCE(a.achievements_wiki_all, ARRAY[]::text[]) AS achievements_wiki,
+        p.status
       FROM persons p
       LEFT JOIN v_person_achievements_all a ON a.person_id = p.id
       LEFT JOIN v_person_ruler_span rs ON rs.person_id = p.id
       LEFT JOIN v_person_countries_life cl ON cl.person_id = p.id
       LEFT JOIN v_person_ruler_periods rp ON rp.person_id = p.id;
+    `)
+
+    // 4) Recreate dependent views
+    await pool.query(`
+      CREATE VIEW v_approved_persons AS
+      SELECT * FROM v_api_persons WHERE status = 'approved'
+    `)
+
+    await pool.query(`
+      CREATE VIEW v_pending_moderation AS
+      SELECT v.*, p.created_at, p.updated_at, p.created_by, p.updated_by
+      FROM v_api_persons v
+      JOIN persons p ON p.id = v.id
+      WHERE p.status = 'pending'
     `)
 
     console.log('Migration complete.')
