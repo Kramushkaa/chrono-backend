@@ -187,16 +187,16 @@ npm run check
 npm run fix
 ```
 
-**Подробнее см. [LINTING.md](./LINTING.md)**
+### Типизация и качество кода
 
-### Типизация TypeScript
+Проект **полностью типизирован** и использует строгие стандарты качества:
 
-Проект **полностью типизирован**:
-- ✅ **0 ошибок** компиляции TypeScript
-- ✅ **150+ `any`** типов заменено на конкретные
+#### TypeScript (100% type coverage)
+- ✅ **0 ошибок** компиляции
+- ✅ **150+ `any`** заменено на конкретные типы
 - ✅ **37+ routes** полностью типизированы
 - ✅ **Database rows** все типизированы
-- ✅ **Middleware** полностью type-safe
+- ✅ **Middleware, Services, Utils** - полная типобезопасность
 
 ```bash
 # Проверка типов
@@ -206,11 +206,25 @@ npm run type-check
 npm run build
 ```
 
-**Подробнее см.:**
-- [PROJECT_STATUS.md](./PROJECT_STATUS.md) - ⭐ **Статус проекта и метрики**
-- [TYPING_SUMMARY.md](./TYPING_SUMMARY.md) - сводка по типизации
-- [LINTING.md](./LINTING.md) - настройка ESLint + Prettier
-- [NEXT_STEPS.md](./NEXT_STEPS.md) - дальнейшие улучшения
+#### ESLint + Prettier
+Настроены для поддержания качества кода:
+
+```bash
+# Проверка и автоисправление
+npm run lint          # Проверка ESLint
+npm run lint:fix      # Автоисправление
+npm run format        # Форматирование Prettier
+
+# Комплексные команды
+npm run check         # Всё сразу: type-check + lint + format:check
+npm run fix           # Всё сразу: lint:fix + format
+```
+
+**Авто-форматирование в VS Code:**
+- Форматирование при сохранении (`Ctrl+S`)
+- ESLint исправления автоматически
+- Рекомендуемые расширения в `.vscode/extensions.json`
+
 
 ### Добавление новых маршрутов
 
