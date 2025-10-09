@@ -9,7 +9,7 @@ export function createMetaRoutes(pool: Pool): Router {
   // Health
   router.get(
     '/health',
-    asyncHandler(async (_req: any, res: any) => {
+    asyncHandler(async (_req: Request, res: Response) => {
       res.json({
         success: true,
         data: {
@@ -24,34 +24,32 @@ export function createMetaRoutes(pool: Pool): Router {
   // DTO version
   router.get(
     '/dto-version',
-    asyncHandler(async (_req: any, res: any) => {
+    asyncHandler(async (_req: Request, res: Response) => {
       res.json({ success: true, data: { version: DTO_VERSION_BE } });
     })
   );
 
-  // Categories
+  // Categories (only from approved persons for public filters)
   router.get(
     '/categories',
-    asyncHandler(async (_req: any, res: any) => {
-      let query = 'SELECT category FROM unique_categories';
-      let result = await pool.query(query);
-      if (result.rows.length === 0) {
-        query = `
+    asyncHandler(async (_req: Request, res: Response) => {
+      // Возвращаем только категории одобренных личностей
+      const query = `
         SELECT DISTINCT category 
           FROM persons 
          WHERE category IS NOT NULL 
+           AND status = 'approved'
          ORDER BY category`;
-        result = await pool.query(query);
-      }
+      const result = await pool.query(query);
       const categories = result.rows.map(row => row.category);
       res.json({ success: true, data: categories });
     })
   );
 
-  // Countries (names only)
+  // Countries (names only - from approved persons)
   router.get(
     '/countries',
-    asyncHandler(async (_req: any, res: any) => {
+    asyncHandler(async (_req: Request, res: Response) => {
       const result = await pool.query('SELECT name FROM v_countries ORDER BY name');
       const countries = result.rows.map(r => r.name);
       res.json({ success: true, data: countries });
@@ -61,16 +59,16 @@ export function createMetaRoutes(pool: Pool): Router {
   // Country options (id + name)
   router.get(
     '/countries/options',
-    asyncHandler(async (_req: any, res: any) => {
+    asyncHandler(async (_req: Request, res: Response) => {
       const result = await pool.query('SELECT id, name FROM countries ORDER BY name');
       res.json({ success: true, data: result.rows });
     })
   );
 
-  // Stats
+  // Stats (only approved persons for public statistics)
   router.get(
     '/stats',
-    asyncHandler(async (_req: any, res: any) => {
+    asyncHandler(async (_req: Request, res: Response) => {
       const statsResult = await pool.query(`
       SELECT 
         COUNT(*) as total_persons,
@@ -78,10 +76,12 @@ export function createMetaRoutes(pool: Pool): Router {
         MAX(death_year) as latest_death,
         COUNT(DISTINCT category) as unique_categories,
         (SELECT COUNT(*) FROM v_countries) as unique_countries
-      FROM persons`);
+      FROM persons
+      WHERE status = 'approved'`);
       const categoryStatsResult = await pool.query(`
       SELECT category, COUNT(*) as count
         FROM persons
+       WHERE status = 'approved'
        GROUP BY category
        ORDER BY count DESC`);
       const countryStatsResult = await pool.query(`
