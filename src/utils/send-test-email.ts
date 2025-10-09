@@ -7,12 +7,13 @@ import { sendEmail } from './email';
 
 function readHtmlArg(argv: string[]): string {
   const arg4 = argv[4];
-  if (!arg4) return `<div style="font-family:Arial,sans-serif"><h2>Тест отправки</h2><p>Это тестовое письмо через Resend API.</p></div>`;
+  if (!arg4)
+    return `<div style="font-family:Arial,sans-serif"><h2>Тест отправки</h2><p>Это тестовое письмо через Resend API.</p></div>`;
   if (arg4.startsWith('@')) {
     const filePath = path.resolve(process.cwd(), arg4.slice(1));
     return fs.readFileSync(filePath, 'utf8');
   }
-  const fileFlag = argv.find((a) => a?.startsWith?.('--file='));
+  const fileFlag = argv.find(a => a?.startsWith?.('--file='));
   if (fileFlag) {
     const filePath = path.resolve(process.cwd(), fileFlag.split('=')[1]);
     return fs.readFileSync(filePath, 'utf8');
@@ -36,5 +37,3 @@ async function main() {
 }
 
 main();
-
-

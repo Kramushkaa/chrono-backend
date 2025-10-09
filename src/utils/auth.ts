@@ -25,9 +25,9 @@ export const generateAccessToken = (user: User): string => {
     sub: user.id,
     email: user.email,
     role: user.role,
-    email_verified: user.email_verified
+    email_verified: user.email_verified,
   };
-  
+
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
 };
 
@@ -56,7 +56,7 @@ export const verifyAccessToken = (token: string): JWTPayload | null => {
       sub: decoded.sub,
       email: decoded.email,
       role: decoded.role,
-      email_verified: decoded.email_verified
+      email_verified: decoded.email_verified,
     };
   } catch (error) {
     return null;
@@ -71,47 +71,59 @@ export const validateEmail = (email: string): boolean => {
 
 export const validatePassword = (password: string): ValidationResult => {
   const errors: ValidationError[] = [];
-  
+
   if (password.length < 8) {
     errors.push({ field: 'password', message: 'Пароль должен содержать минимум 8 символов' });
   }
-  
+
   if (!/[A-Z]/.test(password)) {
-    errors.push({ field: 'password', message: 'Пароль должен содержать хотя бы одну заглавную букву' });
+    errors.push({
+      field: 'password',
+      message: 'Пароль должен содержать хотя бы одну заглавную букву',
+    });
   }
-  
+
   if (!/[a-z]/.test(password)) {
-    errors.push({ field: 'password', message: 'Пароль должен содержать хотя бы одну строчную букву' });
+    errors.push({
+      field: 'password',
+      message: 'Пароль должен содержать хотя бы одну строчную букву',
+    });
   }
-  
+
   if (!/\d/.test(password)) {
     errors.push({ field: 'password', message: 'Пароль должен содержать хотя бы одну цифру' });
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
 export const validateUsername = (username: string): ValidationResult => {
   const errors: ValidationError[] = [];
-  
+
   if (username.length < 3) {
-    errors.push({ field: 'username', message: 'Имя пользователя должно содержать минимум 3 символа' });
+    errors.push({
+      field: 'username',
+      message: 'Имя пользователя должно содержать минимум 3 символа',
+    });
   }
-  
+
   if (username.length > 50) {
     errors.push({ field: 'username', message: 'Имя пользователя не должно превышать 50 символов' });
   }
-  
+
   if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-    errors.push({ field: 'username', message: 'Имя пользователя может содержать только буквы, цифры, дефисы и подчеркивания' });
+    errors.push({
+      field: 'username',
+      message: 'Имя пользователя может содержать только буквы, цифры, дефисы и подчеркивания',
+    });
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
@@ -124,20 +136,20 @@ export const validateRegisterData = (data: {
   full_name?: string;
 }): ValidationResult => {
   const errors: ValidationError[] = [];
-  
+
   // Валидация email
   if (!data.email) {
     errors.push({ field: 'email', message: 'Email обязателен' });
   } else if (!validateEmail(data.email)) {
     errors.push({ field: 'email', message: 'Некорректный формат email' });
   }
-  
+
   // Валидация пароля
   const passwordValidation = validatePassword(data.password);
   if (!passwordValidation.isValid) {
     errors.push(...passwordValidation.errors);
   }
-  
+
   // Валидация username/login (если предоставлен)
   const providedLogin = data.login || data.username;
   if (providedLogin) {
@@ -146,15 +158,18 @@ export const validateRegisterData = (data: {
       errors.push(...usernameValidation.errors);
     }
   }
-  
+
   // Валидация full_name (если предоставлен)
   if (data.full_name && data.full_name.length > 255) {
-    errors.push({ field: 'full_name', message: 'Имя пользователя не должно превышать 255 символов' });
+    errors.push({
+      field: 'full_name',
+      message: 'Имя пользователя не должно превышать 255 символов',
+    });
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
@@ -164,18 +179,18 @@ export const validateLoginData = (data: {
   password: string;
 }): ValidationResult => {
   const errors: ValidationError[] = [];
-  
+
   if (!data.login) {
     errors.push({ field: 'login', message: 'Логин обязателен' });
   }
-  
+
   if (!data.password) {
     errors.push({ field: 'password', message: 'Пароль обязателен' });
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
@@ -184,9 +199,18 @@ export const hasPermission = (userRole: string, requiredPermission: string): boo
   const rolePermissions: { [key: string]: string[] } = {
     user: ['read:persons'],
     moderator: ['read:persons', 'write:persons', 'read:users'],
-    admin: ['read:persons', 'write:persons', 'delete:persons', 'read:users', 'write:users', 'delete:users', 'manage:roles', 'manage:system']
+    admin: [
+      'read:persons',
+      'write:persons',
+      'delete:persons',
+      'read:users',
+      'write:users',
+      'delete:users',
+      'manage:roles',
+      'manage:system',
+    ],
   };
-  
+
   const userPermissions = rolePermissions[userRole] || [];
   return userPermissions.includes(requiredPermission);
 };
@@ -206,4 +230,4 @@ export const addDays = (date: Date, days: number): Date => {
 
 export const isTokenExpired = (expiresAt: Date): boolean => {
   return new Date() > expiresAt;
-}; 
+};

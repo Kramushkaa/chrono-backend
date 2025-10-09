@@ -1,13 +1,14 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/authService';
-import { 
-  RegisterRequest, 
-  LoginRequest, 
-  UpdateProfileRequest, 
+import {
+  RegisterRequest,
+  LoginRequest,
+  UpdateProfileRequest,
   ChangePasswordRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
-  VerifyEmailRequest
+  VerifyEmailRequest,
+  User,
 } from '../types/auth';
 import { errors } from '../utils/errors';
 
@@ -19,7 +20,7 @@ export class AuthController {
   }
 
   // Регистрация пользователя
-  async register(req: Request, res: Response, next: any): Promise<void> {
+  async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userData: RegisterRequest = req.body;
       const user = await this.authService.registerUser(userData);
@@ -27,7 +28,10 @@ export class AuthController {
       // Отправка письма с подтверждением email (best-effort)
       try {
         const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
-        const verifyToken = (user as any).email_verification_token as string; // заполнено в сервисе
+        const verifyToken = user.email_verification_token; // заполнено в сервисе
+        if (!verifyToken) {
+          throw new Error('Verification token not generated');
+        }
         const verifyUrl = `${baseUrl}/profile?verify_token=${encodeURIComponent(verifyToken)}`;
         const html = `
           <div style="font-family: Arial, sans-serif;">
@@ -56,9 +60,9 @@ export class AuthController {
             username: user.username,
             full_name: user.full_name,
             role: user.role,
-            email_verified: user.email_verified
-          }
-        }
+            email_verified: user.email_verified,
+          },
+        },
       });
     } catch (error) {
       next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при регистрации'));
@@ -66,13 +70,16 @@ export class AuthController {
   }
 
   // Вход пользователя
-  async login(req: Request, res: Response, next: any): Promise<void> {
+  async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      console.log('🔐 Login attempt:', { login: (req.body && (req.body.login || req.body.email)) || 'no-body', bodyType: typeof req.body });
+      console.log('🔐 Login attempt:', {
+        login: (req.body && (req.body.login || req.body.email)) || 'no-body',
+        bodyType: typeof req.body,
+      });
       // Support legacy { email, password } and new { login, password }
       const loginData: LoginRequest = {
         login: (req.body && (req.body.login || req.body.email)) || '',
-        password: (req.body && req.body.password) || ''
+        password: (req.body && req.body.password) || '',
       };
       const result = await this.authService.loginUser(loginData);
 
@@ -86,12 +93,12 @@ export class AuthController {
             username: result.user.username,
             full_name: result.user.full_name,
             role: result.user.role,
-            email_verified: result.user.email_verified
+            email_verified: result.user.email_verified,
           },
           access_token: result.accessToken,
           refresh_token: result.refreshToken,
-          expires_in: 24 * 60 * 60 // 24 часа в секундах
-        }
+          expires_in: 24 * 60 * 60, // 24 часа в секундах
+        },
       });
     } catch (error) {
       console.error('🔐 Login error:', error);
@@ -100,10 +107,10 @@ export class AuthController {
   }
 
   // Обновление токена доступа
-  async refreshToken(req: Request, res: Response, next: any): Promise<void> {
+  async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { refresh_token } = req.body;
-      
+
       if (!refresh_token) {
         return next(errors.badRequest('Refresh токен обязателен', 'missing_refresh_token'));
       }
@@ -120,20 +127,22 @@ export class AuthController {
             username: result.user.username,
             full_name: result.user.full_name,
             role: result.user.role,
-            email_verified: result.user.email_verified
+            email_verified: result.user.email_verified,
           },
           access_token: result.accessToken,
           refresh_token: result.refreshToken,
-          expires_in: 24 * 60 * 60 // 24 часа в секундах
-        }
+          expires_in: 24 * 60 * 60, // 24 часа в секундах
+        },
       });
     } catch (error) {
-      next(errors.unauthorized(error instanceof Error ? error.message : 'Ошибка при обновлении токена'));
+      next(
+        errors.unauthorized(error instanceof Error ? error.message : 'Ошибка при обновлении токена')
+      );
     }
   }
 
   // Выход пользователя
-  async logout(req: Request, res: Response, next: any): Promise<void> {
+  async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { refresh_token } = req.body;
       const userId = req.user?.sub;
@@ -148,7 +157,7 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Успешный выход'
+        message: 'Успешный выход',
       });
     } catch (error) {
       next(errors.server(error instanceof Error ? error.message : 'Ошибка при выходе'));
@@ -156,10 +165,10 @@ export class AuthController {
   }
 
   // Получение профиля пользователя
-  async getProfile(req: Request, res: Response, next: any): Promise<void> {
+  async getProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user?.sub;
-      
+
       if (!userId) {
         return next(errors.unauthorized('Требуется аутентификация'));
       }
@@ -178,9 +187,9 @@ export class AuthController {
             role: user.role,
             email_verified: user.email_verified,
             created_at: user.created_at,
-            updated_at: user.updated_at
-          }
-        }
+            updated_at: user.updated_at,
+          },
+        },
       });
     } catch (error) {
       next(errors.notFound(error instanceof Error ? error.message : 'Профиль не найден'));
@@ -188,7 +197,7 @@ export class AuthController {
   }
 
   // Обновление профиля пользователя
-  async updateProfile(req: Request, res: Response, next: any): Promise<void> {
+  async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user?.sub;
       const updateData: UpdateProfileRequest = req.body;
@@ -211,17 +220,19 @@ export class AuthController {
             avatar_url: user.avatar_url,
             role: user.role,
             email_verified: user.email_verified,
-            updated_at: user.updated_at
-          }
-        }
+            updated_at: user.updated_at,
+          },
+        },
       });
     } catch (error) {
-      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при обновлении профиля'));
+      next(
+        errors.badRequest(error instanceof Error ? error.message : 'Ошибка при обновлении профиля')
+      );
     }
   }
 
   // Изменение пароля
-  async changePassword(req: Request, res: Response, next: any): Promise<void> {
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user?.sub;
       const passwordData: ChangePasswordRequest = req.body;
@@ -234,15 +245,17 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Пароль успешно изменен'
+        message: 'Пароль успешно изменен',
       });
     } catch (error) {
-      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при изменении пароля'));
+      next(
+        errors.badRequest(error instanceof Error ? error.message : 'Ошибка при изменении пароля')
+      );
     }
   }
 
   // Запрос на восстановление пароля
-  async forgotPassword(req: Request, res: Response, next: any): Promise<void> {
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email }: ForgotPasswordRequest = req.body;
 
@@ -254,15 +267,20 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Если пользователь с таким email существует, инструкции по восстановлению пароля будут отправлены'
+        message:
+          'Если пользователь с таким email существует, инструкции по восстановлению пароля будут отправлены',
       });
     } catch (error) {
-      next(errors.server(error instanceof Error ? error.message : 'Ошибка при запросе восстановления пароля'));
+      next(
+        errors.server(
+          error instanceof Error ? error.message : 'Ошибка при запросе восстановления пароля'
+        )
+      );
     }
   }
 
   // Сброс пароля
-  async resetPassword(req: Request, res: Response, next: any): Promise<void> {
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { token, new_password }: ResetPasswordRequest = req.body;
 
@@ -274,7 +292,7 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Пароль успешно сброшен'
+        message: 'Пароль успешно сброшен',
       });
     } catch (error) {
       next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при сбросе пароля'));
@@ -282,9 +300,9 @@ export class AuthController {
   }
 
   // Подтверждение email
-  async verifyEmail(req: Request, res: Response, next: any): Promise<void> {
+  async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const token = (req.body && (req.body as any).token) || (req.query && (req.query as any).token);
+      const token = (req.body && req.body.token) || (req.query && String(req.query.token || ''));
 
       if (!token) {
         return next(errors.badRequest('Токен подтверждения обязателен', 'missing_token'));
@@ -294,15 +312,17 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Email успешно подтвержден'
+        message: 'Email успешно подтвержден',
       });
     } catch (error) {
-      next(errors.badRequest(error instanceof Error ? error.message : 'Ошибка при подтверждении email'));
+      next(
+        errors.badRequest(error instanceof Error ? error.message : 'Ошибка при подтверждении email')
+      );
     }
   }
 
   // Повторная отправка письма с подтверждением
-  async resendVerification(req: Request, res: Response, next: any): Promise<void> {
+  async resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user?.sub;
       if (!userId) {
@@ -334,10 +354,10 @@ export class AuthController {
   }
 
   // Проверка статуса аутентификации
-  async checkAuth(req: Request, res: Response, next: any): Promise<void> {
+  async checkAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user?.sub;
-      
+
       if (!userId) {
         return next(errors.unauthorized('Пользователь не аутентифицирован'));
       }
@@ -354,12 +374,12 @@ export class AuthController {
             username: user.username,
             full_name: user.full_name,
             role: user.role,
-            email_verified: user.email_verified
-          }
-        }
+            email_verified: user.email_verified,
+          },
+        },
       });
     } catch (error) {
       next(errors.unauthorized('Пользователь не аутентифицирован'));
     }
   }
-} 
+}

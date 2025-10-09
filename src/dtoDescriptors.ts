@@ -1,4 +1,4 @@
-export const DTO_VERSION = '2025-08-26-1'
+export const DTO_VERSION = '2025-08-26-1';
 
 // Very simple, hand-maintained descriptors to detect drift across apps
 export const dtoDescriptors = {
@@ -11,16 +11,16 @@ export const dtoDescriptors = {
     description: 'string',
     imageUrl: 'url|null?',
     wikiLink: 'url|null?',
-    saveAsDraft: 'boolean?'
+    saveAsDraft: 'boolean?',
   },
   LifePeriodItem: {
     country_id: 'int+',
     start_year: 'int',
     end_year: 'int',
-    period_type: 'string?'
+    period_type: 'string?',
   },
   LifePeriods: {
-    periods: 'LifePeriodItem[]'
+    periods: 'LifePeriodItem[]',
   },
   PersonEditPayload: {
     name: 'string?',
@@ -29,22 +29,20 @@ export const dtoDescriptors = {
     category: 'string?',
     description: 'string?',
     imageUrl: 'url|null?',
-    wikiLink: 'url|null?'
+    wikiLink: 'url|null?',
   },
   AchievementGeneric: {
     year: 'int',
     description: 'string',
     wikipedia_url: 'url|null?',
     image_url: 'url|null?',
-    country_id: 'int|null?'
+    country_id: 'int|null?',
   },
   AchievementPerson: {
     year: 'int',
     description: 'string',
     wikipedia_url: 'url|null?',
     image_url: 'url|null?',
-    saveAsDraft: 'boolean?'
-  }
-} as const
-
-
+    saveAsDraft: 'boolean?',
+  },
+} as const;

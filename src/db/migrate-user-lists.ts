@@ -1,7 +1,7 @@
-import { Pool } from 'pg'
-import dotenv from 'dotenv'
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
 
-dotenv.config()
+dotenv.config();
 
 async function run() {
   const pool = new Pool({
@@ -10,12 +10,12 @@ async function run() {
     database: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } as any : undefined,
-  })
-  const client = await pool.connect()
+    ssl: process.env.DB_SSL === 'true' ? ({ rejectUnauthorized: false } as any) : undefined,
+  });
+  const client = await pool.connect();
   try {
-    console.log('▶ Running lists migration against DB:', process.env.DB_NAME)
-    await client.query('BEGIN')
+    console.log('▶ Running lists migration against DB:', process.env.DB_NAME);
+    await client.query('BEGIN');
     await client.query(`
       CREATE TABLE IF NOT EXISTS lists (
         id SERIAL PRIMARY KEY,
@@ -24,7 +24,7 @@ async function run() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `)
+    `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS list_items (
         id SERIAL PRIMARY KEY,
@@ -37,20 +37,18 @@ async function run() {
         position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `)
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_list_items_list ON list_items(list_id)`)
-    await client.query('COMMIT')
-    console.log('✅ Migration completed: lists, list_items')
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_list_items_list ON list_items(list_id)`);
+    await client.query('COMMIT');
+    console.log('✅ Migration completed: lists, list_items');
   } catch (e) {
-    await client.query('ROLLBACK')
-    console.error('❌ Migration failed:', e)
-    process.exitCode = 1
+    await client.query('ROLLBACK');
+    console.error('❌ Migration failed:', e);
+    process.exitCode = 1;
   } finally {
-    client.release()
-    await pool.end()
+    client.release();
+    await pool.end();
   }
 }
 
-run()
-
-
+run();

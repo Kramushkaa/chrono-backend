@@ -9,8 +9,15 @@ type TableInfo = {
   table: string;
   columns: Array<{ name: string; type: string; nullable: boolean; default: string | null }>;
   primaryKey: string[];
-  foreignKeys: Array<{ constraint: string; column: string; refTable: string; refColumn: string; onDelete?: string; onUpdate?: string }>;
-  indexes: Array<{ name: string; definition: string }>; 
+  foreignKeys: Array<{
+    constraint: string;
+    column: string;
+    refTable: string;
+    refColumn: string;
+    onDelete?: string;
+    onUpdate?: string;
+  }>;
+  indexes: Array<{ name: string; definition: string }>;
 };
 
 type ViewInfo = {
@@ -25,7 +32,7 @@ async function introspect(): Promise<void> {
     database: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined as any,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : (undefined as any),
   });
 
   const client = await pool.connect();
@@ -112,7 +119,12 @@ async function introspect(): Promise<void> {
 
       const tableInfo: TableInfo = {
         table,
-        columns: colsRes.rows.map(r => ({ name: r.column_name, type: r.data_type, nullable: r.is_nullable === 'YES', default: r.column_default })),
+        columns: colsRes.rows.map(r => ({
+          name: r.column_name,
+          type: r.data_type,
+          nullable: r.is_nullable === 'YES',
+          default: r.column_default,
+        })),
         primaryKey: pkRes.rows.map(r => r.column_name),
         foreignKeys: fkRes.rows.map(r => ({
           constraint: r.constraint_name,
@@ -137,13 +149,18 @@ async function introspect(): Promise<void> {
        WHERE table_schema = 'public'
        ORDER BY table_name`
     );
-    const views: ViewInfo[] = viewsRes.rows.map(v => ({ view: v.table_name, definition: v.view_definition || '' }));
+    const views: ViewInfo[] = viewsRes.rows.map(v => ({
+      view: v.table_name,
+      definition: v.view_definition || '',
+    }));
 
     // Render markdown
     const lines: string[] = [];
     lines.push('# Структура базы данных — Хронониндзя');
     lines.push('');
-    lines.push('Автоматически сгенерировано из текущей базы (schema public). Параметры подключения берутся из переменных окружения `DB_*`.');
+    lines.push(
+      'Автоматически сгенерировано из текущей базы (schema public). Параметры подключения берутся из переменных окружения `DB_*`.'
+    );
     lines.push('');
     lines.push('## Таблицы');
     lines.push('');
@@ -164,8 +181,15 @@ async function introspect(): Promise<void> {
       if (t.foreignKeys.length > 0) {
         lines.push('- **Внешние ключи**:');
         for (const fk of t.foreignKeys) {
-          const act = [fk.onDelete ? `ON DELETE ${fk.onDelete}` : '', fk.onUpdate ? `ON UPDATE ${fk.onUpdate}` : ''].filter(Boolean).join(' ');
-          lines.push(`  - ${fk.constraint}: (${fk.column}) → ${fk.refTable}(${fk.refColumn}) ${act}`.trim());
+          const act = [
+            fk.onDelete ? `ON DELETE ${fk.onDelete}` : '',
+            fk.onUpdate ? `ON UPDATE ${fk.onUpdate}` : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+          lines.push(
+            `  - ${fk.constraint}: (${fk.column}) → ${fk.refTable}(${fk.refColumn}) ${act}`.trim()
+          );
         }
       }
       if (t.indexes.length > 0) {
@@ -203,9 +227,7 @@ async function introspect(): Promise<void> {
   }
 }
 
-introspect().catch((e) => {
+introspect().catch(e => {
   console.error('❌ Introspection failed:', e);
   process.exit(1);
 });
-
-

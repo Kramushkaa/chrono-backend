@@ -48,7 +48,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   username?: string; // legacy alias, keep for backward compatibility
-  login?: string;    // preferred alias for username
+  login?: string; // preferred alias for username
   full_name?: string;
 }
 
@@ -60,7 +60,7 @@ export interface LoginRequest {
 
 export interface UpdateProfileRequest {
   username?: string; // legacy alias, keep for backward compatibility
-  login?: string;    // preferred alias for username
+  login?: string; // preferred alias for username
   full_name?: string;
   avatar_url?: string;
 }
@@ -124,4 +124,4 @@ export interface ValidationError {
 export interface ValidationResult {
   isValid: boolean;
   errors: ValidationError[];
-} 
+}

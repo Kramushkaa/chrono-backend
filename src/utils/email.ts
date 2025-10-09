@@ -18,7 +18,7 @@ function getTransporter(): nodemailer.Transporter {
       port: SMTP_PORT,
       secure: SMTP_SECURE,
       auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
-    } as any);
+    });
   }
   return transporter;
 }
@@ -26,24 +26,27 @@ function getTransporter(): nodemailer.Transporter {
 async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({ from: EMAIL_FROM, to, subject, html });
-    const req = https.request({
-      hostname: 'api.resend.com',
-      path: '/emails',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
+    const req = https.request(
+      {
+        hostname: 'api.resend.com',
+        path: '/emails',
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      res => {
+        const chunks: Buffer[] = [];
+        res.on('data', d => chunks.push(d));
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) return resolve();
+          const resp = Buffer.concat(chunks).toString('utf8');
+          reject(new Error(`Resend error ${res.statusCode}: ${resp}`));
+        });
       }
-    }, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (d) => chunks.push(d));
-      res.on('end', () => {
-        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) return resolve();
-        const resp = Buffer.concat(chunks).toString('utf8');
-        reject(new Error(`Resend error ${res.statusCode}: ${resp}`));
-      });
-    });
+    );
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -57,5 +60,3 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   const tr = getTransporter();
   await tr.sendMail({ from: EMAIL_FROM, to, subject, html });
 }
-
-

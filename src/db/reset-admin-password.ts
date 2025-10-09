@@ -11,7 +11,7 @@ async function resetAdminPassword() {
     database: process.env.DB_NAME || 'chrononinja',
     password: process.env.DB_PASSWORD || 'password',
     port: parseInt(process.env.DB_PORT || '5432'),
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined as any,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : (undefined as any),
   });
 
   const password = process.env.ADMIN_PASSWORD || 'admin123';
@@ -43,4 +43,3 @@ async function resetAdminPassword() {
 }
 
 resetAdminPassword();
-

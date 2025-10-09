@@ -1,7 +1,7 @@
-import { Pool } from 'pg'
-import dotenv from 'dotenv'
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
 
-dotenv.config()
+dotenv.config();
 
 async function main() {
   const pool = new Pool({
@@ -10,11 +10,11 @@ async function main() {
     database: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined as any,
-  })
-  const client = await pool.connect()
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : (undefined as any),
+  });
+  const client = await pool.connect();
   try {
-    console.log('Applying helpful indexes...')
+    console.log('Applying helpful indexes...');
     const statements = [
       `CREATE INDEX IF NOT EXISTS idx_persons_status ON persons(status)`,
       `CREATE INDEX IF NOT EXISTS idx_persons_created_by ON persons(created_by)`,
@@ -38,18 +38,19 @@ async function main() {
       `CREATE UNIQUE INDEX IF NOT EXISTS uq_list_items_person ON list_items(list_id, item_type, person_id) WHERE item_type = 'person' AND person_id IS NOT NULL`,
       `CREATE UNIQUE INDEX IF NOT EXISTS uq_list_items_achievement ON list_items(list_id, item_type, achievement_id) WHERE item_type = 'achievement' AND achievement_id IS NOT NULL`,
       `CREATE UNIQUE INDEX IF NOT EXISTS uq_list_items_period ON list_items(list_id, item_type, period_id) WHERE item_type = 'period' AND period_id IS NOT NULL`,
-    ]
+    ];
     for (const sql of statements) {
-      console.log('> ' + sql)
-      await client.query(sql)
+      console.log('> ' + sql);
+      await client.query(sql);
     }
-    console.log('Indexes applied.')
+    console.log('Indexes applied.');
   } finally {
-    client.release()
-    await pool.end()
+    client.release();
+    await pool.end();
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1) })
-
-
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

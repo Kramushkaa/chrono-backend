@@ -12,6 +12,27 @@ declare global {
   }
 }
 
+// Типы для error handling
+interface ErrorWithName extends Error {
+  name: string;
+}
+
+// Вспомогательная функция для получения IP адреса
+function getClientIp(req: Request): string {
+  // Express за прокси (trust proxy должен быть включен)
+  if (req.ip) {
+    return req.ip;
+  }
+
+  // Fallback для случаев без прокси
+  const socket = req.socket as { remoteAddress?: string };
+  if (socket?.remoteAddress) {
+    return socket.remoteAddress;
+  }
+
+  return 'unknown';
+}
+
 // Middleware для аутентификации
 export const authenticateToken = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization;
@@ -105,8 +126,8 @@ export const logRequest = (req: Request, res: Response, next: NextFunction): voi
   const method = req.method;
   const url = req.url;
   const userAgent = req.headers['user-agent'];
-  const ip = (req.ip as any) || (req as any).socket?.remoteAddress || (req as any).connection?.remoteAddress || 'unknown';
-  
+  const ip = getClientIp(req);
+
   // Определяем пользователя
   let userInfo = 'anonymous';
   if (req.user) {
@@ -115,7 +136,7 @@ export const logRequest = (req: Request, res: Response, next: NextFunction): voi
     const email = req.user.email;
     userInfo = `${email} (ID: ${userId}, ${role})`;
   }
-  
+
   // Сокращаем User-Agent для читаемости
   let shortUA = 'unknown';
   if (userAgent) {
@@ -138,26 +159,43 @@ export const logRequest = (req: Request, res: Response, next: NextFunction): voi
   }
 
   console.log(`[${timestamp}] ${method} ${url} - User: ${userInfo} - IP: ${ip} - UA: ${shortUA}`);
-  
+
   next();
 };
 
 // Middleware для обработки ошибок
-export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction): void => {
+export const errorHandler = (
+  err: Error | ErrorWithName | ApiError,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
   console.error('Error:', err);
+
   if (err instanceof ApiError) {
-    res.status(err.status).json({ success: false, code: err.code, message: err.message, details: err.details })
-    return
+    res
+      .status(err.status)
+      .json({ success: false, code: err.code, message: err.message, details: err.details });
+    return;
   }
-  if ((err as any)?.name === 'ValidationError') {
+
+  const errorWithName = err as ErrorWithName;
+
+  if (errorWithName.name === 'ValidationError') {
     res.status(400).json({ success: false, code: 'validation_error', message: err.message });
     return;
   }
-  if ((err as any)?.name === 'UnauthorizedError') {
-    res.status(401).json({ success: false, code: 'unauthorized', message: 'Недействительный токен' });
+
+  if (errorWithName.name === 'UnauthorizedError') {
+    res
+      .status(401)
+      .json({ success: false, code: 'unauthorized', message: 'Недействительный токен' });
     return;
   }
-  res.status(500).json({ success: false, code: 'internal_error', message: 'Внутренняя ошибка сервера' });
+
+  res
+    .status(500)
+    .json({ success: false, code: 'internal_error', message: 'Внутренняя ошибка сервера' });
 };
 
 // Middleware для CORS
@@ -168,7 +206,7 @@ export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number
   const requests = new Map<string, { count: number; resetTime: number }>();
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    const ip = (req.ip as any) || (req as any).socket?.remoteAddress || (req as any).connection?.remoteAddress || 'unknown';
+    const ip = getClientIp(req);
     const now = Date.now();
     const windowStart = now - windowMs;
 
@@ -180,7 +218,7 @@ export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number
     }
 
     const current = requests.get(ip);
-    
+
     if (!current || current.resetTime < windowStart) {
       requests.set(ip, { count: 1, resetTime: now });
     } else if (current.count >= maxRequests) {
@@ -192,4 +230,4 @@ export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number
 
     next();
   };
-}; 
+};

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController';
-import { 
-  authenticateToken, 
-  requireRoleMiddleware, 
+import {
+  authenticateToken,
+  requireRoleMiddleware,
   requirePermission,
-  rateLimit
+  rateLimit,
 } from '../middleware/auth';
 
 export function createAuthRoutes(authController: AuthController): Router {
@@ -14,7 +14,7 @@ export function createAuthRoutes(authController: AuthController): Router {
   router.use(rateLimit(15 * 60 * 1000, 100)); // 100 запросов за 15 минут
 
   // Публичные маршруты (не требуют аутентификации)
-  
+
   // Регистрация пользователя
   router.post('/register', async (req, res, next) => {
     await authController.register(req, res, next);
@@ -54,7 +54,7 @@ export function createAuthRoutes(authController: AuthController): Router {
   });
 
   // Защищенные маршруты (требуют аутентификации)
-  
+
   // Выход пользователя
   router.post('/logout', authenticateToken, async (req, res, next) => {
     await authController.logout(req, res, next);
@@ -81,144 +81,138 @@ export function createAuthRoutes(authController: AuthController): Router {
   });
 
   // Маршруты для администраторов
-  
+
   // Получение списка пользователей (только для админов)
-  router.get('/users', 
-    authenticateToken, 
-    requireRoleMiddleware(['admin']), 
-    async (req, res) => {
-      // TODO: Реализовать получение списка пользователей
-      res.status(501).json({
-        success: false,
-        error: 'Not implemented',
-        message: 'Функция получения списка пользователей пока не реализована'
-      });
-    }
-  );
+  router.get('/users', authenticateToken, requireRoleMiddleware(['admin']), async (req, res) => {
+    // TODO: Реализовать получение списка пользователей
+    res.status(501).json({
+      success: false,
+      error: 'Not implemented',
+      message: 'Функция получения списка пользователей пока не реализована',
+    });
+  });
 
   // Получение пользователя по ID (только для админов)
-  router.get('/users/:id', 
-    authenticateToken, 
-    requireRoleMiddleware(['admin']), 
+  router.get(
+    '/users/:id',
+    authenticateToken,
+    requireRoleMiddleware(['admin']),
     async (req, res) => {
       // TODO: Реализовать получение пользователя по ID
       res.status(501).json({
         success: false,
         error: 'Not implemented',
-        message: 'Функция получения пользователя по ID пока не реализована'
+        message: 'Функция получения пользователя по ID пока не реализована',
       });
     }
   );
 
   // Обновление пользователя (только для админов)
-  router.put('/users/:id', 
-    authenticateToken, 
-    requireRoleMiddleware(['admin']), 
+  router.put(
+    '/users/:id',
+    authenticateToken,
+    requireRoleMiddleware(['admin']),
     async (req, res) => {
       // TODO: Реализовать обновление пользователя
       res.status(501).json({
         success: false,
         error: 'Not implemented',
-        message: 'Функция обновления пользователя пока не реализована'
+        message: 'Функция обновления пользователя пока не реализована',
       });
     }
   );
 
   // Удаление пользователя (только для админов)
-  router.delete('/users/:id', 
-    authenticateToken, 
-    requireRoleMiddleware(['admin']), 
+  router.delete(
+    '/users/:id',
+    authenticateToken,
+    requireRoleMiddleware(['admin']),
     async (req, res) => {
       // TODO: Реализовать удаление пользователя
       res.status(501).json({
         success: false,
         error: 'Not implemented',
-        message: 'Функция удаления пользователя пока не реализована'
+        message: 'Функция удаления пользователя пока не реализована',
       });
     }
   );
 
   // Маршруты для работы с ролями и разрешениями
-  
+
   // Получение списка ролей (только для админов)
-  router.get('/roles', 
-    authenticateToken, 
-    requireRoleMiddleware(['admin']), 
-    async (req, res) => {
-      // TODO: Реализовать получение списка ролей
-      res.status(501).json({
-        success: false,
-        error: 'Not implemented',
-        message: 'Функция получения списка ролей пока не реализована'
-      });
-    }
-  );
+  router.get('/roles', authenticateToken, requireRoleMiddleware(['admin']), async (req, res) => {
+    // TODO: Реализовать получение списка ролей
+    res.status(501).json({
+      success: false,
+      error: 'Not implemented',
+      message: 'Функция получения списка ролей пока не реализована',
+    });
+  });
 
   // Получение списка разрешений (только для админов)
-  router.get('/permissions', 
-    authenticateToken, 
-    requireRoleMiddleware(['admin']), 
+  router.get(
+    '/permissions',
+    authenticateToken,
+    requireRoleMiddleware(['admin']),
     async (req, res) => {
       // TODO: Реализовать получение списка разрешений
       res.status(501).json({
         success: false,
         error: 'Not implemented',
-        message: 'Функция получения списка разрешений пока не реализована'
+        message: 'Функция получения списка разрешений пока не реализована',
       });
     }
   );
 
   // Маршруты для модераторов
-  
+
   // Получение статистики пользователей (для модераторов и админов)
-  router.get('/stats/users', 
-    authenticateToken, 
-    requireRoleMiddleware(['moderator', 'admin']), 
+  router.get(
+    '/stats/users',
+    authenticateToken,
+    requireRoleMiddleware(['moderator', 'admin']),
     async (req, res) => {
       // TODO: Реализовать получение статистики пользователей
       res.status(501).json({
         success: false,
         error: 'Not implemented',
-        message: 'Функция получения статистики пользователей пока не реализована'
+        message: 'Функция получения статистики пользователей пока не реализована',
       });
     }
   );
 
   // Маршруты для проверки разрешений
-  
+
   // Проверка разрешения пользователя
-  router.get('/check-permission/:permission', 
-    authenticateToken, 
-    async (req, res) => {
-      const { permission } = req.params;
-      const userRole = req.user?.role;
+  router.get('/check-permission/:permission', authenticateToken, async (req, res) => {
+    const { permission } = req.params;
+    const userRole = req.user?.role;
 
-      if (!userRole) {
-        res.status(401).json({
-          success: false,
-          error: 'Unauthorized',
-          message: 'Требуется аутентификация'
-        });
-        return;
-      }
-
-      // TODO: Реализовать проверку разрешений через базу данных
-      res.status(501).json({
+    if (!userRole) {
+      res.status(401).json({
         success: false,
-        error: 'Not implemented',
-        message: 'Функция проверки разрешений пока не реализована'
+        error: 'Unauthorized',
+        message: 'Требуется аутентификация',
       });
+      return;
     }
-  );
+
+    // TODO: Реализовать проверку разрешений через базу данных
+    res.status(501).json({
+      success: false,
+      error: 'Not implemented',
+      message: 'Функция проверки разрешений пока не реализована',
+    });
+  });
 
   // Обработка ошибок 404 для неизвестных маршрутов (Express 5 совместимо)
   router.use((req, res) => {
     res.status(404).json({
       success: false,
       error: 'Not found',
-      message: 'Маршрут не найден'
+      message: 'Маршрут не найден',
     });
   });
 
   return router;
-} 
+}

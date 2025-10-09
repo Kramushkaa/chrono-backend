@@ -1,4 +1,4 @@
-import { Pool } from 'pg'
+import { Pool } from 'pg';
 
 export function createPool(): Pool {
   return new Pool({
@@ -11,7 +11,5 @@ export function createPool(): Pool {
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 30000, // Увеличиваем таймаут для удаленной БД
     ssl: { rejectUnauthorized: false }, // Включаем SSL для удаленной базы данных
-  })
+  });
 }
-
-

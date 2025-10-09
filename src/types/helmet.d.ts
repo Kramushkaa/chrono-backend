@@ -3,5 +3,3 @@ declare module 'helmet' {
   const helmet: () => RequestHandler;
   export default helmet;
 }
-
-

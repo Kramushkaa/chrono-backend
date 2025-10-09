@@ -42,7 +42,10 @@ app.use(helmet());
 
 // CORS: поддержка списка доменов (через запятую) и шаблонов вида *.chrono.ninja, .chrono.ninja или голых доменов
 const rawOrigins = process.env.CORS || process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
-const allowedOriginPatterns = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
+const allowedOriginPatterns = rawOrigins
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
 const isProd = process.env.NODE_ENV === 'production';
 
 if (isProd && allowedOriginPatterns.includes('*')) {
@@ -77,14 +80,16 @@ function isOriginAllowed(origin: string, patterns: string[]): boolean {
   return false;
 }
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (isOriginAllowed(origin, allowedOriginPatterns)) return callback(null, true);
-    return callback(new Error(`CORS: Origin ${origin} is not allowed`));
-  },
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (isOriginAllowed(origin, allowedOriginPatterns)) return callback(null, true);
+      return callback(new Error(`CORS: Origin ${origin} is not allowed`));
+    },
+    credentials: true,
+  })
+);
 
 // Маршруты аутентификации
 app.use('/api/auth', createAuthRoutes(authController));
@@ -108,61 +113,67 @@ app.use('/api', createMetaRoutes(pool));
 app.use('/api', createListsRoutes(pool));
 
 // Backend info endpoint (оставляем как отдельный информационный маршрут)
-app.get('/api/backend-info', asyncHandler(async (_req: any, res: any) => {
-  res.json({
-    success: true,
-    data: {
-      name: 'Хронониндзя API',
-      version: '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-      timestamp: new Date().toISOString(),
-      endpoints: {
-        auth: '/api/auth',
-        persons: '/api/persons',
-        achievements: '/api/achievements',
-        periods: '/api/periods',
-        lists: '/api/lists',
-        stats: '/api/stats',
-        health: '/api/health',
-        categories: '/api/categories',
-        countries: '/api/countries'
-      }
-    }
-  });
-}));
-
-// Backend switch endpoint (для переключения между backend'ами)
-app.post('/api/backend-switch', asyncHandler(async (req: any, res: any) => {
-  const { backendUrl } = req.body;
-  
-  if (!backendUrl || typeof backendUrl !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid backend URL',
-      message: 'Необходимо указать URL backend\'а'
-    });
-  }
-  
-  try {
-    // Валидируем URL
-    new URL(backendUrl);
-    
+app.get(
+  '/api/backend-info',
+  asyncHandler(async (_req: any, res: any) => {
     res.json({
       success: true,
       data: {
-        message: 'Backend URL updated',
-        backendUrl,
-        timestamp: new Date().toISOString()
-      }
+        name: 'Хронониндзя API',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString(),
+        endpoints: {
+          auth: '/api/auth',
+          persons: '/api/persons',
+          achievements: '/api/achievements',
+          periods: '/api/periods',
+          lists: '/api/lists',
+          stats: '/api/stats',
+          health: '/api/health',
+          categories: '/api/categories',
+          countries: '/api/countries',
+        },
+      },
     });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: 'Invalid URL format',
-      message: 'Неверный формат URL'
-    });
-  }
-}));
+  })
+);
+
+// Backend switch endpoint (для переключения между backend'ами)
+app.post(
+  '/api/backend-switch',
+  asyncHandler(async (req: any, res: any) => {
+    const { backendUrl } = req.body;
+
+    if (!backendUrl || typeof backendUrl !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid backend URL',
+        message: "Необходимо указать URL backend'а",
+      });
+    }
+
+    try {
+      // Валидируем URL
+      new URL(backendUrl);
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Backend URL updated',
+          backendUrl,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid URL format',
+        message: 'Неверный формат URL',
+      });
+    }
+  })
+);
 
 // Корневой маршрут
 app.get('/', (req, res) => {
@@ -175,8 +186,8 @@ app.get('/', (req, res) => {
       countries: '/api/countries',
       stats: '/api/stats',
       health: '/api/health',
-      auth: '/api/auth'
-    }
+      auth: '/api/auth',
+    },
   });
 });
 
@@ -190,7 +201,7 @@ app.use((req, res) => {
   res.status(404).json({
     success: false,
     error: 'Not found',
-    message: 'Маршрут не найден'
+    message: 'Маршрут не найден',
   });
 });
 
@@ -210,7 +221,7 @@ async function startServer() {
       console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
       console.log(`👥 Persons API: http://localhost:${PORT}/api/persons`);
       console.log(`📈 Stats API: http://localhost:${PORT}/api/stats`);
-      
+
       // Логгирование CORS
       const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
       const corsInfo = isLocal ? 'http://localhost:3000' : 'все домены (*)';
@@ -240,5 +251,4 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-export default app; 
-
+export default app;

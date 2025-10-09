@@ -1,7 +1,7 @@
-import { Pool } from 'pg'
-import dotenv from 'dotenv'
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
 
-dotenv.config()
+dotenv.config();
 
 async function run() {
   const pool = new Pool({
@@ -10,10 +10,10 @@ async function run() {
     database: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined as any,
-  })
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : (undefined as any),
+  });
   try {
-    console.log('Running migration: update views for persons/achievements/countries...')
+    console.log('Running migration: update views for persons/achievements/countries...');
 
     // 1) Countries of life periods: add arrays country_names and country_ids, keep countries string for compatibility
     await pool.query(`
@@ -27,7 +27,7 @@ async function run() {
       LEFT JOIN countries c ON c.id = pr.country_id
       WHERE pr.period_type = 'life'
       GROUP BY pr.person_id;
-    `)
+    `);
 
     // 2) Drop obsolete top-3 view if present
     await pool.query(`
@@ -35,10 +35,10 @@ async function run() {
         PERFORM 1 FROM pg_views WHERE viewname = 'v_achievements_top3';
         IF FOUND THEN EXECUTE 'DROP VIEW IF EXISTS v_achievements_top3'; END IF;
       END $$;
-    `)
+    `);
 
     // 3) Main API view: drop and recreate to change column list
-    await pool.query(`DROP VIEW IF EXISTS v_api_persons CASCADE`)
+    await pool.query(`DROP VIEW IF EXISTS v_api_persons CASCADE`);
     await pool.query(`
       CREATE VIEW v_api_persons AS
       SELECT
@@ -65,13 +65,13 @@ async function run() {
       LEFT JOIN v_person_ruler_span rs ON rs.person_id = p.id
       LEFT JOIN v_person_countries_life cl ON cl.person_id = p.id
       LEFT JOIN v_person_ruler_periods rp ON rp.person_id = p.id;
-    `)
+    `);
 
     // 4) Recreate dependent views
     await pool.query(`
       CREATE VIEW v_approved_persons AS
       SELECT * FROM v_api_persons WHERE status = 'approved'
-    `)
+    `);
 
     await pool.query(`
       CREATE VIEW v_pending_moderation AS
@@ -79,17 +79,15 @@ async function run() {
       FROM v_api_persons v
       JOIN persons p ON p.id = v.id
       WHERE p.status = 'pending'
-    `)
+    `);
 
-    console.log('Migration complete.')
+    console.log('Migration complete.');
   } catch (e) {
-    console.error('Migration failed:', e)
-    process.exitCode = 1
+    console.error('Migration failed:', e);
+    process.exitCode = 1;
   } finally {
-    await pool.end()
+    await pool.end();
   }
 }
 
-run()
-
-
+run();

@@ -1,23 +1,25 @@
 import { Pool } from 'pg';
-import { 
-  User, 
-  UserSession, 
-  RegisterRequest, 
-  LoginRequest, 
+import {
+  User,
+  UserSession,
+  RegisterRequest,
+  LoginRequest,
   UpdateProfileRequest,
-  ChangePasswordRequest 
+  ChangePasswordRequest,
 } from '../types/auth';
-import { 
-  hashPassword, 
-  comparePassword, 
-  generateAccessToken, 
+import { UserRow, UserSessionRow } from '../types/database';
+import {
+  hashPassword,
+  comparePassword,
+  generateAccessToken,
   generateRefreshToken,
   generateEmailVerificationToken,
   generatePasswordResetToken,
   validateRegisterData,
   validateLoginData,
   addDays,
-  isTokenExpired
+  isTokenExpired,
+  hashToken,
 } from '../utils/auth';
 
 export class AuthService {
@@ -51,7 +53,7 @@ export class AuthService {
 
     // Хеширование пароля
     const passwordHash = await hashPassword(data.password);
-    
+
     // Генерация токена для подтверждения email
     const emailVerificationToken = generateEmailVerificationToken();
     const emailVerificationExpires = addDays(new Date(), 2);
@@ -62,13 +64,20 @@ export class AuthService {
       RETURNING *
     `;
 
-    const values = [data.email.toLowerCase(), passwordHash, desiredUsername, data.full_name, emailVerificationToken, emailVerificationExpires];
-    
+    const values = [
+      data.email.toLowerCase(),
+      passwordHash,
+      desiredUsername,
+      data.full_name,
+      emailVerificationToken,
+      emailVerificationExpires,
+    ];
+
     try {
       const result = await this.pool.query(query, values);
       const created = result.rows[0];
       // Пробрасываем токен наружу для отправки письма
-      (created as any).email_verification_token = emailVerificationToken;
+      created.email_verification_token = emailVerificationToken;
       return this.mapUserFromDb(created);
     } catch (error) {
       throw new Error(`Ошибка при создании пользователя: ${error}`);
@@ -76,7 +85,9 @@ export class AuthService {
   }
 
   // Аутентификация пользователя
-  async loginUser(data: LoginRequest): Promise<{ user: User; accessToken: string; refreshToken: string }> {
+  async loginUser(
+    data: LoginRequest
+  ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     // Валидация данных
     const validation = validateLoginData(data);
     if (!validation.isValid) {
@@ -105,21 +116,24 @@ export class AuthService {
     }
 
     // Генерация токенов
-    const accessToken = generateAccessToken(user);
+    const mappedUser = this.mapUserFromDb(user);
+    const accessToken = generateAccessToken(mappedUser);
     const refreshToken = generateRefreshToken();
 
     // Сохранение refresh токена в базе (хеш)
     await this.saveRefreshToken(user.id, refreshToken);
 
     return {
-      user: this.mapUserFromDb(user),
+      user: mappedUser,
       accessToken,
-      refreshToken
+      refreshToken,
     };
   }
 
   // Обновление токена доступа
-  async refreshAccessToken(refreshToken: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
+  async refreshAccessToken(
+    refreshToken: string
+  ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     const session = await this.getSessionByToken(refreshToken);
     if (!session) {
       throw new Error('Недействительный refresh токен');
@@ -135,16 +149,17 @@ export class AuthService {
       throw new Error('Пользователь не найден или заблокирован');
     }
 
-    const accessToken = generateAccessToken(user);
+    const mappedUser = this.mapUserFromDb(user);
+    const accessToken = generateAccessToken(mappedUser);
     // Ротация refresh-токена: удаляем старый, создаем новый
     await this.deleteSession(session.id);
     const newRefreshToken = generateRefreshToken();
     await this.saveRefreshToken(user.id, newRefreshToken);
 
     return {
-      user: this.mapUserFromDb(user),
+      user: mappedUser,
       accessToken,
-      refreshToken: newRefreshToken
+      refreshToken: newRefreshToken,
     };
   }
 
@@ -166,10 +181,15 @@ export class AuthService {
   // Обновление профиля пользователя
   async updateUserProfile(userId: number, data: UpdateProfileRequest): Promise<User> {
     const updateFields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | null | undefined)[] = [];
     let paramIndex = 1;
 
-    const desiredLogin = (data.login !== undefined) ? (data.login ?? '') : (data.username !== undefined ? data.username ?? '' : undefined);
+    const desiredLogin =
+      data.login !== undefined
+        ? (data.login ?? '')
+        : data.username !== undefined
+          ? (data.username ?? '')
+          : undefined;
     if (desiredLogin !== undefined) {
       // Проверка уникальности username
       if (desiredLogin) {
@@ -280,7 +300,7 @@ export class AuthService {
       throw new Error('Недействительный токен сброса пароля');
     }
 
-    if (isTokenExpired(user.password_reset_expires)) {
+    if (!user.password_reset_expires || isTokenExpired(user.password_reset_expires)) {
       throw new Error('Токен сброса пароля истек');
     }
 
@@ -338,44 +358,44 @@ export class AuthService {
   }
 
   // Получение пользователя по email
-  private async getUserByEmail(email: string): Promise<any> {
+  private async getUserByEmail(email: string): Promise<UserRow | null> {
     const query = 'SELECT * FROM users WHERE email = $1';
-    const result = await this.pool.query(query, [email]);
+    const result = await this.pool.query<UserRow>(query, [email]);
     return result.rows[0] || null;
   }
 
   // Получение пользователя по username
-  private async getUserByUsername(username: string): Promise<any> {
+  private async getUserByUsername(username: string): Promise<UserRow | null> {
     const query = 'SELECT * FROM users WHERE username = $1';
-    const result = await this.pool.query(query, [username]);
+    const result = await this.pool.query<UserRow>(query, [username]);
     return result.rows[0] || null;
   }
 
   // Получение пользователя по ID
-  private async getUserById(id: number): Promise<any> {
+  private async getUserById(id: number): Promise<UserRow | null> {
     const query = 'SELECT * FROM users WHERE id = $1';
-    const result = await this.pool.query(query, [id]);
+    const result = await this.pool.query<UserRow>(query, [id]);
     return result.rows[0] || null;
   }
 
   // Получение пользователя по токену сброса пароля
-  private async getUserByResetToken(token: string): Promise<any> {
+  private async getUserByResetToken(token: string): Promise<UserRow | null> {
     const query = 'SELECT * FROM users WHERE password_reset_token = $1';
-    const result = await this.pool.query(query, [token]);
+    const result = await this.pool.query<UserRow>(query, [token]);
     return result.rows[0] || null;
   }
 
   // Получение пользователя по токену подтверждения email
-  private async getUserByVerificationToken(token: string): Promise<any> {
+  private async getUserByVerificationToken(token: string): Promise<UserRow | null> {
     const query = 'SELECT * FROM users WHERE email_verification_token = $1';
-    const result = await this.pool.query(query, [token]);
+    const result = await this.pool.query<UserRow>(query, [token]);
     return result.rows[0] || null;
   }
 
   // Сохранение refresh токена
   private async saveRefreshToken(userId: number, token: string): Promise<void> {
     const expiresAt = addDays(new Date(), 7); // 7 дней
-    const tokenHash = require('../utils/auth').hashToken(token);
+    const tokenHash = hashToken(token);
 
     const query = `
       INSERT INTO user_sessions (user_id, token_hash, expires_at)
@@ -386,10 +406,10 @@ export class AuthService {
   }
 
   // Получение сессии по токену
-  private async getSessionByToken(token: string): Promise<any> {
-    const tokenHash = require('../utils/auth').hashToken(token);
+  private async getSessionByToken(token: string): Promise<UserSessionRow | null> {
+    const tokenHash = hashToken(token);
     const query = 'SELECT * FROM user_sessions WHERE token_hash = $1';
-    const result = await this.pool.query(query, [tokenHash]);
+    const result = await this.pool.query<UserSessionRow>(query, [tokenHash]);
     return result.rows[0] || null;
   }
 
@@ -401,25 +421,25 @@ export class AuthService {
 
   // Удаление сессии по токену
   private async deleteSessionByToken(token: string): Promise<void> {
-    const tokenHash = require('../utils/auth').hashToken(token);
+    const tokenHash = hashToken(token);
     const query = 'DELETE FROM user_sessions WHERE token_hash = $1';
     await this.pool.query(query, [tokenHash]);
   }
 
   // Маппинг пользователя из базы данных
-  private mapUserFromDb(dbUser: any): User {
+  private mapUserFromDb(dbUser: UserRow): User {
     return {
       id: dbUser.id,
       email: dbUser.email,
-      username: dbUser.username,
-      full_name: dbUser.full_name,
-      avatar_url: dbUser.avatar_url,
+      username: dbUser.username ?? undefined,
+      full_name: dbUser.full_name ?? undefined,
+      avatar_url: dbUser.avatar_url ?? undefined,
       role: dbUser.role,
       is_active: dbUser.is_active,
       email_verified: dbUser.email_verified,
-      email_verification_token: dbUser.email_verification_token,
+      email_verification_token: dbUser.email_verification_token ?? undefined,
       created_at: new Date(dbUser.created_at),
-      updated_at: new Date(dbUser.updated_at)
+      updated_at: new Date(dbUser.updated_at),
     };
   }
-} 
+}

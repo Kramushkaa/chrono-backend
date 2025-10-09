@@ -33,6 +33,13 @@
     "migrate:moderation": "ts-node src/db/migrate-moderation-periods-achievements.ts",
     "migrate:achievements-only": "ts-node src/db/migrate-moderation-periods-achievements.ts --achievements-only",
     "migrate:check": "ts-node src/db/migrate-moderation-periods-achievements.ts --check-only",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "type-check": "tsc --noEmit",
+    "check": "npm run type-check && npm run lint && npm run format:check",
+    "fix": "npm run lint:fix && npm run format",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -45,29 +52,35 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "helmet": "^6.2.0",
+    "@chrononinja/dto": "file:./shared-dto",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.19.2",
+    "helmet": "^6.2.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.5",
     "pg": "^8.11.3",
-    "zod": "^4.0.17",
-    "@chrononinja/dto": "file:./shared-dto"
+    "zod": "^4.0.17"
   },
   "devDependencies": {
-    "@types/helmet": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/helmet": "^4.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.0",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.10.9",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "nodemon": "^3.0.1",
+    "prettier": "^3.6.2",
     "ts-node": "^10.9.1",
     "typescript": "^5.3.2"
   }

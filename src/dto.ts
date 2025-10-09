@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from 'zod';
 
 export const UpsertPersonSchema = z.object({
   id: z.string().trim().min(1).max(128),
@@ -10,36 +10,38 @@ export const UpsertPersonSchema = z.object({
   imageUrl: z.string().trim().url().max(1000).nullable().optional(),
   wikiLink: z.string().trim().url().max(1000).nullable().optional(),
   saveAsDraft: z.boolean().optional().default(false),
-})
+});
 
 export const LifePeriodItemSchema = z.object({
   country_id: z.number().int().positive(),
   start_year: z.number().int(),
   end_year: z.number().int(),
-  period_type: z.string().trim().optional().default('life')
-})
+  period_type: z.string().trim().optional().default('life'),
+});
 
 export const LifePeriodsSchema = z.object({
-  periods: z.array(LifePeriodItemSchema).min(1)
-})
+  periods: z.array(LifePeriodItemSchema).min(1),
+});
 
-export const PersonEditPayloadSchema = z.object({
-  name: z.string().trim().min(1).max(200).optional(),
-  birthYear: z.number().int().optional(),
-  deathYear: z.number().int().optional(),
-  category: z.string().trim().min(1).max(100).optional(),
-  description: z.string().trim().max(5000).optional(),
-  imageUrl: z.string().trim().url().max(1000).nullable().optional(),
-  wikiLink: z.string().trim().url().max(1000).nullable().optional(),
-}).refine((obj) => Object.keys(obj).length > 0, { message: 'Пустой payload' })
+export const PersonEditPayloadSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    birthYear: z.number().int().optional(),
+    deathYear: z.number().int().optional(),
+    category: z.string().trim().min(1).max(100).optional(),
+    description: z.string().trim().max(5000).optional(),
+    imageUrl: z.string().trim().url().max(1000).nullable().optional(),
+    wikiLink: z.string().trim().url().max(1000).nullable().optional(),
+  })
+  .refine(obj => Object.keys(obj).length > 0, { message: 'Пустой payload' });
 
 export const AchievementGenericSchema = z.object({
   year: z.number().int(),
   description: z.string().trim().min(2).max(2000),
   wikipedia_url: z.string().trim().url().max(1000).nullable().optional(),
   image_url: z.string().trim().url().max(1000).nullable().optional(),
-  country_id: z.number().int().positive().nullable().optional()
-})
+  country_id: z.number().int().positive().nullable().optional(),
+});
 
 export const AchievementPersonSchema = z.object({
   year: z.number().int(),
@@ -47,13 +49,11 @@ export const AchievementPersonSchema = z.object({
   wikipedia_url: z.string().trim().url().max(1000).nullable().optional(),
   image_url: z.string().trim().url().max(1000).nullable().optional(),
   saveAsDraft: z.boolean().optional().default(false),
-})
+});
 
-export type UpsertPersonDTO = z.infer<typeof UpsertPersonSchema>
-export type LifePeriodItemDTO = z.infer<typeof LifePeriodItemSchema>
-export type LifePeriodsDTO = z.infer<typeof LifePeriodsSchema>
-export type PersonEditPayloadDTO = z.infer<typeof PersonEditPayloadSchema>
-export type AchievementGenericDTO = z.infer<typeof AchievementGenericSchema>
-export type AchievementPersonDTO = z.infer<typeof AchievementPersonSchema>
-
-
+export type UpsertPersonDTO = z.infer<typeof UpsertPersonSchema>;
+export type LifePeriodItemDTO = z.infer<typeof LifePeriodItemSchema>;
+export type LifePeriodsDTO = z.infer<typeof LifePeriodsSchema>;
+export type PersonEditPayloadDTO = z.infer<typeof PersonEditPayloadSchema>;
+export type AchievementGenericDTO = z.infer<typeof AchievementGenericSchema>;
+export type AchievementPersonDTO = z.infer<typeof AchievementPersonSchema>;

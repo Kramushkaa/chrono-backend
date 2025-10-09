@@ -1,5 +1,46 @@
-export function mapApiPersonRow(row: any) {
-  const result: any = {
+import { PersonsViewRow, PersonWithRelations } from '../types/database';
+
+// ============================================
+// API Response типы
+// ============================================
+
+export interface ApiPerson {
+  id: string;
+  name: string;
+  birthYear: number;
+  deathYear: number | null;
+  reignStart: number | null;
+  reignEnd: number | null;
+  category: string;
+  country: string;
+  description: string | null;
+  wikiLink: string | null;
+  achievementsWiki: string[];
+  achievements: string[];
+  achievementYears?: number[];
+  rulerPeriods: Array<{
+    startYear: number;
+    endYear: number;
+    countryId: number;
+    countryName: string;
+  }>;
+  imageUrl: string | null;
+  status?: 'draft' | 'pending' | 'approved' | 'rejected';
+}
+
+// ============================================
+// Маппинг из database row в API response
+// ============================================
+
+export function mapApiPersonRow(row: PersonsViewRow | PersonWithRelations): ApiPerson {
+  const achievements =
+    Array.isArray(row.achievements) && row.achievements.length > 0
+      ? typeof row.achievements[0] === 'string'
+        ? (row.achievements as string[])
+        : []
+      : [];
+
+  const result: ApiPerson = {
     id: row.id,
     name: row.name,
     birthYear: row.birth_year,
@@ -10,33 +51,54 @@ export function mapApiPersonRow(row: any) {
     country: row.country,
     description: row.description,
     wikiLink: row.wiki_link || null,
-    achievementsWiki: Array.isArray(row.achievements_wiki) ? row.achievements_wiki : [],
-    achievements: row.achievements || [],
-    achievementYears: Array.isArray(row.achievement_years) ? row.achievement_years : undefined,
-    rulerPeriods: Array.isArray(row.ruler_periods)
-      ? row.ruler_periods.map((p: any) => ({
-          startYear: p.start_year,
-          endYear: p.end_year,
-          countryId: p.country_id,
-          countryName: p.country_name,
-        }))
-      : [],
+    achievementsWiki:
+      'achievements_wiki' in row && Array.isArray(row.achievements_wiki)
+        ? row.achievements_wiki
+        : [],
+    achievements,
+    achievementYears:
+      'achievement_years' in row && Array.isArray(row.achievement_years)
+        ? row.achievement_years
+        : undefined,
+    rulerPeriods:
+      'ruler_periods' in row && Array.isArray(row.ruler_periods)
+        ? row.ruler_periods.map(p => ({
+            startYear: p.start_year,
+            endYear: p.end_year,
+            countryId: p.country_id,
+            countryName: p.country_name,
+          }))
+        : [],
     imageUrl: row.image_url,
   };
-  
+
   // Добавляем поля модерации, если они есть в исходной строке
   if (row.status !== undefined) {
     result.status = row.status;
   }
-  
+
   return result;
 }
 
+// ============================================
+// Pagination utilities
+// ============================================
+
+export interface PaginationDefaults {
+  defLimit: number;
+  maxLimit: number;
+}
+
+export interface PaginationParams {
+  limitParam: number;
+  offsetParam: number;
+}
+
 export function parseLimitOffset(
-  rawLimit: any,
-  rawOffset: any,
-  defaults: { defLimit: number; maxLimit: number }
-) {
+  rawLimit: string | number | undefined,
+  rawOffset: string | number | undefined,
+  defaults: PaginationDefaults
+): PaginationParams {
   const def = defaults.defLimit;
   const max = defaults.maxLimit;
   const lim = Number.parseInt(String(rawLimit ?? def), 10);
@@ -46,7 +108,21 @@ export function parseLimitOffset(
   return { limitParam, offsetParam };
 }
 
-export function paginateRows<T>(rows: T[], limitParam: number, offsetParam: number) {
+export interface PaginatedResult<T> {
+  data: T[];
+  meta: {
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+    nextOffset: number | null;
+  };
+}
+
+export function paginateRows<T>(
+  rows: T[],
+  limitParam: number,
+  offsetParam: number
+): PaginatedResult<T> {
   const hasMore = rows.length > limitParam;
   const data = hasMore ? rows.slice(0, limitParam) : rows;
   return {
@@ -59,5 +135,3 @@ export function paginateRows<T>(rows: T[], limitParam: number, offsetParam: numb
     },
   };
 }
-
-
