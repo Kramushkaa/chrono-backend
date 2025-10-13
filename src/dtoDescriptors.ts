@@ -1,4 +1,4 @@
-export const DTO_VERSION = '2025-08-26-1';
+export const DTO_VERSION = '2025-10-13-1';
 
 // Very simple, hand-maintained descriptors to detect drift across apps
 export const dtoDescriptors = {
