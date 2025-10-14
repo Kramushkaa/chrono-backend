@@ -5,8 +5,9 @@ import { asyncHandler, errors } from '../utils/errors';
 import { parseLimitOffset, paginateRows } from '../utils/api';
 import { AuthRequest } from '../types/express';
 import { AchievementRow, CountResult } from '../types/database';
+import { TelegramService } from '../services/telegramService';
 
-export function createAchievementsRoutes(pool: Pool): Router {
+export function createAchievementsRoutes(pool: Pool, telegramService: TelegramService): Router {
   const router = Router();
 
   // Admin: pending achievements
@@ -206,13 +207,13 @@ export function createAchievementsRoutes(pool: Pool): Router {
       const { year, description, wikipedia_url, image_url, saveAsDraft = false } = parsed.data;
 
       const personRes = await pool.query(
-        'SELECT birth_year, death_year FROM persons WHERE id = $1',
+        'SELECT birth_year, death_year, name FROM persons WHERE id = $1',
         [id]
       );
       if (personRes.rowCount === 0) {
         throw errors.notFound('Личность не найдена');
       }
-      const { birth_year, death_year } = personRes.rows[0];
+      const { birth_year, death_year, name: personName } = personRes.rows[0];
       if (birth_year != null && death_year != null) {
         if (year < Number(birth_year) || year > Number(death_year)) {
           throw errors.badRequest(
@@ -222,9 +223,11 @@ export function createAchievementsRoutes(pool: Pool): Router {
       }
       const role = req.user!.role;
       let result;
+      let status: 'draft' | 'approved' | 'pending' = 'pending';
 
       if (saveAsDraft) {
         // Сохранение как черновик
+        status = 'draft';
         result = await pool.query(
           `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url, status, created_by)
          VALUES ($1, $2, btrim($3), $4, $5, 'draft', $6)
@@ -232,6 +235,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
           [id, year, description, wikipedia_url ?? null, image_url ?? null, req.user!.sub]
         );
       } else if (role === 'admin' || role === 'moderator') {
+        status = 'approved';
         result = await pool.query(
           `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url, status, created_by)
          VALUES ($1, $2, btrim($3), $4, $5, 'approved', $6)
@@ -243,6 +247,7 @@ export function createAchievementsRoutes(pool: Pool): Router {
         );
       } else {
         // Обычные пользователи с подтверждённой почтой создают достижения в статусе pending
+        status = 'pending';
         result = await pool.query(
           `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url, status, created_by)
          VALUES ($1, $2, btrim($3), $4, $5, 'pending', $6)
@@ -250,6 +255,15 @@ export function createAchievementsRoutes(pool: Pool): Router {
           [id, year, description, wikipedia_url ?? null, image_url ?? null, req.user!.sub]
         );
       }
+
+      // Отправка уведомления в Telegram о создании достижения (только если не черновик)
+      if (status !== 'draft') {
+        const userEmail = req.user?.email || 'unknown';
+        telegramService
+          .notifyAchievementCreated(description, year, userEmail, status, personName)
+          .catch(err => console.warn('Telegram notification failed (achievement created):', err));
+      }
+
       res.status(201).json({ success: true, data: result.rows[0] });
     })
   );

@@ -10,8 +10,9 @@ import { Pool } from 'pg';
 import { authenticateToken, requireRoleMiddleware, requireVerifiedEmail } from '../middleware/auth';
 import { ApiError, errors, mapPgError, asyncHandler } from '../utils/errors';
 import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../utils/api';
+import { TelegramService } from '../services/telegramService';
 
-export function createPersonRoutes(pool: Pool) {
+export function createPersonRoutes(pool: Pool, telegramService: TelegramService) {
   const router = Router();
 
   const allowedPersonFields = new Set([
@@ -104,6 +105,13 @@ export function createPersonRoutes(pool: Pool) {
           (req as any).user!.sub,
         ]
       );
+
+      // Отправка уведомления в Telegram о создании личности модератором (неблокирующее)
+      const userEmail = (req as any).user?.email || 'unknown';
+      telegramService
+        .notifyPersonCreated(name.trim(), userEmail, 'approved', id)
+        .catch(err => console.warn('Telegram notification failed (admin person created):', err));
+
       res.json({ success: true });
     })
   );
@@ -484,6 +492,15 @@ export function createPersonRoutes(pool: Pool) {
         }
 
         await client.query('COMMIT');
+
+        // Отправка уведомления в Telegram о создании личности пользователем (только если не черновик)
+        if (!saveAsDraft) {
+          const userEmail = (req as any).user?.email || 'unknown';
+          telegramService
+            .notifyPersonCreated(name, userEmail, 'pending', id)
+            .catch(err => console.warn('Telegram notification failed (person proposed):', err));
+        }
+
         res.json({ success: true });
       } catch (error) {
         await client.query('ROLLBACK');
@@ -505,6 +522,11 @@ export function createPersonRoutes(pool: Pool) {
       if (!id || !action) {
         throw errors.badRequest('id и action обязательны');
       }
+
+      // Получаем информацию о личности для уведомления
+      const personRes = await pool.query('SELECT name FROM persons WHERE id = $1', [id]);
+      const personName = personRes.rows[0]?.name || 'Unknown';
+
       if (action === 'approve') {
         await pool.query(
           `UPDATE persons SET status='approved', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
@@ -518,6 +540,13 @@ export function createPersonRoutes(pool: Pool) {
       } else {
         throw errors.badRequest('action должен быть approve или reject');
       }
+
+      // Отправка уведомления в Telegram о решении модератора (неблокирующее)
+      const reviewerEmail = (req as any).user?.email || 'unknown';
+      telegramService
+        .notifyPersonReviewed(personName, action, reviewerEmail, id)
+        .catch(err => console.warn('Telegram notification failed (person reviewed):', err));
+
       res.json({ success: true });
     })
   );
@@ -544,7 +573,7 @@ export function createPersonRoutes(pool: Pool) {
         );
 
       // Проверяем, что персона существует и одобрена
-      const existingPersonRes = await pool.query('SELECT id, status FROM persons WHERE id = $1', [
+      const existingPersonRes = await pool.query('SELECT id, status, name FROM persons WHERE id = $1', [
         id,
       ]);
 
@@ -565,6 +594,12 @@ export function createPersonRoutes(pool: Pool) {
        VALUES ($1, $2, $3, 'pending') RETURNING id, created_at`,
         [id, userId, JSON.stringify(payload)]
       );
+
+      // Отправка уведомления в Telegram о предложении изменений (неблокирующее)
+      const userEmail = (req as any).user?.email || 'unknown';
+      telegramService
+        .notifyPersonEditProposed(existingPerson.name, userEmail, id)
+        .catch(err => console.warn('Telegram notification failed (person edit proposed):', err));
 
       res.status(201).json({
         success: true,
@@ -715,7 +750,7 @@ export function createPersonRoutes(pool: Pool) {
       const { id } = req.params;
 
       // Проверяем, что личность является черновиком и принадлежит пользователю
-      const personRes = await pool.query('SELECT created_by, status FROM persons WHERE id = $1', [
+      const personRes = await pool.query('SELECT created_by, status, name FROM persons WHERE id = $1', [
         id,
       ]);
 
@@ -757,6 +792,13 @@ export function createPersonRoutes(pool: Pool) {
         );
 
         await client.query('COMMIT');
+
+        // Отправка уведомления в Telegram об отправке черновика на модерацию (неблокирующее)
+        const userEmail = (req as any).user?.email || 'unknown';
+        telegramService
+          .notifyPersonCreated(person.name, userEmail, 'pending', id)
+          .catch(err => console.warn('Telegram notification failed (draft submitted):', err));
+
         res.json({ success: true, data: result.rows[0] });
       } catch (error) {
         await client.query('ROLLBACK');

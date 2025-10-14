@@ -104,13 +104,13 @@ app.use('/api/auth', createAuthRoutes(authController));
 app.use(logRequest);
 
 // Маршруты управления Личностями (создание/модерация)
-app.use('/api', createPersonRoutes(pool));
+app.use('/api', createPersonRoutes(pool, telegramService));
 
 // Маршруты для достижений
-app.use('/api', createAchievementsRoutes(pool));
+app.use('/api', createAchievementsRoutes(pool, telegramService));
 
 // Маршруты для периодов жизни
-app.use('/api', createPeriodsRoutes(pool));
+app.use('/api', createPeriodsRoutes(pool, telegramService));
 
 // Основные маршруты API
 app.use('/api', createMetaRoutes(pool));

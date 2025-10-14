@@ -5,8 +5,9 @@ import { asyncHandler, errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset } from '../utils/api';
 import { AuthRequest } from '../types/express';
 import { PeriodRow, CountResult } from '../types/database';
+import { TelegramService } from '../services/telegramService';
 
-export function createPeriodsRoutes(pool: Pool): Router {
+export function createPeriodsRoutes(pool: Pool, telegramService: TelegramService): Router {
   const router = Router();
 
   // Create standalone period (with person_id)
