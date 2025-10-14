@@ -335,7 +335,7 @@ export class AuthService {
   }
 
   // Подтверждение email
-  async verifyEmail(token: string): Promise<void> {
+  async verifyEmail(token: string): Promise<User> {
     const user = await this.getUserByVerificationToken(token);
     if (!user) {
       throw new Error('Недействительный токен подтверждения email');
@@ -348,10 +348,12 @@ export class AuthService {
       UPDATE users 
       SET email_verified = true, email_verification_token = NULL, email_verification_expires = NULL, updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
+      RETURNING *
     `;
 
     try {
-      await this.pool.query(query, [user.id]);
+      const result = await this.pool.query(query, [user.id]);
+      return this.mapUserFromDb(result.rows[0]);
     } catch (error) {
       throw new Error(`Ошибка при подтверждении email: ${error}`);
     }

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/authService';
+import { TelegramService } from '../services/telegramService';
 import {
   RegisterRequest,
   LoginRequest,
@@ -14,9 +15,11 @@ import { errors } from '../utils/errors';
 
 export class AuthController {
   private authService: AuthService;
+  private telegramService: TelegramService;
 
-  constructor(authService: AuthService) {
+  constructor(authService: AuthService, telegramService: TelegramService) {
     this.authService = authService;
+    this.telegramService = telegramService;
   }
 
   // Регистрация пользователя
@@ -24,6 +27,11 @@ export class AuthController {
     try {
       const userData: RegisterRequest = req.body;
       const user = await this.authService.registerUser(userData);
+
+      // Отправка уведомления в Telegram о новой регистрации (неблокирующее)
+      this.telegramService
+        .notifyNewRegistration(user.email, user.username, user.full_name)
+        .catch(err => console.warn('Telegram notification failed (registration):', err));
 
       // Отправка письма с подтверждением email (best-effort)
       try {
@@ -46,6 +54,11 @@ export class AuthController {
         `;
         const { sendEmail } = await import('../utils/email');
         await sendEmail(user.email, 'Подтверждение email — Хронониндзя', html);
+
+        // Отправка уведомления в Telegram об отправке письма подтверждения (неблокирующее)
+        this.telegramService
+          .notifyVerificationEmailSent(user.email, false)
+          .catch(err => console.warn('Telegram notification failed (verification sent):', err));
       } catch (err) {
         console.warn('Email verification send failed:', err);
       }
@@ -308,7 +321,12 @@ export class AuthController {
         return next(errors.badRequest('Токен подтверждения обязателен', 'missing_token'));
       }
 
-      await this.authService.verifyEmail(token);
+      const user = await this.authService.verifyEmail(token);
+
+      // Отправка уведомления в Telegram о подтверждении email (неблокирующее)
+      this.telegramService
+        .notifyEmailVerified(user.email, user.username)
+        .catch(err => console.warn('Telegram notification failed (email verified):', err));
 
       res.status(200).json({
         success: true,
@@ -343,6 +361,11 @@ export class AuthController {
           </div>`;
         const { sendEmail } = await import('../utils/email');
         await sendEmail(email, 'Подтверждение email — Хронониндзя', html);
+
+        // Отправка уведомления в Telegram о повторной отправке письма (неблокирующее)
+        this.telegramService
+          .notifyVerificationEmailSent(email, true)
+          .catch(err => console.warn('Telegram notification failed (resend verification):', err));
       } catch (err) {
         console.warn('Resend verification send failed:', err);
       }

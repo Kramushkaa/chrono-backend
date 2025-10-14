@@ -33,6 +33,7 @@
     "migrate:moderation": "ts-node src/db/migrate-moderation-periods-achievements.ts",
     "migrate:achievements-only": "ts-node src/db/migrate-moderation-periods-achievements.ts --achievements-only",
     "migrate:check": "ts-node src/db/migrate-moderation-periods-achievements.ts --check-only",
+    "telegram:test": "ts-node src/utils/test-telegram.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -60,6 +61,7 @@
     "helmet": "^6.2.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "node-telegram-bot-api": "^0.66.0",
     "nodemailer": "^7.0.5",
     "pg": "^8.11.3",
     "zod": "^4.0.17"
@@ -72,6 +74,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.0",
+    "@types/node-telegram-bot-api": "^0.64.11",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.10.9",
     "@typescript-eslint/eslint-plugin": "^8.46.0",

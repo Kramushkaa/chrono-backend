@@ -43,6 +43,12 @@ export const config = {
     password: process.env.EMAIL_PASSWORD || '',
   },
 
+  // Настройки Telegram бота для уведомлений
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    adminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || '',
+  },
+
   // Настройки безопасности
   security: {
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),

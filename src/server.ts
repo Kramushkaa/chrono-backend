@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { Pool } from 'pg';
 import { AuthService } from './services/authService';
+import { TelegramService } from './services/telegramService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler, authenticateToken } from './middleware/auth';
@@ -15,6 +16,7 @@ import { createListsRoutes } from './routes/listsRoutes';
 import { createAchievementsRoutes } from './routes/achievementsRoutes';
 import { createPeriodsRoutes } from './routes/periodsRoutes';
 import { createMetaRoutes } from './routes/metaRoutes';
+import { config } from './config';
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -24,7 +26,11 @@ const pool = createPool();
 
 // Создание сервисов и контроллеров
 const authService = new AuthService(pool);
-const authController = new AuthController(authService);
+const telegramService = new TelegramService(
+  config.telegram.botToken,
+  config.telegram.adminChatId
+);
+const authController = new AuthController(authService, telegramService);
 
 // Создание Express приложения
 const app = express();
