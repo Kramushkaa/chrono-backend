@@ -81,6 +81,9 @@ export function createAuthRoutes(authController: AuthController): Router {
   });
 
   // Маршруты для администраторов
+  // NOTE: Admin user management endpoints are stubbed for future implementation
+  // Planned features: user CRUD, roles, permissions, statistics
+  // Implementation planned when admin panel is developed
 
   // Получение списка пользователей (только для админов)
   router.get('/users', authenticateToken, requireRoleMiddleware(['admin']), async (req, res) => {

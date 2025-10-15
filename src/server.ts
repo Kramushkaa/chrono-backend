@@ -11,7 +11,7 @@ import { logRequest, errorHandler, authenticateToken } from './middleware/auth';
 import { asyncHandler } from './utils/errors';
 import { DTO_VERSION as DTO_VERSION_BE } from './dtoDescriptors';
 import { createPool } from './db/pool';
-import { createPersonRoutes } from './routes/personRoutes';
+import { createPersonRoutes } from './routes/persons';
 import { createListsRoutes } from './routes/listsRoutes';
 import { createAchievementsRoutes } from './routes/achievementsRoutes';
 import { createPeriodsRoutes } from './routes/periodsRoutes';
