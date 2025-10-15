@@ -3,7 +3,6 @@ import { AuthController } from '../controllers/authController';
 import {
   authenticateToken,
   requireRoleMiddleware,
-  requirePermission,
   rateLimit,
 } from '../middleware/auth';
 

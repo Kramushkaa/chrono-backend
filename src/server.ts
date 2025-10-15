@@ -2,14 +2,12 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
-import { Pool } from 'pg';
 import { AuthService } from './services/authService';
 import { TelegramService } from './services/telegramService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
-import { logRequest, errorHandler, authenticateToken } from './middleware/auth';
+import { logRequest, errorHandler } from './middleware/auth';
 import { asyncHandler } from './utils/errors';
-import { DTO_VERSION as DTO_VERSION_BE } from './dtoDescriptors';
 import { createPool } from './db/pool';
 import { createPersonRoutes } from './routes/persons';
 import { createListsRoutes } from './routes/listsRoutes';
@@ -26,10 +24,7 @@ const pool = createPool();
 
 // Создание сервисов и контроллеров
 const authService = new AuthService(pool);
-const telegramService = new TelegramService(
-  config.telegram.botToken,
-  config.telegram.adminChatId
-);
+const telegramService = new TelegramService(config.telegram.botToken, config.telegram.adminChatId);
 const authController = new AuthController(authService, telegramService);
 
 // Создание Express приложения

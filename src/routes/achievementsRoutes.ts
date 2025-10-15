@@ -3,8 +3,7 @@ import { Pool } from 'pg';
 import { authenticateToken, requireRoleMiddleware, requireVerifiedEmail } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
 import { parseLimitOffset, paginateRows } from '../utils/api';
-import { AuthRequest } from '../types/express';
-import { AchievementRow, CountResult } from '../types/database';
+import { CountResult } from '../types/database';
 import { TelegramService } from '../services/telegramService';
 
 export function createAchievementsRoutes(pool: Pool, telegramService: TelegramService): Router {

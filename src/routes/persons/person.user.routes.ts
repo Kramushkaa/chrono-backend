@@ -23,9 +23,10 @@ export function createUserPersonRoutes(pool: Pool, telegramService: TelegramServ
         req.query.limit as string | undefined,
         req.query.offset as string | undefined,
         {
-        defLimit: 200,
-        maxLimit: 500,
-      });
+          defLimit: 200,
+          maxLimit: 500,
+        }
+      );
       const countOnly = String(req.query.count || 'false') === 'true';
 
       // Поддержка фильтрации по статусам
@@ -214,9 +215,10 @@ export function createUserPersonRoutes(pool: Pool, telegramService: TelegramServ
       const { id } = req.params;
 
       // Проверяем, что личность является черновиком и принадлежит пользователю
-      const personRes = await pool.query('SELECT created_by, status, name FROM persons WHERE id = $1', [
-        id,
-      ]);
+      const personRes = await pool.query(
+        'SELECT created_by, status, name FROM persons WHERE id = $1',
+        [id]
+      );
 
       if (personRes.rowCount === 0) {
         throw errors.notFound('Личность не найдена');
@@ -407,4 +409,3 @@ export function createUserPersonRoutes(pool: Pool, telegramService: TelegramServ
 
   return router;
 }
-

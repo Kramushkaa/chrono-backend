@@ -3,11 +3,9 @@ import { Pool } from 'pg';
 import { authenticateToken, requireVerifiedEmail, requireRoleMiddleware } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset } from '../utils/api';
-import { AuthRequest } from '../types/express';
-import { PeriodRow, CountResult } from '../types/database';
-import { TelegramService } from '../services/telegramService';
+import { CountResult } from '../types/database';
 
-export function createPeriodsRoutes(pool: Pool, telegramService: TelegramService): Router {
+export function createPeriodsRoutes(pool: Pool, _telegramService: unknown): Router {
   const router = Router();
 
   // Create standalone period (with person_id)

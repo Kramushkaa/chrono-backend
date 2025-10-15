@@ -71,9 +71,10 @@ export function createAdminPersonRoutes(pool: Pool, telegramService: TelegramSer
         req.query.limit as string | undefined,
         req.query.offset as string | undefined,
         {
-        defLimit: 200,
-        maxLimit: 500,
-      });
+          defLimit: 200,
+          maxLimit: 500,
+        }
+      );
       const countOnly = String(req.query.count || 'false') === 'true';
       const contentType = req.query.content_type as string;
       let whereClause = '';
@@ -143,4 +144,3 @@ export function createAdminPersonRoutes(pool: Pool, telegramService: TelegramSer
 
   return router;
 }
-

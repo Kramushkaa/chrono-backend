@@ -1,7 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { UpsertPersonSchema, PersonEditPayloadSchema, LifePeriodsSchema } from '../../dto';
 import { Pool } from 'pg';
-import { authenticateToken, requireRoleMiddleware, requireVerifiedEmail } from '../../middleware/auth';
+import {
+  authenticateToken,
+  requireRoleMiddleware,
+  requireVerifiedEmail,
+} from '../../middleware/auth';
 import { errors, mapPgError, asyncHandler } from '../../utils/errors';
 import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../../utils/api';
 import { TelegramService } from '../../services/telegramService';
@@ -21,7 +25,7 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
       const params: (string | number | string[])[] = [];
       let paramIndex = 1;
       if (category) {
-        const categoryArray = Array.isArray(category) 
+        const categoryArray = Array.isArray(category)
           ? (category as string[])
           : category.toString().split(',');
         where += ` AND v.category = ANY($${paramIndex}::text[])`;
@@ -67,9 +71,10 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
         req.query.limit as string | undefined,
         req.query.offset as string | undefined,
         {
-        defLimit: 100,
-        maxLimit: 1000,
-      });
+          defLimit: 100,
+          maxLimit: 1000,
+        }
+      );
       query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
       params.push(limitParam + 1, offsetParam);
       const result = await pool.query(query, params);
@@ -334,9 +339,10 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
         );
 
       // Проверяем, что персона существует и одобрена
-      const existingPersonRes = await pool.query('SELECT id, status, name FROM persons WHERE id = $1', [
-        id,
-      ]);
+      const existingPersonRes = await pool.query(
+        'SELECT id, status, name FROM persons WHERE id = $1',
+        [id]
+      );
 
       if (existingPersonRes.rowCount === 0) {
         throw errors.notFound('Личность не найдена');
@@ -487,4 +493,3 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
 
   return router;
 }
-

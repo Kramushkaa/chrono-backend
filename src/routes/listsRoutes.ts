@@ -3,9 +3,6 @@ import jwt from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { authenticateToken } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
-import { parseLimitOffset, paginateRows } from '../utils/api';
-import { AuthRequest } from '../types/express';
-import { ListRow, ListItemRow, CountResult } from '../types/database';
 
 export function createListsRoutes(pool: Pool): Router {
   const router = Router();

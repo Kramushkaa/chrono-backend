@@ -66,4 +66,3 @@ export async function applyPayloadToPerson(
   values.push(id);
   await pool.query(sql, values);
 }
-

@@ -15,4 +15,3 @@ export function createPersonRoutes(pool: Pool, telegramService: TelegramService)
 
   return router;
 }
-

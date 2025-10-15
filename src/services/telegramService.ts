@@ -25,7 +25,11 @@ export class TelegramService {
   /**
    * Отправка уведомления о регистрации нового пользователя
    */
-  async notifyNewRegistration(userEmail: string, username?: string, fullName?: string): Promise<void> {
+  async notifyNewRegistration(
+    userEmail: string,
+    username?: string,
+    fullName?: string
+  ): Promise<void> {
     if (!this.isEnabled || !this.bot) return;
 
     const displayName = fullName || username || userEmail;
@@ -355,4 +359,3 @@ Telegram notifications работают корректно!
     }
   }
 }
-
