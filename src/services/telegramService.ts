@@ -32,7 +32,7 @@ export class TelegramService {
   ): Promise<void> {
     if (!this.isEnabled || !this.bot) return;
 
-    const displayName = fullName || username || userEmail;
+    const _displayName = fullName || username || userEmail;
     const usernameText = username ? `\n👤 Username: ${username}` : '';
     const fullNameText = fullName ? `\n📝 Имя: ${fullName}` : '';
 
@@ -83,7 +83,7 @@ ${emoji} <b>${action} письма подтверждения</b>
   async notifyEmailVerified(userEmail: string, username?: string): Promise<void> {
     if (!this.isEnabled || !this.bot) return;
 
-    const displayName = username || userEmail;
+    const _displayName = username || userEmail;
     const usernameText = username ? `\n👤 Username: ${username}` : '';
 
     const message = `

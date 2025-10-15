@@ -16,14 +16,14 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
     requireRoleMiddleware(['moderator', 'admin']),
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 200,
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
       if (countOnly) {
         const cRes = await pool.query<CountResult>(
           `SELECT COUNT(*)::int AS cnt FROM achievements WHERE status = 'pending'`
@@ -70,14 +70,14 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
     authenticateToken,
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 200,
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
       if (countOnly) {
         const cRes = await pool.query<CountResult>(
           `SELECT COALESCE(achievements_count, 0) AS cnt FROM v_user_content_counts WHERE created_by = $1`,
@@ -120,16 +120,16 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
   router.get(
     '/achievements',
     asyncHandler(async (req: Request, res: Response) => {
-      const q = (req.query.q || '').toString().trim();
+      const q = ((req.query.q as string) || '').toString().trim();
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 100,
           maxLimit: 500,
         }
       );
-      const personId = (req.query.person_id || '').toString().trim();
+      const personId = ((req.query.person_id as string) || '').toString().trim();
       const countryIdNum = parseInt((req.query.country_id as string) || '');
       const yearFromNum = parseInt((req.query.year_from as string) || '');
       const yearToNum = parseInt((req.query.year_to as string) || '');
@@ -386,14 +386,14 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
     authenticateToken,
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 200,
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
 
       if (countOnly) {
         const cRes = await pool.query(

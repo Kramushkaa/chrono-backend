@@ -27,7 +27,7 @@ export function createUserPersonRoutes(pool: Pool, telegramService: TelegramServ
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
 
       // Поддержка фильтрации по статусам
       const statusFilter = req.query.status as string;
@@ -143,7 +143,7 @@ export function createUserPersonRoutes(pool: Pool, telegramService: TelegramServ
           const sql = `UPDATE persons SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
           values.push(id);
 
-          const result = await client.query(sql, values);
+          await client.query(sql, values);
         }
 
         // Обновляем периоды жизни, если они указаны
@@ -288,7 +288,7 @@ export function createUserPersonRoutes(pool: Pool, telegramService: TelegramServ
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
 
       if (countOnly) {
         const cRes = await pool.query(

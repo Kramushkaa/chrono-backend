@@ -187,7 +187,7 @@ export function createAuthRoutes(authController: AuthController): Router {
 
   // Проверка разрешения пользователя
   router.get('/check-permission/:permission', authenticateToken, async (req, res) => {
-    const { permission } = req.params;
+    const { permission: _permission } = req.params;
     const userRole = req.user?.role;
 
     if (!userRole) {

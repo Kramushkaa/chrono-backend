@@ -124,7 +124,7 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
   router.get(
     '/persons/lookup/by-ids',
     asyncHandler(async (req: Request, res: Response) => {
-      const raw = (req.query.ids || '').toString().trim();
+      const raw = ((req.query.ids as string) || '').toString().trim();
       if (!raw) {
         res.json({ success: true, data: [] });
         return;
@@ -277,7 +277,7 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
           ]);
 
           // Статус периодов зависит от статуса персоны
-          const periodStatus = saveAsDraft ? 'draft' : 'pending';
+          const _periodStatus = saveAsDraft ? 'draft' : 'pending';
 
           // Вставляем новые периоды
           for (const p of normalizedPeriods) {

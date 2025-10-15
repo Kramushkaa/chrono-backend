@@ -75,7 +75,7 @@ export function createAdminPersonRoutes(pool: Pool, telegramService: TelegramSer
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
       const contentType = req.query.content_type as string;
       let whereClause = '';
       const params: (string | number)[] = [];

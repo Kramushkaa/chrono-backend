@@ -306,14 +306,14 @@ export function createPeriodsRoutes(pool: Pool, _telegramService: unknown): Rout
     authenticateToken,
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 200,
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
 
       if (countOnly) {
         const cRes = await pool.query(
@@ -357,14 +357,14 @@ export function createPeriodsRoutes(pool: Pool, _telegramService: unknown): Rout
     requireRoleMiddleware(['moderator', 'admin']),
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 200,
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
 
       if (countOnly) {
         const cRes = await pool.query(
@@ -441,14 +441,14 @@ export function createPeriodsRoutes(pool: Pool, _telegramService: unknown): Rout
     authenticateToken,
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 200,
           maxLimit: 500,
         }
       );
-      const countOnly = String(req.query.count || 'false') === 'true';
+      const countOnly = String((req.query.count as string) || 'false') === 'true';
 
       if (countOnly) {
         const cRes = await pool.query(
@@ -491,16 +491,16 @@ export function createPeriodsRoutes(pool: Pool, _telegramService: unknown): Rout
     '/periods',
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
-        String(req.query.limit || ''),
-        String(req.query.offset || ''),
+        String((req.query.limit as string) || ''),
+        String((req.query.offset as string) || ''),
         {
           defLimit: 200,
           maxLimit: 500,
         }
       );
-      const type = (req.query.type || '').toString().trim().toLowerCase();
-      const q = (req.query.q || '').toString().trim();
-      const personId = (req.query.person_id || '').toString().trim();
+      const type = ((req.query.type as string) || '').toString().trim().toLowerCase();
+      const q = ((req.query.q as string) || '').toString().trim();
+      const personId = ((req.query.person_id as string) || '').toString().trim();
       const countryIdNum = parseInt((req.query.country_id as string) || '');
       const yearFromNum = parseInt((req.query.year_from as string) || '');
       const yearToNum = parseInt((req.query.year_to as string) || '');
