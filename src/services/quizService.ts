@@ -37,7 +37,11 @@ export class QuizService {
     totalQuestions: number,
     totalTimeMs: number,
     questionTypes: QuizQuestionType[],
-    detailedAnswers?: Array<{ isCorrect: boolean; timeSpent: number; questionType: QuizQuestionType }>
+    detailedAnswers?: Array<{
+      isCorrect: boolean;
+      timeSpent: number;
+      questionType: QuizQuestionType;
+    }>
   ): number {
     // Если есть детальная информация, используем её
     if (detailedAnswers && detailedAnswers.length === questionTypes.length) {
@@ -97,32 +101,39 @@ export class QuizService {
   }
 
   /**
-   * Calculate time bonus for a single question
+   * Calculate time bonus for a single question using hyperbolic curve (1/t)
+   * Faster answers get exponentially more bonus
    */
   private calculateQuestionTimeBonus(timeMs: number, questionType: QuizQuestionType): number {
-    const isSingleChoice = ['birthYear', 'deathYear', 'profession', 'country'].includes(questionType);
+    const isSingleChoice = ['birthYear', 'deathYear', 'profession', 'country'].includes(
+      questionType
+    );
     const isContemporaries = questionType === 'contemporaries';
-    
-    // Оптимальное время для максимального бонуса
-    let optimalTime: number;
+
     let maxBonus: number;
-    
+    let k: number; // Коэффициент для гиперболической кривой
+    let offset: number; // Смещение для избежания деления на 0
+
     if (isSingleChoice) {
-      optimalTime = 1000; // 1 секунда
-      maxBonus = 1.2;
+      maxBonus = 1.5; // Увеличиваем максимальный бонус
+      k = 3000; // Настраиваем крутизну кривой
+      offset = 500; // Минимальное смещение
     } else if (isContemporaries) {
-      optimalTime = 7000; // 7 секунд
-      maxBonus = 1.5;
+      maxBonus = 2.0; // Больший бонус для сложных вопросов
+      k = 20000;
+      offset = 2000;
     } else {
       // achievementsMatch, birthOrder, guessPerson
-      optimalTime = 4000; // 4 секунды
-      maxBonus = 1.5;
+      maxBonus = 1.8;
+      k = 10000;
+      offset = 1000;
     }
-    
-    const timeRange = 60000; // 60 секунд для расчета бонуса
 
-    const rawBonus = Math.min(maxBonus, 1 + (optimalTime - timeMs) / timeRange);
-    return Math.max(1.0, rawBonus); // Не штрафуем за медленные ответы
+    // Гиперболическая функция: bonus = 1 + k / (timeMs + offset)
+    const rawBonus = 1 + k / (timeMs + offset);
+
+    // Ограничиваем максимальным бонусом и минимумом 1.0
+    return Math.min(maxBonus, Math.max(1.0, rawBonus));
   }
 
   /**
@@ -175,7 +186,11 @@ export class QuizService {
     totalTimeMs: number,
     config: QuizSetupConfig,
     questionTypes: QuizQuestionType[],
-    detailedAnswers?: Array<{ isCorrect: boolean; timeSpent: number; questionType: QuizQuestionType }>
+    detailedAnswers?: Array<{
+      isCorrect: boolean;
+      timeSpent: number;
+      questionType: QuizQuestionType;
+    }>
   ): Promise<{ attemptId: number; ratingPoints: number }> {
     const ratingPoints = this.calculateRatingPoints(
       correctAnswers,
@@ -281,7 +296,7 @@ export class QuizService {
       // Save creator's attempt if provided
       if (creatorAttempt) {
         const questionTypes = questions.map(q => q.type);
-        
+
         // Prepare detailed answers with question types
         const detailedAnswers = creatorAttempt.answers?.map(answer => {
           const question = questions.find(q => q.id === answer.questionId);
@@ -291,7 +306,7 @@ export class QuizService {
             questionType: question!.type,
           };
         });
-        
+
         const ratingPoints = this.calculateRatingPoints(
           creatorAttempt.correctAnswers,
           creatorAttempt.totalQuestions,
