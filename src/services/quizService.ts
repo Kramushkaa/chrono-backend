@@ -46,12 +46,19 @@ export class QuizService {
     const typeDifficulty = this.calculateTypeDifficulty(questionTypes);
     const difficultyMultiplier = 1 + questionCountBonus + typeDifficulty;
 
-    // TimeBonus = if all correct: min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000), else 1.0
+    // TimeBonus - учитывается для каждого правильного ответа
+    // Предполагаем равномерное распределение времени по вопросам
+    // TimeBonus = min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000)
     let timeBonus = 1.0;
-    if (correctAnswers === totalQuestions) {
+    if (correctAnswers > 0) {
       const avgTimePerQuestion = totalTimeMs / totalQuestions;
-      timeBonus = Math.min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000);
-      timeBonus = Math.max(1.0, timeBonus); // Don't penalize slow but correct answers
+      // Бонус применяется пропорционально проценту правильных ответов
+      const rawBonus = Math.min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000);
+      const cappedBonus = Math.max(1.0, rawBonus); // Don't penalize slow answers
+      
+      // Применяем бонус пропорционально проценту правильных ответов
+      const correctRatio = correctAnswers / totalQuestions;
+      timeBonus = 1.0 + (cappedBonus - 1.0) * correctRatio;
     }
 
     const ratingPoints = baseScore * difficultyMultiplier * timeBonus;
