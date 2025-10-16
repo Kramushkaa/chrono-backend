@@ -101,11 +101,25 @@ export class QuizService {
    */
   private calculateQuestionTimeBonus(timeMs: number, questionType: QuizQuestionType): number {
     const isSingleChoice = ['birthYear', 'deathYear', 'profession', 'country'].includes(questionType);
+    const isContemporaries = questionType === 'contemporaries';
     
-    // Для простых вопросов бонус меньше
-    const maxBonus = isSingleChoice ? 1.2 : 1.5;
-    const optimalTime = isSingleChoice ? 15000 : 30000; // 15 сек для простых, 30 сек для сложных
-    const timeRange = 60000; // 60 секунд
+    // Оптимальное время для максимального бонуса
+    let optimalTime: number;
+    let maxBonus: number;
+    
+    if (isSingleChoice) {
+      optimalTime = 1000; // 1 секунда
+      maxBonus = 1.2;
+    } else if (isContemporaries) {
+      optimalTime = 7000; // 7 секунд
+      maxBonus = 1.5;
+    } else {
+      // achievementsMatch, birthOrder, guessPerson
+      optimalTime = 4000; // 4 секунды
+      maxBonus = 1.5;
+    }
+    
+    const timeRange = 60000; // 60 секунд для расчета бонуса
 
     const rawBonus = Math.min(maxBonus, 1 + (optimalTime - timeMs) / timeRange);
     return Math.max(1.0, rawBonus); // Не штрафуем за медленные ответы
