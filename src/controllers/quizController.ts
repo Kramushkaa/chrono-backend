@@ -56,7 +56,8 @@ export class QuizController {
         data.totalQuestions,
         data.totalTimeMs,
         data.config,
-        data.questionTypes
+        data.questionTypes,
+        data.answers
       );
 
       res.json({

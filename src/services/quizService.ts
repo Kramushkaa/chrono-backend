@@ -30,39 +30,103 @@ export class QuizService {
 
   /**
    * Calculate rating points based on quiz performance
-   * Formula: BaseScore × DifficultyMultiplier × TimeBonus
+   * Formula: Σ(QuestionPoints × DifficultyMultiplier × TimeBonus) for each correct answer
    */
   calculateRatingPoints(
     correctAnswers: number,
     totalQuestions: number,
     totalTimeMs: number,
-    questionTypes: QuizQuestionType[]
+    questionTypes: QuizQuestionType[],
+    detailedAnswers?: Array<{ isCorrect: boolean; timeSpent: number; questionType: QuizQuestionType }>
   ): number {
-    // BaseScore = (correctAnswers / totalQuestions) × 100
-    const baseScore = (correctAnswers / totalQuestions) * 100;
+    // Если есть детальная информация, используем её
+    if (detailedAnswers && detailedAnswers.length === questionTypes.length) {
+      return this.calculateDetailedRatingPoints(detailedAnswers, totalQuestions);
+    }
 
-    // DifficultyMultiplier = 1 + (questionCount - 5) × 0.1 + Σ(questionTypeDifficulty)
+    // Fallback на старый алгоритм если детальной информации нет
+    const baseScore = (correctAnswers / totalQuestions) * 100;
     const questionCountBonus = (totalQuestions - 5) * 0.1;
     const typeDifficulty = this.calculateTypeDifficulty(questionTypes);
     const difficultyMultiplier = 1 + questionCountBonus + typeDifficulty;
 
-    // TimeBonus - учитывается для каждого правильного ответа
-    // Предполагаем равномерное распределение времени по вопросам
-    // TimeBonus = min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000)
     let timeBonus = 1.0;
     if (correctAnswers > 0) {
       const avgTimePerQuestion = totalTimeMs / totalQuestions;
-      // Бонус применяется пропорционально проценту правильных ответов
       const rawBonus = Math.min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000);
-      const cappedBonus = Math.max(1.0, rawBonus); // Don't penalize slow answers
-      
-      // Применяем бонус пропорционально проценту правильных ответов
+      const cappedBonus = Math.max(1.0, rawBonus);
       const correctRatio = correctAnswers / totalQuestions;
       timeBonus = 1.0 + (cappedBonus - 1.0) * correctRatio;
     }
 
     const ratingPoints = baseScore * difficultyMultiplier * timeBonus;
-    return Math.round(ratingPoints * 100) / 100; // Round to 2 decimal places
+    return Math.round(ratingPoints * 100) / 100;
+  }
+
+  /**
+   * Calculate rating points with detailed per-question information
+   */
+  private calculateDetailedRatingPoints(
+    answers: Array<{ isCorrect: boolean; timeSpent: number; questionType: QuizQuestionType }>,
+    totalQuestions: number
+  ): number {
+    const basePointsPerQuestion = 100 / totalQuestions;
+    const questionCountBonus = (totalQuestions - 5) * 0.1;
+
+    let totalRating = 0;
+
+    for (const answer of answers) {
+      if (!answer.isCorrect) continue;
+
+      // Базовые очки за правильный ответ
+      let questionPoints = basePointsPerQuestion;
+
+      // Бонус за сложность вопроса
+      const typeDifficulty = this.getQuestionTypeDifficulty(answer.questionType);
+      const difficultyMultiplier = 1 + questionCountBonus + typeDifficulty;
+      questionPoints *= difficultyMultiplier;
+
+      // Бонус за скорость ответа (разный для разных типов)
+      const timeBonus = this.calculateQuestionTimeBonus(answer.timeSpent, answer.questionType);
+      questionPoints *= timeBonus;
+
+      totalRating += questionPoints;
+    }
+
+    return Math.round(totalRating * 100) / 100;
+  }
+
+  /**
+   * Calculate time bonus for a single question
+   */
+  private calculateQuestionTimeBonus(timeMs: number, questionType: QuizQuestionType): number {
+    const isSingleChoice = ['birthYear', 'deathYear', 'profession', 'country'].includes(questionType);
+    
+    // Для простых вопросов бонус меньше
+    const maxBonus = isSingleChoice ? 1.2 : 1.5;
+    const optimalTime = isSingleChoice ? 15000 : 30000; // 15 сек для простых, 30 сек для сложных
+    const timeRange = 60000; // 60 секунд
+
+    const rawBonus = Math.min(maxBonus, 1 + (optimalTime - timeMs) / timeRange);
+    return Math.max(1.0, rawBonus); // Не штрафуем за медленные ответы
+  }
+
+  /**
+   * Get difficulty value for a single question type
+   */
+  private getQuestionTypeDifficulty(questionType: QuizQuestionType): number {
+    const difficultyMap: Record<QuizQuestionType, number> = {
+      birthYear: 0.0,
+      deathYear: 0.0,
+      profession: 0.0,
+      country: 0.0,
+      achievementsMatch: 0.1,
+      guessPerson: 0.1,
+      birthOrder: 0.2,
+      contemporaries: 0.2,
+    };
+
+    return difficultyMap[questionType] || 0;
   }
 
   /**
@@ -96,13 +160,15 @@ export class QuizService {
     totalQuestions: number,
     totalTimeMs: number,
     config: QuizSetupConfig,
-    questionTypes: QuizQuestionType[]
+    questionTypes: QuizQuestionType[],
+    detailedAnswers?: Array<{ isCorrect: boolean; timeSpent: number; questionType: QuizQuestionType }>
   ): Promise<{ attemptId: number; ratingPoints: number }> {
     const ratingPoints = this.calculateRatingPoints(
       correctAnswers,
       totalQuestions,
       totalTimeMs,
-      questionTypes
+      questionTypes,
+      detailedAnswers
     );
 
     const query = `
@@ -162,6 +228,7 @@ export class QuizService {
       correctAnswers: number;
       totalQuestions: number;
       totalTimeMs: number;
+      answers?: Array<{ questionId: string; answer: any; isCorrect: boolean; timeSpent: number }>;
     }
   ): Promise<{ id: number; shareCode: string }> {
     const client = await this.pool.connect();
@@ -200,11 +267,23 @@ export class QuizService {
       // Save creator's attempt if provided
       if (creatorAttempt) {
         const questionTypes = questions.map(q => q.type);
+        
+        // Prepare detailed answers with question types
+        const detailedAnswers = creatorAttempt.answers?.map(answer => {
+          const question = questions.find(q => q.id === answer.questionId);
+          return {
+            isCorrect: answer.isCorrect,
+            timeSpent: answer.timeSpent,
+            questionType: question!.type,
+          };
+        });
+        
         const ratingPoints = this.calculateRatingPoints(
           creatorAttempt.correctAnswers,
           creatorAttempt.totalQuestions,
           creatorAttempt.totalTimeMs,
-          questionTypes
+          questionTypes,
+          detailedAnswers
         );
 
         const attemptQuery = `
@@ -451,11 +530,22 @@ export class QuizService {
     // Get question types for rating calculation
     const questionTypes = questions.map(q => q.type);
 
+    // Prepare detailed answers with question types
+    const detailedAnswers = session.answers.map(answer => {
+      const question = questions.find(q => q.id === answer.questionId);
+      return {
+        isCorrect: answer.isCorrect,
+        timeSpent: answer.timeSpent,
+        questionType: question!.type,
+      };
+    });
+
     const ratingPoints = this.calculateRatingPoints(
       correctAnswers,
       totalQuestions,
       totalTimeMs,
-      questionTypes
+      questionTypes,
+      detailedAnswers
     );
 
     // Save attempt

@@ -43,6 +43,7 @@ export interface SaveQuizAttemptRequest {
   totalTimeMs: number;
   config: QuizSetupConfig;
   questionTypes: QuizQuestionType[]; // For difficulty calculation
+  answers?: Array<{ isCorrect: boolean; timeSpent: number; questionType: QuizQuestionType }>; // Detailed per-question info
 }
 
 export interface SaveQuizAttemptResponse {
