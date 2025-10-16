@@ -632,11 +632,29 @@ export class QuizService {
   async getUserQuizHistory(
     userId: number,
     limit: number = 10
-  ): Promise<Array<QuizSessionDB & { quiz_title: string }>> {
+  ): Promise<
+    Array<{
+      session_token: string;
+      quiz_title: string;
+      shared_quiz_id: number;
+      correct_answers: number;
+      total_questions: number;
+      total_time_ms: number;
+      started_at: Date;
+      finished_at: Date;
+    }>
+  > {
     const query = `
       SELECT 
-        qs.*,
-        sq.title as quiz_title
+        qs.session_token,
+        sq.title as quiz_title,
+        qs.shared_quiz_id,
+        qs.started_at,
+        qs.finished_at,
+        -- Calculate results from session answers
+        (SELECT COUNT(*) FROM jsonb_array_elements(qs.answers) elem WHERE (elem->>'isCorrect')::boolean = true) as correct_answers,
+        (SELECT COUNT(*) FROM jsonb_array_elements(qs.answers)) as total_questions,
+        (SELECT SUM((elem->>'timeSpent')::integer) FROM jsonb_array_elements(qs.answers) elem) as total_time_ms
       FROM quiz_sessions qs
       JOIN shared_quizzes sq ON qs.shared_quiz_id = sq.id
       WHERE qs.user_id = $1 
@@ -652,19 +670,43 @@ export class QuizService {
   /**
    * Get detailed session by token (for viewing history)
    */
-  async getSessionHistory(sessionToken: string): Promise<QuizSessionDB | null> {
-    const query = `
-      SELECT * FROM quiz_sessions
-      WHERE session_token = $1 AND finished_at IS NOT NULL
+  async getSessionDetail(sessionToken: string): Promise<{
+    session: QuizSessionDB;
+    questions: QuizQuestion[];
+    quizTitle: string;
+  } | null> {
+    // Get session
+    const sessionQuery = `
+      SELECT qs.*, sq.title as quiz_title
+      FROM quiz_sessions qs
+      JOIN shared_quizzes sq ON qs.shared_quiz_id = sq.id
+      WHERE qs.session_token = $1 AND qs.finished_at IS NOT NULL
     `;
 
-    const result = await this.pool.query(query, [sessionToken]);
+    const sessionResult = await this.pool.query(sessionQuery, [sessionToken]);
 
-    if (result.rows.length === 0) {
+    if (sessionResult.rows.length === 0) {
       return null;
     }
 
-    return result.rows[0] as QuizSessionDB;
+    const session = sessionResult.rows[0] as QuizSessionDB & { quiz_title: string };
+
+    // Get questions for this quiz
+    const questionsQuery = `
+      SELECT question_data, question_index
+      FROM shared_quiz_questions
+      WHERE shared_quiz_id = $1
+      ORDER BY question_index ASC
+    `;
+
+    const questionsResult = await this.pool.query(questionsQuery, [session.shared_quiz_id]);
+    const questions = questionsResult.rows.map(row => row.question_data as QuizQuestion);
+
+    return {
+      session,
+      questions,
+      quizTitle: session.quiz_title,
+    };
   }
 
   /**

@@ -56,5 +56,15 @@ export function createQuizRoutes(pool: Pool): Router {
   // Get user stats (requires auth)
   router.get('/quiz/leaderboard/me', authenticateToken, quizController.getUserStats);
 
+  // ============================================================================
+  // Quiz History Routes
+  // ============================================================================
+
+  // Get user's quiz session history (requires auth)
+  router.get('/quiz/history', authenticateToken, quizController.getUserHistory);
+
+  // Get detailed session history (requires auth, checks ownership)
+  router.get('/quiz/history/:sessionToken', authenticateToken, quizController.getSessionDetail);
+
   return router;
 }

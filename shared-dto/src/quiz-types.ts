@@ -153,6 +153,53 @@ export interface DetailedQuestionResult {
   timeSpent: number;
 }
 
+// Quiz session history
+export interface QuizSessionHistoryEntry {
+  sessionToken: string;
+  quizTitle: string;
+  sharedQuizId: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  totalTimeMs: number;
+  startedAt: Date;
+  finishedAt: Date;
+}
+
+export interface QuizSessionHistoryResponse {
+  success: boolean;
+  data: {
+    sessions: QuizSessionHistoryEntry[];
+    total: number;
+  };
+}
+
+export interface QuizSessionDetailResponse {
+  success: boolean;
+  data: {
+    session: {
+      sessionToken: string;
+      quizTitle: string;
+      startedAt: Date;
+      finishedAt: Date;
+    };
+    results: {
+      correctAnswers: number;
+      totalQuestions: number;
+      totalTimeMs: number;
+    };
+    detailedAnswers: Array<{
+      questionId: string;
+      question: string;
+      questionType: QuizQuestionType;
+      userAnswer: string | string[] | string[][];
+      correctAnswer: string | string[] | string[][];
+      isCorrect: boolean;
+      timeSpent: number;
+      explanation?: string;
+    }>;
+  };
+}
+
 // ============================================================================
 // Leaderboard Types
 // ============================================================================

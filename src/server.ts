@@ -137,6 +137,8 @@ app.get(
           periods: '/api/periods',
           lists: '/api/lists',
           quiz: '/api/quiz',
+          quizHistory: '/api/quiz/history',
+          quizLeaderboard: '/api/quiz/leaderboard',
           stats: '/api/stats',
           health: '/api/health',
           categories: '/api/categories',

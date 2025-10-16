@@ -404,4 +404,133 @@ export class QuizController {
       next(error);
     }
   };
+
+  // ============================================================================
+  // Quiz Session History
+  // ============================================================================
+
+  /**
+   * Get user's quiz session history
+   * GET /api/quiz/history
+   */
+  getUserHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.sub;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: 'Unauthorized',
+          message: 'Требуется авторизация',
+        });
+        return;
+      }
+
+      const limit = parseInt(req.query.limit as string) || 10;
+      const sessions = await this.quizService.getUserQuizHistory(userId, limit);
+
+      // Transform to match DTO
+      const transformedSessions = sessions.map(s => ({
+        sessionToken: s.session_token,
+        quizTitle: s.quiz_title,
+        sharedQuizId: s.shared_quiz_id,
+        correctAnswers: s.correct_answers,
+        totalQuestions: s.total_questions,
+        totalTimeMs: s.total_time_ms,
+        startedAt: s.started_at,
+        finishedAt: s.finished_at,
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          sessions: transformedSessions,
+          total: sessions.length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Get detailed session history
+   * GET /api/quiz/history/:sessionToken
+   */
+  getSessionDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { sessionToken } = req.params;
+      const userId = (req as any).user?.sub;
+
+      if (!sessionToken) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid session token',
+          message: 'Токен сессии не указан',
+        });
+        return;
+      }
+
+      const result = await this.quizService.getSessionDetail(sessionToken);
+
+      if (!result) {
+        res.status(404).json({
+          success: false,
+          error: 'Session not found',
+          message: 'Сессия не найдена',
+        });
+        return;
+      }
+
+      // Check if user owns this session
+      if (result.session.user_id && userId && result.session.user_id !== userId) {
+        res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+          message: 'Нет доступа к этой сессии',
+        });
+        return;
+      }
+
+      // Calculate results
+      const correctAnswers = result.session.answers.filter(a => a.isCorrect).length;
+      const totalQuestions = result.questions.length;
+      const totalTimeMs = result.session.answers.reduce((sum, a) => sum + a.timeSpent, 0);
+
+      // Prepare detailed answers with full question data
+      const detailedAnswers = result.questions.map(question => {
+        const userAnswer = result.session.answers.find(a => a.questionId === question.id);
+        return {
+          questionId: question.id,
+          question: question.question,
+          questionType: question.type,
+          userAnswer: userAnswer?.answer || '',
+          correctAnswer: question.correctAnswer,
+          isCorrect: userAnswer?.isCorrect || false,
+          timeSpent: userAnswer?.timeSpent || 0,
+          explanation: question.explanation,
+        };
+      });
+
+      res.json({
+        success: true,
+        data: {
+          session: {
+            sessionToken: result.session.session_token,
+            quizTitle: result.quizTitle,
+            startedAt: result.session.started_at,
+            finishedAt: result.session.finished_at!,
+          },
+          results: {
+            correctAnswers,
+            totalQuestions,
+            totalTimeMs,
+          },
+          detailedAnswers,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
