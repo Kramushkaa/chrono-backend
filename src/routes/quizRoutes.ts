@@ -60,10 +60,13 @@ export function createQuizRoutes(pool: Pool): Router {
   // Quiz History Routes
   // ============================================================================
 
-  // Get user's quiz session history (requires auth)
+  // Get user's quiz history (all types, requires auth)
   router.get('/quiz/history', authenticateToken, quizController.getUserHistory);
 
-  // Get detailed session history (requires auth, checks ownership)
+  // Get detailed attempt history by ID (requires auth, checks ownership)
+  router.get('/quiz/history/attempt/:attemptId', authenticateToken, quizController.getAttemptDetail);
+
+  // Get detailed session history (legacy, for shared quizzes, requires auth)
   router.get('/quiz/history/:sessionToken', authenticateToken, quizController.getSessionDetail);
 
   return router;

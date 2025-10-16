@@ -187,26 +187,45 @@ export class QuizService {
     config: QuizSetupConfig,
     questionTypes: QuizQuestionType[],
     detailedAnswers?: Array<{
+      questionId: string;
+      answer: any;
       isCorrect: boolean;
       timeSpent: number;
       questionType: QuizQuestionType;
-    }>
+    }>,
+    questions?: QuizQuestion[]
   ): Promise<{ attemptId: number; ratingPoints: number }> {
+    // Prepare detailed answers for rating calculation (without questionId and answer)
+    const answersForRating = detailedAnswers?.map((a) => ({
+      isCorrect: a.isCorrect,
+      timeSpent: a.timeSpent,
+      questionType: a.questionType,
+    }));
+
     const ratingPoints = this.calculateRatingPoints(
       correctAnswers,
       totalQuestions,
       totalTimeMs,
       questionTypes,
-      detailedAnswers
+      answersForRating
     );
 
     const query = `
-      INSERT INTO quiz_attempts (user_id, shared_quiz_id, correct_answers, total_questions, total_time_ms, rating_points, config)
-      VALUES ($1, NULL, $2, $3, $4, $5, $6)
+      INSERT INTO quiz_attempts (user_id, shared_quiz_id, correct_answers, total_questions, total_time_ms, rating_points, config, answers, questions)
+      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id
     `;
 
-    const values = [userId, correctAnswers, totalQuestions, totalTimeMs, ratingPoints, config];
+    const values = [
+      userId,
+      correctAnswers,
+      totalQuestions,
+      totalTimeMs,
+      ratingPoints,
+      config,
+      detailedAnswers ? JSON.stringify(detailedAnswers) : null,
+      questions ? JSON.stringify(questions) : null,
+    ];
 
     const result = await this.pool.query(query, values);
     return {
@@ -627,39 +646,46 @@ export class QuizService {
   }
 
   /**
-   * Get user's quiz session history
+   * Get user's quiz history (both regular and shared quizzes)
    */
   async getUserQuizHistory(
     userId: number,
-    limit: number = 10
+    limit: number = 20
   ): Promise<
     Array<{
-      session_token: string;
-      quiz_title: string;
-      shared_quiz_id: number;
+      attempt_id: number;
+      session_token?: string; // For shared quizzes
+      quiz_title?: string; // For shared quizzes
+      shared_quiz_id?: number;
+      is_shared: boolean;
       correct_answers: number;
       total_questions: number;
       total_time_ms: number;
-      started_at: Date;
-      finished_at: Date;
+      rating_points: number;
+      created_at: Date;
+      config?: any;
     }>
   > {
     const query = `
       SELECT 
-        qs.session_token,
-        sq.title as quiz_title,
-        qs.shared_quiz_id,
-        qs.started_at,
-        qs.finished_at,
-        -- Calculate results from session answers
-        (SELECT COUNT(*) FROM jsonb_array_elements(qs.answers) elem WHERE (elem->>'isCorrect')::boolean = true) as correct_answers,
-        (SELECT COUNT(*) FROM jsonb_array_elements(qs.answers)) as total_questions,
-        (SELECT SUM((elem->>'timeSpent')::integer) FROM jsonb_array_elements(qs.answers) elem) as total_time_ms
-      FROM quiz_sessions qs
-      JOIN shared_quizzes sq ON qs.shared_quiz_id = sq.id
-      WHERE qs.user_id = $1 
-        AND qs.finished_at IS NOT NULL
-      ORDER BY qs.finished_at DESC
+        qa.id as attempt_id,
+        NULL as session_token,
+        CASE 
+          WHEN qa.shared_quiz_id IS NOT NULL THEN sq.title
+          ELSE NULL
+        END as quiz_title,
+        qa.shared_quiz_id,
+        qa.shared_quiz_id IS NOT NULL as is_shared,
+        qa.correct_answers,
+        qa.total_questions,
+        qa.total_time_ms,
+        qa.rating_points,
+        qa.created_at,
+        qa.config
+      FROM quiz_attempts qa
+      LEFT JOIN shared_quizzes sq ON qa.shared_quiz_id = sq.id
+      WHERE qa.user_id = $1
+      ORDER BY qa.created_at DESC
       LIMIT $2
     `;
 
@@ -668,7 +694,50 @@ export class QuizService {
   }
 
   /**
-   * Get detailed session by token (for viewing history)
+   * Get detailed attempt by ID (for viewing history of any quiz type)
+   */
+  async getAttemptDetail(attemptId: number, userId: number): Promise<{
+    attempt: QuizAttemptDB;
+    quizTitle?: string;
+  } | null> {
+    const query = `
+      SELECT 
+        qa.*,
+        sq.title as quiz_title
+      FROM quiz_attempts qa
+      LEFT JOIN shared_quizzes sq ON qa.shared_quiz_id = sq.id
+      WHERE qa.id = $1 AND qa.user_id = $2
+    `;
+
+    const result = await this.pool.query(query, [attemptId, userId]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    const attempt: QuizAttemptDB = {
+      id: row.id,
+      user_id: row.user_id,
+      shared_quiz_id: row.shared_quiz_id,
+      correct_answers: row.correct_answers,
+      total_questions: row.total_questions,
+      total_time_ms: row.total_time_ms,
+      rating_points: row.rating_points,
+      config: row.config,
+      answers: row.answers,
+      questions: row.questions,
+      created_at: row.created_at,
+    };
+
+    return {
+      attempt,
+      quizTitle: row.quiz_title,
+    };
+  }
+
+  /**
+   * Get detailed session by token (for viewing history - legacy, for shared quizzes)
    */
   async getSessionDetail(sessionToken: string): Promise<{
     session: QuizSessionDB;

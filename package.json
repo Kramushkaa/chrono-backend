@@ -23,6 +23,7 @@
     "migrate:check": "ts-node src/db/migrate-moderation-periods-achievements.ts --check-only",
     "migrate:quiz": "ts-node src/db/migrate-quiz-tables.ts",
     "migrate:finished-at": "ts-node src/db/migrate-add-finished-at.ts",
+    "migrate:quiz-answers": "ts-node src/db/migrate-add-quiz-answers.ts",
     "telegram:test": "ts-node src/utils/test-telegram.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",

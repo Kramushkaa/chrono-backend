@@ -43,7 +43,14 @@ export interface SaveQuizAttemptRequest {
   totalTimeMs: number;
   config: QuizSetupConfig;
   questionTypes: QuizQuestionType[]; // For difficulty calculation
-  answers?: Array<{ isCorrect: boolean; timeSpent: number; questionType: QuizQuestionType }>; // Detailed per-question info
+  answers?: Array<{
+    questionId: string;
+    answer: any;
+    isCorrect: boolean;
+    timeSpent: number;
+    questionType: QuizQuestionType;
+  }>; // Detailed per-question info
+  questions?: QuizQuestion[]; // The actual questions asked
 }
 
 export interface SaveQuizAttemptResponse {
@@ -283,6 +290,13 @@ export interface QuizAttemptDB {
   total_time_ms: number;
   rating_points: number;
   config: QuizSetupConfig | null;
+  answers?: Array<{
+    questionId: string;
+    answer: any;
+    isCorrect: boolean;
+    timeSpent: number;
+  }>;
+  questions?: QuizQuestion[];
   created_at: Date;
 }
 

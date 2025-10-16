@@ -57,7 +57,8 @@ export class QuizController {
         data.totalTimeMs,
         data.config,
         data.questionTypes,
-        data.answers
+        data.answers,
+        data.questions
       );
 
       res.json({
@@ -410,7 +411,7 @@ export class QuizController {
   // ============================================================================
 
   /**
-   * Get user's quiz session history
+   * Get user's quiz history (all quiz types)
    * GET /api/quiz/history
    */
   getUserHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -426,26 +427,29 @@ export class QuizController {
         return;
       }
 
-      const limit = parseInt(req.query.limit as string) || 10;
-      const sessions = await this.quizService.getUserQuizHistory(userId, limit);
+      const limit = parseInt(req.query.limit as string) || 20;
+      const attempts = await this.quizService.getUserQuizHistory(userId, limit);
 
       // Transform to match DTO
-      const transformedSessions = sessions.map(s => ({
-        sessionToken: s.session_token,
-        quizTitle: s.quiz_title,
-        sharedQuizId: s.shared_quiz_id,
-        correctAnswers: s.correct_answers,
-        totalQuestions: s.total_questions,
-        totalTimeMs: s.total_time_ms,
-        startedAt: s.started_at,
-        finishedAt: s.finished_at,
+      const transformedAttempts = attempts.map(a => ({
+        attemptId: a.attempt_id,
+        sessionToken: a.session_token,
+        quizTitle: a.quiz_title || 'Обычный квиз',
+        sharedQuizId: a.shared_quiz_id,
+        isShared: a.is_shared,
+        correctAnswers: a.correct_answers,
+        totalQuestions: a.total_questions,
+        totalTimeMs: a.total_time_ms,
+        ratingPoints: a.rating_points,
+        createdAt: a.created_at,
+        config: a.config,
       }));
 
       res.json({
         success: true,
         data: {
-          sessions: transformedSessions,
-          total: sessions.length,
+          attempts: transformedAttempts,
+          total: attempts.length,
         },
       });
     } catch (error) {
@@ -454,7 +458,83 @@ export class QuizController {
   };
 
   /**
-   * Get detailed session history
+   * Get detailed attempt history
+   * GET /api/quiz/history/attempt/:attemptId
+   */
+  getAttemptDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { attemptId } = req.params;
+      const userId = (req as any).user?.sub;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: 'Unauthorized',
+          message: 'Требуется авторизация',
+        });
+        return;
+      }
+
+      if (!attemptId) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid attempt ID',
+          message: 'ID попытки не указан',
+        });
+        return;
+      }
+
+      const result = await this.quizService.getAttemptDetail(parseInt(attemptId), userId);
+
+      if (!result) {
+        res.status(404).json({
+          success: false,
+          error: 'Attempt not found',
+          message: 'Попытка не найдена',
+        });
+        return;
+      }
+
+      // Prepare detailed answers with full question data
+      const detailedAnswers = result.attempt.questions?.map((question, index) => {
+        const userAnswer = result.attempt.answers?.find(a => a.questionId === question.id);
+        return {
+          questionId: question.id,
+          question: question.question,
+          questionType: question.type,
+          userAnswer: userAnswer?.answer || '',
+          correctAnswer: question.correctAnswer,
+          isCorrect: userAnswer?.isCorrect || false,
+          timeSpent: userAnswer?.timeSpent || 0,
+          explanation: question.explanation,
+        };
+      }) || [];
+
+      res.json({
+        success: true,
+        data: {
+          attempt: {
+            attemptId: result.attempt.id,
+            quizTitle: result.quizTitle || 'Обычный квиз',
+            isShared: !!result.attempt.shared_quiz_id,
+            createdAt: result.attempt.created_at,
+          },
+          results: {
+            correctAnswers: result.attempt.correct_answers,
+            totalQuestions: result.attempt.total_questions,
+            totalTimeMs: result.attempt.total_time_ms,
+            ratingPoints: result.attempt.rating_points,
+          },
+          detailedAnswers,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Get detailed session history (legacy, for shared quizzes)
    * GET /api/quiz/history/:sessionToken
    */
   getSessionDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
