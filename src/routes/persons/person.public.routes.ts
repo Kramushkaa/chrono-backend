@@ -13,75 +13,36 @@ import { sanitizePayload } from './helpers';
 
 import { PersonsService } from '../../services/personsService';
 
-export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramService, personsService: PersonsService) {
+export function createPublicPersonRoutes(
+  pool: Pool,
+  telegramService: TelegramService,
+  personsService: PersonsService
+) {
   const router = Router();
 
   // --- Public persons listing with filters/pagination ---
   router.get(
     '/persons',
     asyncHandler(async (req: Request, res: Response) => {
-      const { category, country, q } = req.query;
+      const category = req.query.category;
+      const country = req.query.country;
+      const q = (req.query.q as string) || '';
       const startYear = req.query.startYear ?? req.query.year_from;
       const endYear = req.query.endYear ?? req.query.year_to;
-      let where = ' WHERE 1=1';
-      const params: (string | number | string[])[] = [];
-      let paramIndex = 1;
-      if (category) {
-        const categoryArray = Array.isArray(category)
-          ? (category as string[])
-          : category.toString().split(',');
-        where += ` AND v.category = ANY($${paramIndex}::text[])`;
-        params.push(categoryArray);
-        paramIndex++;
-      }
-      if (country) {
-        const countryArray = Array.isArray(country)
-          ? (country as string[])
-          : country
-              .toString()
-              .split(',')
-              .map((c: string) => c.trim());
-        where += ` AND (
-        (v.country_names IS NOT NULL AND v.country_names && $${paramIndex}::text[])
-        OR (v.country_names IS NULL AND EXISTS (
-          SELECT 1 FROM unnest(string_to_array(v.country, '/')) AS c
-          WHERE trim(c) = ANY($${paramIndex}::text[])
-        ))
-      )`;
-        params.push(countryArray);
-        paramIndex++;
-      }
-      if (startYear) {
-        where += ` AND v.death_year >= $${paramIndex}`;
-        params.push(parseInt(startYear.toString()));
-        paramIndex++;
-      }
-      if (endYear) {
-        where += ` AND v.birth_year <= $${paramIndex}`;
-        params.push(parseInt(endYear.toString()));
-        paramIndex++;
-      }
-      const search = (q || '').toString().trim();
-      if (search.length > 0) {
-        where += ` AND (v.name ILIKE $${paramIndex} OR v.category ILIKE $${paramIndex} OR v.country ILIKE $${paramIndex} OR v.description ILIKE $${paramIndex})`;
-        params.push(`%${search}%`);
-        paramIndex++;
-      }
-      let query = `SELECT v.* FROM v_approved_persons v` + where;
-      query += ' ORDER BY v.birth_year ASC, v.id ASC';
-      const { limitParam, offsetParam } = parseLimitOffset(
-        req.query.limit as string | undefined,
-        req.query.offset as string | undefined,
+      const limit = req.query.limit as string | undefined;
+      const offset = req.query.offset as string | undefined;
+
+      const { data, meta } = await personsService.getPersons(
         {
-          defLimit: 100,
-          maxLimit: 1000,
-        }
+          category: category as string | string[] | undefined,
+          country: country as string | string[] | undefined,
+          q,
+          startYear: startYear ? parseInt(startYear.toString()) : undefined,
+          endYear: endYear ? parseInt(endYear.toString()) : undefined,
+        },
+        limit ? parseInt(limit) : undefined,
+        offset ? parseInt(offset) : undefined
       );
-      query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-      params.push(limitParam + 1, offsetParam);
-      const result = await pool.query(query, params);
-      const persons = result.rows.map(mapApiPersonRow);
-      const { data, meta } = paginateRows(persons, limitParam, offsetParam);
       res.json({ success: true, data, meta });
     })
   );
@@ -94,30 +55,8 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
       if (!id) {
         throw errors.badRequest('ID не указан');
       }
-      const result = await pool.query(
-        `
-      SELECT v.*, p.status 
-      FROM v_api_persons v 
-      JOIN persons p ON p.id = v.id 
-      WHERE v.id = $1
-    `,
-        [id]
-      );
-      if (result.rows.length === 0) {
-        throw errors.notFound('Историческая Личность не найдена');
-      }
-      const row = result.rows[0];
-
-      const periodsRes = await pool.query(
-        'SELECT periods FROM v_person_periods WHERE person_id = $1',
-        [row.id]
-      );
-      const periods = periodsRes.rows[0]?.periods || [];
-      const person = {
-        ...mapApiPersonRow(row),
-        periods,
-      };
-
+      
+      const person = await personsService.getPersonById(id);
       res.json({ success: true, data: person });
     })
   );
@@ -131,22 +70,9 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
         res.json({ success: true, data: [] });
         return;
       }
-      const ids = raw
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-      const sql = `
-      WITH req_ids AS (
-        SELECT ($1::text[])[g.ord] AS id, g.ord
-          FROM generate_series(1, COALESCE(array_length($1::text[], 1), 0)) AS g(ord)
-      )
-      SELECT v.*
-        FROM req_ids r
-        JOIN v_api_persons v ON v.id = r.id
-       ORDER BY r.ord ASC`;
-      const result = await pool.query(sql, [ids]);
-      const persons = result.rows.map(mapApiPersonRow);
-      res.json({ success: true, data: persons });
+      const ids = raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+      const data = await personsService.getPersonsByIds(ids);
+      res.json({ success: true, data });
     })
   );
 
@@ -340,40 +266,22 @@ export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramSe
           parsed.error.flatten()
         );
 
-      // Проверяем, что персона существует и одобрена
-      const existingPersonRes = await pool.query(
-        'SELECT id, status, name FROM persons WHERE id = $1',
-        [id]
-      );
-
-      if (existingPersonRes.rowCount === 0) {
-        throw errors.notFound('Личность не найдена');
-      }
-
-      const existingPerson = existingPersonRes.rows[0];
-      if (existingPerson.status !== 'approved') {
-        throw errors.badRequest('Можно предлагать изменения только для одобренных личностей');
-      }
-
       const userId = (req as any).user!.sub;
+      const result = await personsService.proposeEdit(id, payload, userId);
 
-      // Создаем запись в person_edits для модерации изменений
-      const result = await pool.query(
-        `INSERT INTO person_edits (person_id, proposer_user_id, payload, status)
-       VALUES ($1, $2, $3, 'pending') RETURNING id, created_at`,
-        [id, userId, JSON.stringify(payload)]
-      );
-
-      // Отправка уведомления в Telegram о предложении изменений (неблокирующее)
+      // Отправка уведомления в Telegram (неблокирующее)
       const userEmail = (req as any).user?.email || 'unknown';
+      const personRes = await pool.query('SELECT name FROM persons WHERE id = $1', [id]);
+      const personName = personRes.rows[0]?.name || 'Unknown';
+      
       telegramService
-        .notifyPersonEditProposed(existingPerson.name, userEmail, id)
+        .notifyPersonEditProposed(personName, userEmail, id)
         .catch(err => console.warn('Telegram notification failed (person edit proposed):', err));
 
       res.status(201).json({
         success: true,
         message: 'Предложение изменений отправлено на модерацию',
-        data: result.rows[0],
+        data: result,
       });
     })
   );

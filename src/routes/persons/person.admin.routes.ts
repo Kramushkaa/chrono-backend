@@ -8,7 +8,11 @@ import { TelegramService } from '../../services/telegramService';
 import { PersonsService } from '../../services/personsService';
 import { applyPayloadToPerson } from './helpers';
 
-export function createAdminPersonRoutes(pool: Pool, telegramService: TelegramService, personsService: PersonsService) {
+export function createAdminPersonRoutes(
+  pool: Pool,
+  telegramService: TelegramService,
+  personsService: PersonsService
+) {
   const router = Router();
 
   // Admin/Moderator: create or upsert person immediately (approved)
@@ -110,36 +114,21 @@ export function createAdminPersonRoutes(pool: Pool, telegramService: TelegramSer
     requireRoleMiddleware(['admin', 'moderator']),
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
-      const { action, comment } = req.body || {}; // action: 'approve' | 'reject'
-      if (!id || !action) {
-        throw errors.badRequest('id и action обязательны');
-      }
-
-      // Получаем информацию о личности для уведомления
-      const personRes = await pool.query('SELECT name FROM persons WHERE id = $1', [id]);
-      const personName = personRes.rows[0]?.name || 'Unknown';
-
-      if (action === 'approve') {
-        await pool.query(
-          `UPDATE persons SET status='approved', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
-          [id, (req as any).user!.sub, comment ?? null]
-        );
-      } else if (action === 'reject') {
-        await pool.query(
-          `UPDATE persons SET status='rejected', reviewed_by=$2, review_comment=$3 WHERE id=$1`,
-          [id, (req as any).user!.sub, comment ?? null]
-        );
-      } else {
+      const { action, comment } = req.body || {};
+      
+      if (!action || (action !== 'approve' && action !== 'reject')) {
         throw errors.badRequest('action должен быть approve или reject');
       }
 
-      // Отправка уведомления в Telegram о решении модератора (неблокирующее)
+      const result = await personsService.reviewPerson(id, action, (req as any).user!.sub, comment);
+
+      // Отправка уведомления в Telegram (неблокирующее)
       const reviewerEmail = (req as any).user?.email || 'unknown';
       telegramService
-        .notifyPersonReviewed(personName, action, reviewerEmail, id)
+        .notifyPersonReviewed(result.name, action, reviewerEmail, id)
         .catch(err => console.warn('Telegram notification failed (person reviewed):', err));
 
-      res.json({ success: true });
+      res.json({ success: true, data: result });
     })
   );
 

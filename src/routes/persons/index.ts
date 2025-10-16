@@ -6,7 +6,11 @@ import { createAdminPersonRoutes } from './person.admin.routes';
 import { createPublicPersonRoutes } from './person.public.routes';
 import { createUserPersonRoutes } from './person.user.routes';
 
-export function createPersonRoutes(pool: Pool, telegramService: TelegramService, personsService: PersonsService) {
+export function createPersonRoutes(
+  pool: Pool,
+  telegramService: TelegramService,
+  personsService: PersonsService
+) {
   const router = Router();
 
   // Combine all person routes

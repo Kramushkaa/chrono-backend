@@ -9,7 +9,11 @@ import { sanitizePayload } from './helpers';
 
 import { PersonsService } from '../../services/personsService';
 
-export function createUserPersonRoutes(pool: Pool, telegramService: TelegramService, personsService: PersonsService) {
+export function createUserPersonRoutes(
+  pool: Pool,
+  telegramService: TelegramService,
+  personsService: PersonsService
+) {
   const router = Router();
 
   // Persons created by current user
@@ -21,58 +25,22 @@ export function createUserPersonRoutes(pool: Pool, telegramService: TelegramServ
       if (!userId) {
         throw errors.unauthorized('Требуется аутентификация');
       }
-      const { limitParam, offsetParam } = parseLimitOffset(
-        req.query.limit as string | undefined,
-        req.query.offset as string | undefined,
-        {
-          defLimit: 200,
-          maxLimit: 500,
-        }
-      );
+      
+      const limit = req.query.limit as string | undefined;
+      const offset = req.query.offset as string | undefined;
       const countOnly = String((req.query.count as string) || 'false') === 'true';
 
-      // Поддержка фильтрации по статусам
-      const statusFilter = req.query.status as string;
-      let statusCondition = '';
-      const queryParams = [userId];
-
-      if (statusFilter) {
-        // Поддерживаем multiple статусы через запятую
-        const statuses = statusFilter
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean);
-        if (statuses.length > 0) {
-          const placeholders = statuses.map((_, i) => `$${queryParams.length + i + 1}`).join(',');
-          statusCondition = ` AND p.status IN (${placeholders})`;
-          queryParams.push(...statuses);
-        }
-      }
-
       if (countOnly) {
-        // Используем оптимизированное представление для подсчета
-        const countSql = `
-        SELECT COALESCE(persons_count, 0) AS cnt 
-        FROM v_user_content_counts 
-        WHERE created_by = $1
-      `;
-        const c = await pool.query(countSql, [userId]);
-        res.json({ success: true, data: { count: c.rows[0]?.cnt || 0 } });
+        const count = await personsService.getUserPersonsCount(userId);
+        res.json({ success: true, data: { count } });
         return;
       }
 
-      const sql = `
-      SELECT v.*, p.status
-        FROM v_api_persons v
-        JOIN persons p ON p.id = v.id
-       WHERE p.created_by = $1${statusCondition}
-       ORDER BY p.updated_at DESC NULLS LAST, p.id DESC
-       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
-
-      queryParams.push(limitParam + 1, offsetParam);
-      const result = await pool.query(sql, queryParams);
-      const persons = result.rows.map(mapApiPersonRow);
-      const { data, meta } = paginateRows(persons, limitParam, offsetParam);
+      const { data, meta } = await personsService.getUserPersons(
+        userId,
+        limit ? parseInt(limit) : undefined,
+        offset ? parseInt(offset) : undefined
+      );
       res.json({ success: true, data, meta });
     })
   );
