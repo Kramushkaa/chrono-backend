@@ -440,7 +440,7 @@ export class QuizController {
         correctAnswers: a.correct_answers,
         totalQuestions: a.total_questions,
         totalTimeMs: a.total_time_ms,
-        ratingPoints: a.rating_points,
+        ratingPoints: Number(a.rating_points),
         createdAt: a.created_at,
         config: a.config,
       }));
@@ -523,7 +523,7 @@ export class QuizController {
             correctAnswers: result.attempt.correct_answers,
             totalQuestions: result.attempt.total_questions,
             totalTimeMs: result.attempt.total_time_ms,
-            ratingPoints: result.attempt.rating_points,
+            ratingPoints: Number(result.attempt.rating_points),
           },
           detailedAnswers,
         },
