@@ -11,7 +11,9 @@ import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../../utils/api
 import { TelegramService } from '../../services/telegramService';
 import { sanitizePayload } from './helpers';
 
-export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramService) {
+import { PersonsService } from '../../services/personsService';
+
+export function createPublicPersonRoutes(pool: Pool, telegramService: TelegramService, personsService: PersonsService) {
   const router = Router();
 
   // --- Public persons listing with filters/pagination ---

@@ -5,6 +5,9 @@ import helmet from 'helmet';
 import { AuthService } from './services/authService';
 import { TelegramService } from './services/telegramService';
 import { QuizService } from './services/quizService';
+import { AchievementsService } from './services/achievementsService';
+import { PeriodsService } from './services/periodsService';
+import { PersonsService } from './services/personsService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler } from './middleware/auth';
@@ -17,6 +20,7 @@ import { createPeriodsRoutes } from './routes/periodsRoutes';
 import { createMetaRoutes } from './routes/metaRoutes';
 import { createQuizRoutes } from './routes/quizRoutes';
 import { config } from './config';
+import { cleanupExpiredQuizSessions } from './jobs/cleanup-quiz-sessions';
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -28,6 +32,9 @@ const pool = createPool();
 const authService = new AuthService(pool);
 const telegramService = new TelegramService(config.telegram.botToken, config.telegram.adminChatId);
 const quizService = new QuizService(pool);
+const achievementsService = new AchievementsService(pool, telegramService);
+const periodsService = new PeriodsService(pool, telegramService);
+const personsService = new PersonsService(pool, telegramService);
 const authController = new AuthController(authService, telegramService);
 
 // Создание Express приложения
@@ -102,13 +109,13 @@ app.use('/api/auth', createAuthRoutes(authController));
 app.use(logRequest);
 
 // Маршруты управления Личностями (создание/модерация)
-app.use('/api', createPersonRoutes(pool, telegramService));
+app.use('/api', createPersonRoutes(pool, telegramService, personsService));
 
 // Маршруты для достижений
-app.use('/api', createAchievementsRoutes(pool, telegramService));
+app.use('/api', createAchievementsRoutes(pool, telegramService, achievementsService));
 
 // Маршруты для периодов жизни
-app.use('/api', createPeriodsRoutes(pool, telegramService));
+app.use('/api', createPeriodsRoutes(pool, telegramService, periodsService));
 
 // Основные маршруты API
 app.use('/api', createMetaRoutes(pool));
@@ -226,9 +233,9 @@ async function startServer() {
 
     // Очистка истекших незавершённых сессий квизов
     try {
-      const cleanedCount = await quizService.cleanupExpiredSessions();
-      if (cleanedCount > 0) {
-        console.log(`🧹 Очищено просроченных quiz сессий: ${cleanedCount}`);
+      const result = await cleanupExpiredQuizSessions(pool);
+      if (result.deletedCount > 0) {
+        console.log(`🧹 Очищено просроченных quiz сессий: ${result.deletedCount}`);
       }
     } catch (error) {
       console.error('⚠️ Ошибка при очистке quiz сессий:', error);

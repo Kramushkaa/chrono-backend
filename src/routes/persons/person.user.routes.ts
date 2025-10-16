@@ -7,7 +7,9 @@ import { parseLimitOffset, paginateRows, mapApiPersonRow } from '../../utils/api
 import { TelegramService } from '../../services/telegramService';
 import { sanitizePayload } from './helpers';
 
-export function createUserPersonRoutes(pool: Pool, telegramService: TelegramService) {
+import { PersonsService } from '../../services/personsService';
+
+export function createUserPersonRoutes(pool: Pool, telegramService: TelegramService, personsService: PersonsService) {
   const router = Router();
 
   // Persons created by current user
