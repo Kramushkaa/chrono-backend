@@ -24,6 +24,7 @@
     "migrate:quiz": "ts-node src/db/migrate-quiz-tables.ts",
     "migrate:finished-at": "ts-node src/db/migrate-add-finished-at.ts",
     "migrate:quiz-answers": "ts-node src/db/migrate-add-quiz-answers.ts",
+    "migrate:quiz-optimize": "psql $DATABASE_URL -f src/db/migrations/004_optimize_quiz_indexes.sql",
     "telegram:test": "ts-node src/utils/test-telegram.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
