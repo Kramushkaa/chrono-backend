@@ -1,0 +1,784 @@
+import { Pool } from 'pg';
+import * as crypto from 'crypto';
+import type {
+  QuizQuestion,
+  QuizQuestionType,
+  QuizSetupConfig,
+  QuizAttemptDB,
+  SharedQuizDB,
+  SharedQuizQuestionDB,
+  QuizSessionDB,
+  QuizSessionAnswer,
+  GlobalLeaderboardEntry,
+  SharedQuizLeaderboardEntry,
+  QuizAttemptDTO,
+  SharedQuizDTO,
+  QuizQuestionWithoutAnswer,
+  DetailedQuestionResult,
+} from '@chrononinja/dto';
+
+export class QuizService {
+  private pool: Pool;
+
+  constructor(pool: Pool) {
+    this.pool = pool;
+  }
+
+  // ============================================================================
+  // Rating Calculation
+  // ============================================================================
+
+  /**
+   * Calculate rating points based on quiz performance
+   * Formula: BaseScore × DifficultyMultiplier × TimeBonus
+   */
+  calculateRatingPoints(
+    correctAnswers: number,
+    totalQuestions: number,
+    totalTimeMs: number,
+    questionTypes: QuizQuestionType[]
+  ): number {
+    // BaseScore = (correctAnswers / totalQuestions) × 100
+    const baseScore = (correctAnswers / totalQuestions) * 100;
+
+    // DifficultyMultiplier = 1 + (questionCount - 5) × 0.1 + Σ(questionTypeDifficulty)
+    const questionCountBonus = (totalQuestions - 5) * 0.1;
+    const typeDifficulty = this.calculateTypeDifficulty(questionTypes);
+    const difficultyMultiplier = 1 + questionCountBonus + typeDifficulty;
+
+    // TimeBonus = if all correct: min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000), else 1.0
+    let timeBonus = 1.0;
+    if (correctAnswers === totalQuestions) {
+      const avgTimePerQuestion = totalTimeMs / totalQuestions;
+      timeBonus = Math.min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000);
+      timeBonus = Math.max(1.0, timeBonus); // Don't penalize slow but correct answers
+    }
+
+    const ratingPoints = baseScore * difficultyMultiplier * timeBonus;
+    return Math.round(ratingPoints * 100) / 100; // Round to 2 decimal places
+  }
+
+  /**
+   * Calculate difficulty bonus based on question types
+   */
+  private calculateTypeDifficulty(questionTypes: QuizQuestionType[]): number {
+    const difficultyMap: Record<QuizQuestionType, number> = {
+      birthYear: 0.0,
+      deathYear: 0.0,
+      profession: 0.0,
+      country: 0.0,
+      achievementsMatch: 0.1,
+      guessPerson: 0.1,
+      birthOrder: 0.2,
+      contemporaries: 0.2,
+    };
+
+    return questionTypes.reduce((sum, type) => sum + (difficultyMap[type] || 0), 0);
+  }
+
+  // ============================================================================
+  // Regular Quiz Attempts
+  // ============================================================================
+
+  /**
+   * Save a regular (non-shared) quiz attempt
+   */
+  async saveQuizAttempt(
+    userId: number | null,
+    correctAnswers: number,
+    totalQuestions: number,
+    totalTimeMs: number,
+    config: QuizSetupConfig,
+    questionTypes: QuizQuestionType[]
+  ): Promise<{ attemptId: number; ratingPoints: number }> {
+    const ratingPoints = this.calculateRatingPoints(
+      correctAnswers,
+      totalQuestions,
+      totalTimeMs,
+      questionTypes
+    );
+
+    const query = `
+      INSERT INTO quiz_attempts (user_id, shared_quiz_id, correct_answers, total_questions, total_time_ms, rating_points, config)
+      VALUES ($1, NULL, $2, $3, $4, $5, $6)
+      RETURNING id
+    `;
+
+    const values = [userId, correctAnswers, totalQuestions, totalTimeMs, ratingPoints, config];
+
+    const result = await this.pool.query(query, values);
+    return {
+      attemptId: result.rows[0].id,
+      ratingPoints,
+    };
+  }
+
+  // ============================================================================
+  // Shared Quizzes
+  // ============================================================================
+
+  /**
+   * Generate a unique share code
+   */
+  private async generateShareCode(): Promise<string> {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const codeLength = 8;
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      let code = '';
+      for (let i = 0; i < codeLength; i++) {
+        code += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+
+      // Check if code already exists
+      const checkQuery = 'SELECT id FROM shared_quizzes WHERE share_code = $1';
+      const result = await this.pool.query(checkQuery, [code]);
+
+      if (result.rows.length === 0) {
+        return code;
+      }
+    }
+
+    throw new Error('Failed to generate unique share code');
+  }
+
+  /**
+   * Create a shared quiz
+   */
+  async createSharedQuiz(
+    creatorUserId: number,
+    title: string,
+    description: string | undefined,
+    config: QuizSetupConfig,
+    questions: QuizQuestion[],
+    creatorAttempt?: {
+      correctAnswers: number;
+      totalQuestions: number;
+      totalTimeMs: number;
+    }
+  ): Promise<{ id: number; shareCode: string }> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Generate unique share code
+      const shareCode = await this.generateShareCode();
+
+      // Insert shared quiz
+      const quizQuery = `
+        INSERT INTO shared_quizzes (creator_user_id, title, description, share_code, config)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `;
+      const quizResult = await client.query(quizQuery, [
+        creatorUserId,
+        title,
+        description || null,
+        shareCode,
+        config,
+      ]);
+      const sharedQuizId = quizResult.rows[0].id;
+
+      // Insert questions
+      const questionQuery = `
+        INSERT INTO shared_quiz_questions (shared_quiz_id, question_index, question_data)
+        VALUES ($1, $2, $3)
+      `;
+
+      for (let i = 0; i < questions.length; i++) {
+        await client.query(questionQuery, [sharedQuizId, i, questions[i]]);
+      }
+
+      // Save creator's attempt if provided
+      if (creatorAttempt) {
+        const questionTypes = questions.map(q => q.type);
+        const ratingPoints = this.calculateRatingPoints(
+          creatorAttempt.correctAnswers,
+          creatorAttempt.totalQuestions,
+          creatorAttempt.totalTimeMs,
+          questionTypes
+        );
+
+        const attemptQuery = `
+          INSERT INTO quiz_attempts (user_id, shared_quiz_id, correct_answers, total_questions, total_time_ms, rating_points, config)
+          VALUES ($1, $2, $3, $4, $5, $6, NULL)
+        `;
+        await client.query(attemptQuery, [
+          creatorUserId,
+          sharedQuizId,
+          creatorAttempt.correctAnswers,
+          creatorAttempt.totalQuestions,
+          creatorAttempt.totalTimeMs,
+          ratingPoints,
+        ]);
+      }
+
+      await client.query('COMMIT');
+
+      return { id: sharedQuizId, shareCode };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get shared quiz by share code (without correct answers)
+   */
+  async getSharedQuiz(shareCode: string): Promise<SharedQuizDTO | null> {
+    const quizQuery = `
+      SELECT sq.*, u.username as creator_username
+      FROM shared_quizzes sq
+      JOIN users u ON sq.creator_user_id = u.id
+      WHERE sq.share_code = $1
+    `;
+    const quizResult = await this.pool.query(quizQuery, [shareCode]);
+
+    if (quizResult.rows.length === 0) {
+      return null;
+    }
+
+    const quiz = quizResult.rows[0];
+
+    // Get questions
+    const questionsQuery = `
+      SELECT question_data
+      FROM shared_quiz_questions
+      WHERE shared_quiz_id = $1
+      ORDER BY question_index ASC
+    `;
+    const questionsResult = await this.pool.query(questionsQuery, [quiz.id]);
+
+    // Strip correct answers from questions
+    const questions: QuizQuestionWithoutAnswer[] = questionsResult.rows.map(row => {
+      const fullQuestion = row.question_data as QuizQuestion;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { correctAnswer, ...questionWithoutAnswer } = fullQuestion;
+      return questionWithoutAnswer as QuizQuestionWithoutAnswer;
+    });
+
+    return {
+      id: quiz.id,
+      title: quiz.title,
+      description: quiz.description,
+      creatorUsername: quiz.creator_username,
+      config: quiz.config,
+      questions,
+      createdAt: quiz.created_at.toISOString(),
+    };
+  }
+
+  // ============================================================================
+  // Quiz Sessions (for shared quizzes)
+  // ============================================================================
+
+  /**
+   * Start a new quiz session
+   */
+  async startQuizSession(
+    sharedQuizId: number,
+    userId: number | null
+  ): Promise<{ sessionToken: string; expiresAt: Date }> {
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+
+    const query = `
+      INSERT INTO quiz_sessions (shared_quiz_id, user_id, session_token, answers, expires_at)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING expires_at
+    `;
+
+    const result = await this.pool.query(query, [
+      sharedQuizId,
+      userId,
+      sessionToken,
+      JSON.stringify([]),
+      expiresAt,
+    ]);
+
+    return {
+      sessionToken,
+      expiresAt: result.rows[0].expires_at,
+    };
+  }
+
+  /**
+   * Get quiz session by token
+   */
+  async getQuizSession(sessionToken: string): Promise<QuizSessionDB | null> {
+    const query = `
+      SELECT * FROM quiz_sessions
+      WHERE session_token = $1 AND expires_at > NOW()
+    `;
+
+    const result = await this.pool.query(query, [sessionToken]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0] as QuizSessionDB;
+  }
+
+  /**
+   * Check answer for a shared quiz question
+   */
+  async checkAnswer(
+    sessionToken: string,
+    questionId: string,
+    answer: string | string[] | string[][],
+    timeSpent: number
+  ): Promise<{ isCorrect: boolean }> {
+    const session = await this.getQuizSession(sessionToken);
+    if (!session) {
+      throw new Error('Invalid or expired session');
+    }
+
+    // Check if already answered
+    const existingAnswer = session.answers.find(a => a.questionId === questionId);
+    if (existingAnswer) {
+      throw new Error('Question already answered');
+    }
+
+    // Get the question with correct answer
+    const questionQuery = `
+      SELECT question_data
+      FROM shared_quiz_questions
+      WHERE shared_quiz_id = $1 AND (question_data->>'id')::text = $2
+    `;
+    const questionResult = await this.pool.query(questionQuery, [
+      session.shared_quiz_id,
+      questionId,
+    ]);
+
+    if (questionResult.rows.length === 0) {
+      throw new Error('Question not found');
+    }
+
+    const question = questionResult.rows[0].question_data as QuizQuestion;
+    const isCorrect = this.compareAnswers(answer, question.correctAnswer, question.type);
+
+    // Save answer to session
+    const newAnswer: QuizSessionAnswer = {
+      questionId,
+      answer,
+      isCorrect,
+      timeSpent,
+    };
+
+    const updatedAnswers = [...session.answers, newAnswer];
+
+    const updateQuery = `
+      UPDATE quiz_sessions
+      SET answers = $1
+      WHERE session_token = $2
+    `;
+    await this.pool.query(updateQuery, [JSON.stringify(updatedAnswers), sessionToken]);
+
+    return { isCorrect };
+  }
+
+  /**
+   * Compare user answer with correct answer
+   */
+  private compareAnswers(
+    userAnswer: string | string[] | string[][],
+    correctAnswer: string | string[] | string[][],
+    questionType: QuizQuestionType
+  ): boolean {
+    if (questionType === 'birthYear' || questionType === 'deathYear') {
+      return parseInt(userAnswer as string) === parseInt(correctAnswer as string);
+    }
+
+    if (questionType === 'contemporaries') {
+      const userGroups = userAnswer as string[][];
+      const correctGroups = correctAnswer as string[][];
+      const normalizeGroups = (groups: string[][]) =>
+        groups.map(group => group.sort()).sort((a, b) => a[0].localeCompare(b[0]));
+      return (
+        JSON.stringify(normalizeGroups(userGroups)) ===
+        JSON.stringify(normalizeGroups(correctGroups))
+      );
+    }
+
+    if (Array.isArray(userAnswer) && Array.isArray(correctAnswer)) {
+      return JSON.stringify(userAnswer) === JSON.stringify(correctAnswer);
+    }
+
+    return userAnswer === correctAnswer;
+  }
+
+  /**
+   * Finish quiz session and save attempt
+   */
+  async finishQuizSession(sessionToken: string): Promise<{
+    attemptId: number;
+    correctAnswers: number;
+    totalQuestions: number;
+    totalTimeMs: number;
+    detailedResults: DetailedQuestionResult[];
+  }> {
+    const session = await this.getQuizSession(sessionToken);
+    if (!session) {
+      throw new Error('Invalid or expired session');
+    }
+
+    // Get all questions for this quiz
+    const questionsQuery = `
+      SELECT question_data, question_index
+      FROM shared_quiz_questions
+      WHERE shared_quiz_id = $1
+      ORDER BY question_index ASC
+    `;
+    const questionsResult = await this.pool.query(questionsQuery, [session.shared_quiz_id]);
+    const questions = questionsResult.rows.map(row => row.question_data as QuizQuestion);
+
+    // Calculate results
+    const correctAnswers = session.answers.filter(a => a.isCorrect).length;
+    const totalQuestions = questions.length;
+    const totalTimeMs = session.answers.reduce((sum, a) => sum + a.timeSpent, 0);
+
+    // Get question types for rating calculation
+    const questionTypes = questions.map(q => q.type);
+
+    const ratingPoints = this.calculateRatingPoints(
+      correctAnswers,
+      totalQuestions,
+      totalTimeMs,
+      questionTypes
+    );
+
+    // Save attempt
+    const attemptQuery = `
+      INSERT INTO quiz_attempts (user_id, shared_quiz_id, correct_answers, total_questions, total_time_ms, rating_points, config)
+      VALUES ($1, $2, $3, $4, $5, $6, NULL)
+      RETURNING id
+    `;
+
+    const attemptResult = await this.pool.query(attemptQuery, [
+      session.user_id,
+      session.shared_quiz_id,
+      correctAnswers,
+      totalQuestions,
+      totalTimeMs,
+      ratingPoints,
+    ]);
+
+    const attemptId = attemptResult.rows[0].id;
+
+    // Delete session
+    await this.pool.query('DELETE FROM quiz_sessions WHERE session_token = $1', [sessionToken]);
+
+    // Prepare detailed results
+    const detailedResults: DetailedQuestionResult[] = questions.map(question => {
+      const userAnswer = session.answers.find(a => a.questionId === question.id);
+      return {
+        questionId: question.id,
+        question: question.question,
+        isCorrect: userAnswer?.isCorrect || false,
+        userAnswer: userAnswer?.answer || '',
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation,
+        timeSpent: userAnswer?.timeSpent || 0,
+      };
+    });
+
+    return {
+      attemptId,
+      correctAnswers,
+      totalQuestions,
+      totalTimeMs,
+      detailedResults,
+    };
+  }
+
+  // ============================================================================
+  // Leaderboards
+  // ============================================================================
+
+  /**
+   * Get global leaderboard (top 100 + user position)
+   */
+  async getGlobalLeaderboard(userId?: number): Promise<{
+    topPlayers: GlobalLeaderboardEntry[];
+    userEntry?: GlobalLeaderboardEntry;
+    totalPlayers: number;
+  }> {
+    // Get top 100 players
+    const topQuery = `
+      WITH player_stats AS (
+        SELECT 
+          qa.user_id,
+          u.username,
+          SUM(qa.rating_points) as total_rating,
+          COUNT(*) as games_played,
+          AVG((qa.correct_answers::float / qa.total_questions) * 100) as average_score,
+          MAX((qa.correct_answers::float / qa.total_questions) * 100) as best_score
+        FROM quiz_attempts qa
+        LEFT JOIN users u ON qa.user_id = u.id
+        WHERE qa.user_id IS NOT NULL
+        GROUP BY qa.user_id, u.username
+        ORDER BY total_rating DESC
+        LIMIT 100
+      )
+      SELECT 
+        ROW_NUMBER() OVER (ORDER BY total_rating DESC) as rank,
+        *
+      FROM player_stats
+    `;
+
+    const topResult = await this.pool.query(topQuery);
+
+    const topPlayers: GlobalLeaderboardEntry[] = topResult.rows.map(row => ({
+      rank: parseInt(row.rank),
+      userId: row.user_id,
+      username: row.username || 'Unknown',
+      totalRating: parseFloat(row.total_rating),
+      gamesPlayed: parseInt(row.games_played),
+      averageScore: parseFloat(row.average_score),
+      bestScore: parseFloat(row.best_score),
+    }));
+
+    // Get total players count
+    const countQuery = `
+      SELECT COUNT(DISTINCT user_id) as total
+      FROM quiz_attempts
+      WHERE user_id IS NOT NULL
+    `;
+    const countResult = await this.pool.query(countQuery);
+    const totalPlayers = parseInt(countResult.rows[0].total);
+
+    // Get user entry if userId provided and not in top 100
+    let userEntry: GlobalLeaderboardEntry | undefined;
+    if (userId && !topPlayers.find(p => p.userId === userId)) {
+      const userQuery = `
+        WITH all_players AS (
+          SELECT 
+            qa.user_id,
+            u.username,
+            SUM(qa.rating_points) as total_rating,
+            COUNT(*) as games_played,
+            AVG((qa.correct_answers::float / qa.total_questions) * 100) as average_score,
+            MAX((qa.correct_answers::float / qa.total_questions) * 100) as best_score
+          FROM quiz_attempts qa
+          LEFT JOIN users u ON qa.user_id = u.id
+          WHERE qa.user_id IS NOT NULL
+          GROUP BY qa.user_id, u.username
+        ),
+        ranked_players AS (
+          SELECT 
+            ROW_NUMBER() OVER (ORDER BY total_rating DESC) as rank,
+            *
+          FROM all_players
+        )
+        SELECT * FROM ranked_players WHERE user_id = $1
+      `;
+      const userResult = await this.pool.query(userQuery, [userId]);
+
+      if (userResult.rows.length > 0) {
+        const row = userResult.rows[0];
+        userEntry = {
+          rank: parseInt(row.rank),
+          userId: row.user_id,
+          username: row.username,
+          totalRating: parseFloat(row.total_rating),
+          gamesPlayed: parseInt(row.games_played),
+          averageScore: parseFloat(row.average_score),
+          bestScore: parseFloat(row.best_score),
+        };
+      }
+    }
+
+    return { topPlayers, userEntry, totalPlayers };
+  }
+
+  /**
+   * Get user statistics
+   */
+  async getUserStats(userId: number): Promise<{
+    totalGames: number;
+    totalRating: number;
+    averageRating: number;
+    bestRating: number;
+    averageScore: number;
+    rank?: number;
+    recentAttempts: QuizAttemptDTO[];
+  }> {
+    // Get stats
+    const statsQuery = `
+      SELECT 
+        COUNT(*) as total_games,
+        SUM(rating_points) as total_rating,
+        AVG(rating_points) as average_rating,
+        MAX(rating_points) as best_rating,
+        AVG((correct_answers::float / total_questions) * 100) as average_score
+      FROM quiz_attempts
+      WHERE user_id = $1
+    `;
+    const statsResult = await this.pool.query(statsQuery, [userId]);
+    const stats = statsResult.rows[0];
+
+    // Get rank
+    const rankQuery = `
+      WITH player_totals AS (
+        SELECT 
+          user_id,
+          SUM(rating_points) as total_rating
+        FROM quiz_attempts
+        WHERE user_id IS NOT NULL
+        GROUP BY user_id
+      ),
+      ranked_players AS (
+        SELECT 
+          user_id,
+          ROW_NUMBER() OVER (ORDER BY total_rating DESC) as rank
+        FROM player_totals
+      )
+      SELECT rank FROM ranked_players WHERE user_id = $1
+    `;
+    const rankResult = await this.pool.query(rankQuery, [userId]);
+    const rank = rankResult.rows.length > 0 ? parseInt(rankResult.rows[0].rank) : undefined;
+
+    // Get recent attempts
+    const attemptsQuery = `
+      SELECT 
+        qa.*,
+        sq.title as shared_quiz_title
+      FROM quiz_attempts qa
+      LEFT JOIN shared_quizzes sq ON qa.shared_quiz_id = sq.id
+      WHERE qa.user_id = $1
+      ORDER BY qa.created_at DESC
+      LIMIT 10
+    `;
+    const attemptsResult = await this.pool.query(attemptsQuery, [userId]);
+
+    const recentAttempts: QuizAttemptDTO[] = attemptsResult.rows.map(row => ({
+      id: row.id,
+      correctAnswers: row.correct_answers,
+      totalQuestions: row.total_questions,
+      totalTimeMs: row.total_time_ms,
+      ratingPoints: parseFloat(row.rating_points),
+      config: row.config,
+      sharedQuizTitle: row.shared_quiz_title,
+      createdAt: row.created_at.toISOString(),
+    }));
+
+    return {
+      totalGames: parseInt(stats.total_games),
+      totalRating: parseFloat(stats.total_rating) || 0,
+      averageRating: parseFloat(stats.average_rating) || 0,
+      bestRating: parseFloat(stats.best_rating) || 0,
+      averageScore: parseFloat(stats.average_score) || 0,
+      rank,
+      recentAttempts,
+    };
+  }
+
+  /**
+   * Get shared quiz leaderboard
+   */
+  async getSharedQuizLeaderboard(
+    shareCode: string,
+    userId?: number
+  ): Promise<{
+    quizTitle: string;
+    entries: SharedQuizLeaderboardEntry[];
+    userEntry?: SharedQuizLeaderboardEntry;
+    totalAttempts: number;
+  }> {
+    // Get quiz info
+    const quizQuery = 'SELECT id, title FROM shared_quizzes WHERE share_code = $1';
+    const quizResult = await this.pool.query(quizQuery, [shareCode]);
+
+    if (quizResult.rows.length === 0) {
+      throw new Error('Quiz not found');
+    }
+
+    const quiz = quizResult.rows[0];
+
+    // Get leaderboard entries (top 100)
+    const entriesQuery = `
+      WITH ranked_attempts AS (
+        SELECT 
+          qa.user_id,
+          COALESCE(u.username, 'Неизвестный ронин') as username,
+          qa.correct_answers,
+          qa.total_questions,
+          qa.total_time_ms,
+          qa.created_at,
+          ROW_NUMBER() OVER (
+            ORDER BY qa.correct_answers DESC, qa.total_time_ms ASC
+          ) as rank
+        FROM quiz_attempts qa
+        LEFT JOIN users u ON qa.user_id = u.id
+        WHERE qa.shared_quiz_id = $1
+      )
+      SELECT * FROM ranked_attempts
+      ORDER BY rank
+      LIMIT 100
+    `;
+    const entriesResult = await this.pool.query(entriesQuery, [quiz.id]);
+
+    const entries: SharedQuizLeaderboardEntry[] = entriesResult.rows.map(row => ({
+      rank: parseInt(row.rank),
+      userId: row.user_id,
+      username: row.username,
+      correctAnswers: row.correct_answers,
+      totalQuestions: row.total_questions,
+      totalTimeMs: row.total_time_ms,
+      completedAt: row.created_at.toISOString(),
+    }));
+
+    // Get total attempts
+    const countQuery = 'SELECT COUNT(*) as total FROM quiz_attempts WHERE shared_quiz_id = $1';
+    const countResult = await this.pool.query(countQuery, [quiz.id]);
+    const totalAttempts = parseInt(countResult.rows[0].total);
+
+    // Get user entry if not in top 100
+    let userEntry: SharedQuizLeaderboardEntry | undefined;
+    if (userId && !entries.find(e => e.userId === userId)) {
+      const userQuery = `
+        WITH ranked_attempts AS (
+          SELECT 
+            qa.user_id,
+            u.username,
+            qa.correct_answers,
+            qa.total_questions,
+            qa.total_time_ms,
+            qa.created_at,
+            ROW_NUMBER() OVER (
+              ORDER BY qa.correct_answers DESC, qa.total_time_ms ASC
+            ) as rank
+          FROM quiz_attempts qa
+          LEFT JOIN users u ON qa.user_id = u.id
+          WHERE qa.shared_quiz_id = $1
+        )
+        SELECT * FROM ranked_attempts WHERE user_id = $2
+      `;
+      const userResult = await this.pool.query(userQuery, [quiz.id, userId]);
+
+      if (userResult.rows.length > 0) {
+        const row = userResult.rows[0];
+        userEntry = {
+          rank: parseInt(row.rank),
+          userId: row.user_id,
+          username: row.username,
+          correctAnswers: row.correct_answers,
+          totalQuestions: row.total_questions,
+          totalTimeMs: row.total_time_ms,
+          completedAt: row.created_at.toISOString(),
+        };
+      }
+    }
+
+    return {
+      quizTitle: quiz.title,
+      entries,
+      userEntry,
+      totalAttempts,
+    };
+  }
+}

@@ -14,6 +14,7 @@ import { createListsRoutes } from './routes/listsRoutes';
 import { createAchievementsRoutes } from './routes/achievementsRoutes';
 import { createPeriodsRoutes } from './routes/periodsRoutes';
 import { createMetaRoutes } from './routes/metaRoutes';
+import { createQuizRoutes } from './routes/quizRoutes';
 import { config } from './config';
 
 // Загрузка переменных окружения
@@ -113,6 +114,9 @@ app.use('/api', createMetaRoutes(pool));
 // Lists routes
 app.use('/api', createListsRoutes(pool));
 
+// Quiz routes
+app.use('/api', createQuizRoutes(pool));
+
 // Backend info endpoint (оставляем как отдельный информационный маршрут)
 app.get(
   '/api/backend-info',
@@ -130,6 +134,7 @@ app.get(
           achievements: '/api/achievements',
           periods: '/api/periods',
           lists: '/api/lists',
+          quiz: '/api/quiz',
           stats: '/api/stats',
           health: '/api/health',
           categories: '/api/categories',
@@ -188,6 +193,7 @@ app.get('/', (req, res) => {
       stats: '/api/stats',
       health: '/api/health',
       auth: '/api/auth',
+      quiz: '/api/quiz',
     },
   });
 });

@@ -57,6 +57,33 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   }
 };
 
+// Optional authentication middleware (doesn't fail if token is missing)
+export const optionalAuthenticateToken = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    // No token provided, continue without user
+    next();
+    return;
+  }
+
+  try {
+    const decoded = verifyAccessToken(token);
+    if (decoded) {
+      req.user = decoded;
+    }
+    next();
+  } catch (error) {
+    // Invalid token, but continue without user (no error thrown)
+    next();
+  }
+};
+
 // Middleware для проверки роли
 export const requireRoleMiddleware = (roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
