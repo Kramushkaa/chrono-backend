@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { AuthService } from './services/authService';
 import { TelegramService } from './services/telegramService';
+import { QuizService } from './services/quizService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler } from './middleware/auth';
@@ -26,6 +27,7 @@ const pool = createPool();
 // Создание сервисов и контроллеров
 const authService = new AuthService(pool);
 const telegramService = new TelegramService(config.telegram.botToken, config.telegram.adminChatId);
+const quizService = new QuizService(pool);
 const authController = new AuthController(authService, telegramService);
 
 // Создание Express приложения
@@ -219,6 +221,16 @@ async function startServer() {
     const client = await pool.connect();
     console.log('✅ Подключение к базе данных установлено');
     client.release();
+
+    // Очистка истекших незавершённых сессий квизов
+    try {
+      const cleanedCount = await quizService.cleanupExpiredSessions();
+      if (cleanedCount > 0) {
+        console.log(`🧹 Очищено просроченных quiz сессий: ${cleanedCount}`);
+      }
+    } catch (error) {
+      console.error('⚠️ Ошибка при очистке quiz сессий:', error);
+    }
 
     // Запуск сервера
     app.listen(PORT, () => {

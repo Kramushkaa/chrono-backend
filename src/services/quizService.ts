@@ -426,7 +426,9 @@ export class QuizService {
   async getQuizSession(sessionToken: string): Promise<QuizSessionDB | null> {
     const query = `
       SELECT * FROM quiz_sessions
-      WHERE session_token = $1 AND expires_at > NOW()
+      WHERE session_token = $1 
+        AND expires_at > NOW() 
+        AND finished_at IS NULL
     `;
 
     const result = await this.pool.query(query, [sessionToken]);
@@ -595,8 +597,11 @@ export class QuizService {
 
     const attemptId = attemptResult.rows[0].id;
 
-    // Delete session
-    await this.pool.query('DELETE FROM quiz_sessions WHERE session_token = $1', [sessionToken]);
+    // Mark session as finished (instead of deleting)
+    await this.pool.query(
+      'UPDATE quiz_sessions SET finished_at = NOW() WHERE session_token = $1',
+      [sessionToken]
+    );
 
     // Prepare detailed results
     const detailedResults: DetailedQuestionResult[] = questions.map(question => {
@@ -619,6 +624,63 @@ export class QuizService {
       totalTimeMs,
       detailedResults,
     };
+  }
+
+  /**
+   * Get user's quiz session history
+   */
+  async getUserQuizHistory(
+    userId: number,
+    limit: number = 10
+  ): Promise<Array<QuizSessionDB & { quiz_title: string }>> {
+    const query = `
+      SELECT 
+        qs.*,
+        sq.title as quiz_title
+      FROM quiz_sessions qs
+      JOIN shared_quizzes sq ON qs.shared_quiz_id = sq.id
+      WHERE qs.user_id = $1 
+        AND qs.finished_at IS NOT NULL
+      ORDER BY qs.finished_at DESC
+      LIMIT $2
+    `;
+
+    const result = await this.pool.query(query, [userId, limit]);
+    return result.rows;
+  }
+
+  /**
+   * Get detailed session by token (for viewing history)
+   */
+  async getSessionHistory(sessionToken: string): Promise<QuizSessionDB | null> {
+    const query = `
+      SELECT * FROM quiz_sessions
+      WHERE session_token = $1 AND finished_at IS NOT NULL
+    `;
+
+    const result = await this.pool.query(query, [sessionToken]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0] as QuizSessionDB;
+  }
+
+  /**
+   * Cleanup expired unfinished sessions
+   * Should be called periodically (e.g., via cron job)
+   */
+  async cleanupExpiredSessions(): Promise<number> {
+    const query = `
+      DELETE FROM quiz_sessions
+      WHERE expires_at <= NOW() 
+        AND finished_at IS NULL
+      RETURNING id
+    `;
+
+    const result = await this.pool.query(query);
+    return result.rows.length;
   }
 
   // ============================================================================

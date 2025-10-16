@@ -266,6 +266,7 @@ export interface QuizSessionDB {
   answers: QuizSessionAnswer[];
   started_at: Date;
   expires_at: Date;
+  finished_at: Date | null;
 }
 
 export interface QuizSessionAnswer {
