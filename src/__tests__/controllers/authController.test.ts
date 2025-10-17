@@ -2,18 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthController } from '../../controllers/authController';
 import { AuthService } from '../../services/authService';
 import { TelegramService } from '../../services/telegramService';
+import { EmailService } from '../../services/emailService';
 import { User } from '../../types/auth';
-import * as emailModule from '../../utils/email';
 
 // Mock modules
 jest.mock('../../services/authService');
 jest.mock('../../services/telegramService');
-jest.mock('../../utils/email');
+jest.mock('../../services/emailService');
 
 describe('AuthController', () => {
   let authController: AuthController;
   let mockAuthService: jest.Mocked<AuthService>;
   let mockTelegramService: jest.Mocked<TelegramService>;
+  let mockEmailService: jest.Mocked<EmailService>;
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
   let mockNext: jest.MockedFunction<NextFunction>;
@@ -53,7 +54,13 @@ describe('AuthController', () => {
       notifyEmailVerified: jest.fn().mockResolvedValue(undefined),
     } as any;
 
-    authController = new AuthController(mockAuthService, mockTelegramService);
+    mockEmailService = {
+      sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+      sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    authController = new AuthController(mockAuthService, mockTelegramService, mockEmailService);
 
     mockRequest = {
       body: {},
@@ -67,9 +74,6 @@ describe('AuthController', () => {
     };
 
     mockNext = jest.fn();
-
-    // Mock sendEmail
-    (emailModule.sendEmail as jest.Mock) = jest.fn().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -104,7 +108,11 @@ describe('AuthController', () => {
         mockUser.username,
         mockUser.full_name
       );
-      expect(emailModule.sendEmail).toHaveBeenCalled();
+      expect(mockEmailService.sendVerificationEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.email_verification_token,
+        mockUser.full_name
+      );
       expect(mockResponse.status).toHaveBeenCalledWith(201);
       expect(mockResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -129,7 +137,7 @@ describe('AuthController', () => {
         password: 'Password123!',
       };
       mockAuthService.registerUser.mockResolvedValue(mockUser);
-      (emailModule.sendEmail as jest.Mock).mockRejectedValue(new Error('Email service down'));
+      mockEmailService.sendVerificationEmail.mockRejectedValue(new Error('Email service down'));
 
       await authController.register(
         mockRequest as Request,
@@ -785,7 +793,10 @@ describe('AuthController', () => {
       );
 
       expect(mockAuthService.resendEmailVerification).toHaveBeenCalledWith(1);
-      expect(emailModule.sendEmail).toHaveBeenCalled();
+      expect(mockEmailService.sendVerificationEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        'new-verification-token'
+      );
       expect(mockTelegramService.notifyVerificationEmailSent).toHaveBeenCalledWith(
         'test@example.com',
         true
@@ -805,7 +816,7 @@ describe('AuthController', () => {
         email: 'test@example.com',
         token: 'token',
       });
-      (emailModule.sendEmail as jest.Mock).mockRejectedValue(new Error('Email failed'));
+      mockEmailService.sendVerificationEmail.mockRejectedValue(new Error('Email failed'));
 
       await authController.resendVerification(
         mockRequest as Request,

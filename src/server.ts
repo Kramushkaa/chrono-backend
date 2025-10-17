@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { AuthService } from './services/authService';
 import { TelegramService } from './services/telegramService';
+import { EmailService } from './services/emailService';
 import { QuizService } from './services/quizService';
 import { AchievementsService } from './services/achievementsService';
 import { PeriodsService } from './services/periodsService';
@@ -20,6 +21,7 @@ import { createAchievementsRoutes } from './routes/achievementsRoutes';
 import { createPeriodsRoutes } from './routes/periodsRoutes';
 import { createMetaRoutes } from './routes/metaRoutes';
 import { createQuizRoutes } from './routes/quizRoutes';
+import { createHealthRoutes } from './routes/healthRoutes';
 import { config } from './config';
 import { cleanupExpiredQuizSessions } from './jobs/cleanup-quiz-sessions';
 
@@ -32,12 +34,13 @@ const pool = createPool();
 // Создание сервисов и контроллеров
 const authService = new AuthService(pool);
 const telegramService = new TelegramService(config.telegram.botToken, config.telegram.adminChatId);
+const emailService = new EmailService();
 const quizService = new QuizService(pool);
 const achievementsService = new AchievementsService(pool, telegramService);
 const periodsService = new PeriodsService(pool, telegramService);
 const personsService = new PersonsService(pool, telegramService);
 const listsService = new ListsService(pool);
-const authController = new AuthController(authService, telegramService);
+const authController = new AuthController(authService, telegramService, emailService);
 
 // Создание Express приложения
 const app = express();
@@ -109,6 +112,9 @@ app.use('/api/auth', createAuthRoutes(authController));
 
 // Логирование запросов (после аутентификации, чтобы req.user был доступен)
 app.use(logRequest);
+
+// Health check routes (без префикса /api для load balancers)
+app.use('/', createHealthRoutes(pool));
 
 // Маршруты управления Личностями (создание/модерация)
 app.use('/api', createPersonRoutes(pool, telegramService, personsService));

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/authService';
 import { TelegramService } from '../services/telegramService';
+import { EmailService } from '../services/emailService';
 import {
   RegisterRequest,
   LoginRequest,
@@ -16,10 +17,12 @@ import { errors } from '../utils/errors';
 export class AuthController {
   private authService: AuthService;
   private telegramService: TelegramService;
+  private emailService: EmailService;
 
-  constructor(authService: AuthService, telegramService: TelegramService) {
+  constructor(authService: AuthService, telegramService: TelegramService, emailService: EmailService) {
     this.authService = authService;
     this.telegramService = telegramService;
+    this.emailService = emailService;
   }
 
   // Регистрация пользователя
@@ -35,25 +38,13 @@ export class AuthController {
 
       // Отправка письма с подтверждением email (best-effort)
       try {
-        const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
         const verifyToken = user.email_verification_token; // заполнено в сервисе
         if (!verifyToken) {
           throw new Error('Verification token not generated');
         }
-        const verifyUrl = `${baseUrl}/profile?verify_token=${encodeURIComponent(verifyToken)}`;
-        const html = `
-          <div style="font-family: Arial, sans-serif;">
-            <h2>Подтверждение email</h2>
-            <p>Здравствуйте, ${user.full_name || user.username || user.email}!</p>
-            <p>Для завершения регистрации подтвердите вашу почту, нажав на кнопку ниже.</p>
-            <p>
-              <a href="${verifyUrl}" style="display:inline-block;padding:10px 16px;background:#2d7; color:#fff; text-decoration:none; border-radius:6px;">Подтвердить email</a>
-            </p>
-            <p>Если кнопка не работает, перейдите по ссылке: <br/> ${verifyUrl}</p>
-          </div>
-        `;
-        const { sendEmail } = await import('../utils/email');
-        await sendEmail(user.email, 'Подтверждение email — Хронониндзя', html);
+
+        const userName = user.full_name || user.username;
+        await this.emailService.sendVerificationEmail(user.email, verifyToken, userName);
 
         // Отправка уведомления в Telegram об отправке письма подтверждения (неблокирующее)
         this.telegramService
@@ -349,18 +340,7 @@ export class AuthController {
       const { email, token } = await this.authService.resendEmailVerification(userId);
 
       try {
-        const baseUrl = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
-        const verifyUrl = `${baseUrl}/profile?verify_token=${encodeURIComponent(token)}`;
-        const html = `
-          <div style="font-family: Arial, sans-serif;">
-            <h2>Подтверждение email</h2>
-            <p>Здравствуйте!</p>
-            <p>Для подтверждения почты нажмите на кнопку:</p>
-            <p><a href="${verifyUrl}" style="display:inline-block;padding:10px 16px;background:#2d7; color:#fff; text-decoration:none; border-radius:6px;">Подтвердить email</a></p>
-            <p>Или перейдите по ссылке: ${verifyUrl}</p>
-          </div>`;
-        const { sendEmail } = await import('../utils/email');
-        await sendEmail(email, 'Подтверждение email — Хронониндзя', html);
+        await this.emailService.sendVerificationEmail(email, token);
 
         // Отправка уведомления в Telegram о повторной отправке письма (неблокирующее)
         this.telegramService
