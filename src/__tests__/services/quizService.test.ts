@@ -1074,10 +1074,7 @@ describe('QuizService', () => {
 
     it('should handle contemporaries groups with missing persons', () => {
       const userAnswer = [['person-1'], ['person-2']];
-      const correctAnswer = [
-        ['person-1', 'person-2'],
-        ['person-3'],
-      ];
+      const correctAnswer = [['person-1', 'person-2'], ['person-3']];
 
       const result = (quizService as any).compareAnswers(
         userAnswer,
@@ -1089,8 +1086,16 @@ describe('QuizService', () => {
     });
 
     it('should handle guessPerson answer format', () => {
-      const correct = (quizService as any).compareAnswers('person-123', 'person-123', 'guessPerson');
-      const incorrect = (quizService as any).compareAnswers('person-456', 'person-123', 'guessPerson');
+      const correct = (quizService as any).compareAnswers(
+        'person-123',
+        'person-123',
+        'guessPerson'
+      );
+      const incorrect = (quizService as any).compareAnswers(
+        'person-456',
+        'person-123',
+        'guessPerson'
+      );
 
       expect(correct).toBe(true);
       expect(incorrect).toBe(false);
