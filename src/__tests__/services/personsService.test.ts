@@ -654,4 +654,237 @@ describe('PersonsService', () => {
       );
     });
   });
+
+  // ============================================================================
+  // Additional Tests for Life Periods Transactions
+  // ============================================================================
+
+  describe('proposePersonWithLifePeriods - edge cases', () => {
+    const personData = {
+      id: 'new-person',
+      name: 'Test Person',
+      birthYear: 1900,
+      deathYear: 2000,
+      category: 'Scientist',
+      description: 'Test',
+      lifePeriods: [{ countryId: 1, start: 1900, end: 2000 }],
+    };
+
+    it('should throw error when no periods provided for non-draft submission', async () => {
+      const user = createMockUser();
+      const dataWithoutPeriods = { ...personData, lifePeriods: [] };
+
+      await expect(
+        personsService.proposePersonWithLifePeriods(dataWithoutPeriods, user, false)
+      ).rejects.toThrow('Для отправки на модерацию необходимо указать хотя бы один период жизни');
+    });
+
+    it('should allow draft submission without periods', async () => {
+      const user = createMockUser();
+      const dataWithoutPeriods = { ...personData, lifePeriods: [] };
+
+      const mockClient = {
+        query: jest.fn()
+          .mockResolvedValueOnce(createQueryResult([])) // INSERT person
+          .mockResolvedValue(createQueryResult([])),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+
+      await personsService.proposePersonWithLifePeriods(dataWithoutPeriods, user, true);
+
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('should throw error for invalid country ID', async () => {
+      const user = createMockUser();
+      const dataWithInvalidCountry = {
+        ...personData,
+        lifePeriods: [{ countryId: 0, start: 1900, end: 2000 }],
+      };
+
+      const mockClient = {
+        query: jest.fn().mockResolvedValueOnce(createQueryResult([])), // INSERT person
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+
+      await expect(
+        personsService.proposePersonWithLifePeriods(dataWithInvalidCountry, user, false)
+      ).rejects.toThrow('Некорректная страна');
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    it('should throw error for periods outside life years', async () => {
+      const user = createMockUser();
+      const dataWithInvalidPeriod = {
+        ...personData,
+        lifePeriods: [{ countryId: 1, start: 1850, end: 1920 }],
+      };
+
+      const mockClient = {
+        query: jest.fn().mockResolvedValueOnce(createQueryResult([])), // INSERT person
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+
+      await expect(
+        personsService.proposePersonWithLifePeriods(dataWithInvalidPeriod, user, false)
+      ).rejects.toThrow('Периоды должны быть в пределах годов жизни');
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    it('should sort periods before insertion', async () => {
+      const user = createMockUser({ role: 'admin' });
+      const dataWithUnsortedPeriods = {
+        ...personData,
+        lifePeriods: [
+          { countryId: 2, start: 1950, end: 2000 },
+          { countryId: 1, start: 1900, end: 1950 },
+        ],
+      };
+
+      const mockClient = {
+        query: jest.fn()
+          .mockResolvedValueOnce(createQueryResult([])) // INSERT person
+          .mockResolvedValueOnce(createQueryResult([])) // DELETE periods
+          .mockResolvedValueOnce(createQueryResult([])) // INSERT period 1
+          .mockResolvedValueOnce(createQueryResult([])), // INSERT period 2
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+
+      await personsService.proposePersonWithLifePeriods(dataWithUnsortedPeriods, user, false);
+
+      // Проверяем, что периоды вставлены в правильном порядке (1900-1950 перед 1950-2000)
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining('INSERT INTO periods'),
+        ['new-person', 1900, 1950, 1, 'approved', user.sub]
+      );
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('INSERT INTO periods'),
+        ['new-person', 1950, 2000, 2, 'approved', user.sub]
+      );
+    });
+  });
+
+  describe('revertPersonToDraft - edge cases', () => {
+    it('should successfully revert pending person to draft', async () => {
+      const mockClient = {
+        query: jest.fn()
+          .mockResolvedValueOnce(createQueryResult([])) // BEGIN
+          .mockResolvedValueOnce(createQueryResult([])) // UPDATE persons
+          .mockResolvedValueOnce(createQueryResult([])), // UPDATE periods
+        release: jest.fn(),
+      };
+
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            id: 'person-1',
+            created_by: 1,
+            status: 'pending',
+          },
+        ])
+      );
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+
+      await expect(personsService.revertPersonToDraft('person-1', 1)).resolves.not.toThrow();
+
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('should throw error when person is not pending', async () => {
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            created_by: 1,
+            status: 'approved',
+          },
+        ])
+      );
+
+      await expect(personsService.revertPersonToDraft('person-1', 1)).rejects.toThrow(
+        'Можно возвращать в черновики только личности на модерации'
+      );
+    });
+  });
+
+  describe('getPersonDrafts - edge cases', () => {
+    it('should return empty list when no drafts exist', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      const result = await personsService.getPersonDrafts(1, 10, 0);
+
+      expect(result.data).toHaveLength(0);
+      expect(result.meta.hasMore).toBe(false);
+    });
+
+    it('should handle pagination correctly', async () => {
+      const mockDrafts = Array.from({ length: 11 }, (_, i) => ({
+        id: `person-${i + 1}`,
+        status: 'draft',
+      }));
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult(mockDrafts));
+
+      const result = await personsService.getPersonDrafts(1, 10, 0);
+
+      expect(result.data).toHaveLength(10);
+      expect(result.meta.hasMore).toBe(true);
+    });
+  });
+
+  describe('getPersonLifePeriods - edge cases', () => {
+    it('should return empty array when no life periods exist', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ id: 'person-1' }])) // Person exists
+        .mockResolvedValueOnce(createQueryResult([])); // No periods
+
+      const result = await personsService.getPersonLifePeriods('person-1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return multiple periods sorted by start year', async () => {
+      const mockPeriods = [
+        {
+          id: 1,
+          country_id: 1,
+          start_year: 1900,
+          end_year: 1950,
+          status: 'approved',
+          country_name: 'Country A',
+        },
+        {
+          id: 2,
+          country_id: 2,
+          start_year: 1950,
+          end_year: 2000,
+          status: 'approved',
+          country_name: 'Country B',
+        },
+      ];
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ id: 'person-1' }])) // Person exists
+        .mockResolvedValueOnce(createQueryResult(mockPeriods));
+
+      const result = await personsService.getPersonLifePeriods('person-1');
+
+      expect(result).toHaveLength(2);
+      expect(result[0].startYear).toBe(1900);
+      expect(result[1].startYear).toBe(1950);
+    });
+  });
 });
