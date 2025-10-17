@@ -1,11 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, rateLimit } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
 import { ListsService } from '../services/listsService';
 
 export function createListsRoutes(pool: Pool, listsService: ListsService): Router {
   const router = Router();
+
+  // Rate limiting: 30 requests per minute (content mutations)
+  router.use(rateLimit(1 * 60 * 1000, 30));
 
   // Create a share token for a list (owner only)
   router.post(

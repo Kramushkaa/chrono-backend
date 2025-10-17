@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
-import { authenticateToken, requireVerifiedEmail, requireRoleMiddleware } from '../middleware/auth';
+import { authenticateToken, requireVerifiedEmail, requireRoleMiddleware, rateLimit } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset } from '../utils/api';
 import { CountResult } from '../types/database';
@@ -13,6 +13,9 @@ export function createPeriodsRoutes(
   periodsService: PeriodsService
 ): Router {
   const router = Router();
+
+  // Rate limiting: 30 requests per minute (content mutations)
+  router.use(rateLimit(1 * 60 * 1000, 30));
 
   // Create standalone period (with person_id)
   router.post(

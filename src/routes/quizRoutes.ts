@@ -2,12 +2,15 @@ import { Router } from 'express';
 import { Pool } from 'pg';
 import { QuizController } from '../controllers/quizController';
 import { QuizService } from '../services/quizService';
-import { authenticateToken, optionalAuthenticateToken } from '../middleware/auth';
+import { authenticateToken, optionalAuthenticateToken, rateLimit } from '../middleware/auth';
 
 export function createQuizRoutes(pool: Pool): Router {
   const router = Router();
   const quizService = new QuizService(pool);
   const quizController = new QuizController(quizService);
+
+  // Rate limiting: 50 requests per 5 minutes (gameplay protection)
+  router.use(rateLimit(5 * 60 * 1000, 50));
 
   // ============================================================================
   // Regular Quiz Routes
