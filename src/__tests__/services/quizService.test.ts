@@ -1035,6 +1035,166 @@ describe('QuizService', () => {
   });
 
   // ============================================================================
+  // Additional Answer Comparison Tests
+  // ============================================================================
+
+  describe('compareAnswers - additional edge cases', () => {
+    it('should handle matching pairs with different order', () => {
+      const userAnswer = [
+        ['person-2', 'achievement-2'],
+        ['person-1', 'achievement-1'],
+      ];
+      const correctAnswer = [
+        ['person-1', 'achievement-1'],
+        ['person-2', 'achievement-2'],
+      ];
+
+      const result = (quizService as any).compareAnswers(
+        userAnswer,
+        correctAnswer,
+        'achievementsMatch'
+      );
+
+      // Order matters in achievementsMatch
+      expect(result).toBe(false);
+    });
+
+    it('should handle birth order with partial correctness', () => {
+      const correctOrder = ['person-1', 'person-2', 'person-3'];
+      const partiallyCorrect = ['person-1', 'person-3', 'person-2'];
+
+      const result = (quizService as any).compareAnswers(
+        partiallyCorrect,
+        correctOrder,
+        'birthOrder'
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it('should handle contemporaries groups with missing persons', () => {
+      const userAnswer = [['person-1'], ['person-2']];
+      const correctAnswer = [
+        ['person-1', 'person-2'],
+        ['person-3'],
+      ];
+
+      const result = (quizService as any).compareAnswers(
+        userAnswer,
+        correctAnswer,
+        'contemporaries'
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it('should handle guessPerson answer format', () => {
+      const correct = (quizService as any).compareAnswers('person-123', 'person-123', 'guessPerson');
+      const incorrect = (quizService as any).compareAnswers('person-456', 'person-123', 'guessPerson');
+
+      expect(correct).toBe(true);
+      expect(incorrect).toBe(false);
+    });
+
+    it('should trim whitespace in string answers', () => {
+      const result = (quizService as any).compareAnswers('  1900  ', '1900', 'birthYear');
+
+      expect(result).toBe(true);
+    });
+  });
+
+  // ============================================================================
+  // Shared Quiz Leaderboard
+  // ============================================================================
+
+  describe('getSharedQuizLeaderboard', () => {
+    it('should get shared quiz leaderboard with entries', async () => {
+      const mockQuiz = { id: 1, title: 'Test Quiz', creator_id: 1 };
+      const mockAttempts = [
+        {
+          user_id: 1,
+          correct_answers: 10,
+          total_questions: 10,
+          total_time_ms: 60000,
+          rating_points: 100,
+          created_at: new Date('2024-01-01'),
+          rank: 1,
+        },
+        {
+          user_id: 2,
+          correct_answers: 8,
+          total_questions: 10,
+          total_time_ms: 70000,
+          rating_points: 85,
+          created_at: new Date('2024-01-02'),
+          rank: 2,
+        },
+      ];
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([mockQuiz])) // quiz info
+        .mockResolvedValueOnce(createQueryResult(mockAttempts)) // top attempts
+        .mockResolvedValueOnce(createQueryResult([{ total: '10' }])); // total count
+
+      const result = await quizService.getSharedQuizLeaderboard('SHARE123');
+
+      expect(result.entries).toHaveLength(2);
+      expect(result.totalAttempts).toBe(10);
+      expect(result.quizTitle).toBe('Test Quiz');
+    });
+
+    it('should return empty leaderboard when no attempts', async () => {
+      const mockQuiz = { id: 1, title: 'Empty Quiz', creator_id: 1 };
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([mockQuiz]))
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([{ total: '0' }]));
+
+      const result = await quizService.getSharedQuizLeaderboard('SHARE123');
+
+      expect(result.entries).toEqual([]);
+      expect(result.totalAttempts).toBe(0);
+    });
+
+    it('should include user entry when userId provided', async () => {
+      const mockQuiz = { id: 1, title: 'Test Quiz', creator_id: 1 };
+      const mockAttempts = [
+        {
+          user_id: 1,
+          correct_answers: 10,
+          total_questions: 10,
+          total_time_ms: 60000,
+          rating_points: 100,
+          created_at: new Date('2024-01-01'),
+          rank: 1,
+        },
+      ];
+      const mockUserEntry = {
+        user_id: 999,
+        correct_answers: 5,
+        total_questions: 10,
+        total_time_ms: 80000,
+        rating_points: 50,
+        created_at: new Date('2024-01-15'),
+        rank: 15,
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([mockQuiz]))
+        .mockResolvedValueOnce(createQueryResult(mockAttempts))
+        .mockResolvedValueOnce(createQueryResult([{ total: '20' }]))
+        .mockResolvedValueOnce(createQueryResult([mockUserEntry])); // user entry
+
+      const result = await quizService.getSharedQuizLeaderboard('SHARE123', 999);
+
+      expect(result.userEntry).toBeDefined();
+      expect(result.userEntry?.userId).toBe(999);
+      expect(result.userEntry?.rank).toBe(15);
+    });
+  });
+
+  // ============================================================================
   // Integration Note
   // ============================================================================
   // Complex transaction methods (createSharedQuiz, finishQuiz) require

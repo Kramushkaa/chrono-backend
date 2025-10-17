@@ -887,4 +887,210 @@ describe('PersonsService', () => {
       expect(result[1].startYear).toBe(1950);
     });
   });
+
+  // ============================================================================
+  // Additional Coverage - getPersons, getPendingPersons, getPersonsByIds
+  // ============================================================================
+
+  describe('getPersons', () => {
+    it('should get persons with complex filters', async () => {
+      const mockPersons = [
+        { id: 'person-1', name: 'Test Person 1', category: 'Scientist' },
+        { id: 'person-2', name: 'Test Person 2', category: 'Artist' },
+      ];
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult(mockPersons));
+
+      const result = await personsService.getPersons(
+        {
+          q: 'test',
+          category: 'Scientist',
+          startYear: 1900,
+          endYear: 2000,
+        },
+        10,
+        0
+      );
+
+      expect(result.data.length).toBeGreaterThan(0);
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('WHERE'), expect.any(Array));
+    });
+
+    it('should handle search query', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      await personsService.getPersons({ q: 'Einstein' }, 10, 0);
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('ILIKE'),
+        expect.arrayContaining(['%Einstein%'])
+      );
+    });
+  });
+
+  describe('getPendingPersons', () => {
+    it('should get pending persons for moderation', async () => {
+      const mockPending = [
+        {
+          id: 'person-1',
+          name: 'Pending Person 1',
+          status: 'pending',
+          creator_email: 'user@example.com',
+        },
+        {
+          id: 'person-2',
+          name: 'Pending Person 2',
+          status: 'pending',
+          creator_email: 'user2@example.com',
+        },
+      ];
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult(mockPending));
+
+      const result = await personsService.getPendingPersons(10, 0);
+
+      expect(result.data).toHaveLength(2);
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining("status = 'pending'"),
+        expect.any(Array)
+      );
+    });
+
+    it('should handle pagination', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      await personsService.getPendingPersons(20, 40);
+
+      expect(mockPool.query).toHaveBeenCalledWith(expect.any(String), [21, 40]);
+    });
+  });
+
+  describe('getPersonsByIds', () => {
+    it('should get persons by batch of IDs', async () => {
+      const mockPersons = [
+        { id: 'person-1', name: 'Person 1' },
+        { id: 'person-2', name: 'Person 2' },
+        { id: 'person-3', name: 'Person 3' },
+      ];
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult(mockPersons));
+
+      const result = await personsService.getPersonsByIds(['person-1', 'person-2', 'person-3']);
+
+      expect(result).toHaveLength(3);
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('generate_series'),
+        [['person-1', 'person-2', 'person-3']]
+      );
+    });
+
+    it('should return empty array for empty IDs', async () => {
+      const result = await personsService.getPersonsByIds([]);
+
+      expect(result).toEqual([]);
+      expect(mockPool.query).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('proposeEdit', () => {
+    it('should propose edit for existing person', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 'person-1',
+              name: 'Original Name',
+              birth_year: 1900,
+            },
+          ])
+        ) // Check person exists
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 1,
+              person_id: 'person-1',
+              status: 'pending',
+            },
+          ])
+        ); // INSERT edit
+
+      const result = await personsService.proposeEdit(
+        'person-1',
+        {
+          name: 'Updated Name',
+        },
+        1
+      );
+
+      expect(result.status).toBe('pending');
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO person_edits'),
+        expect.any(Array)
+      );
+    });
+
+    it('should throw error when person not found', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      await expect(personsService.proposeEdit('nonexistent', { name: 'Test' }, 1)).rejects.toThrow(
+        'Личность не найдена'
+      );
+    });
+  });
+
+  describe('reviewEdit', () => {
+    it('should approve edit and update person', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 1,
+              person_id: 'person-1',
+              status: 'pending',
+              payload: { name: 'Updated Name' },
+            },
+          ])
+        ) // Check edit exists
+        .mockResolvedValueOnce(createQueryResult([])) // UPDATE person_edits
+        .mockResolvedValueOnce(createQueryResult([])) // applyPayloadToPerson (UPDATE persons)
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 1,
+              status: 'approved',
+            },
+          ])
+        ); // SELECT updated edit
+
+      const result = await personsService.reviewEdit(1, 'approve', 2);
+
+      expect(result.status).toBe('approved');
+    });
+
+    it('should reject edit without updating person', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 1,
+              person_id: 'person-1',
+              status: 'pending',
+            },
+          ])
+        ) // Check edit exists
+        .mockResolvedValueOnce(createQueryResult([])) // UPDATE person_edits
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 1,
+              status: 'rejected',
+            },
+          ])
+        ); // SELECT updated edit
+
+      const result = await personsService.reviewEdit(1, 'reject', 2, 'Not accurate');
+
+      expect(result.status).toBe('rejected');
+    });
+  });
 });
