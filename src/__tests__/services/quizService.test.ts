@@ -1,5 +1,5 @@
 import { QuizService } from '../../services/quizService';
-import { createMockPool } from '../mocks';
+import { createMockPool, createQueryResult } from '../mocks';
 import type { QuizQuestionType } from '@chrononinja/dto';
 
 describe('QuizService', () => {
@@ -288,9 +288,389 @@ describe('QuizService', () => {
   });
 
   // ============================================================================
+  // Database Methods Tests
+  // ============================================================================
+
+  describe('saveQuizAttempt', () => {
+    it('should save quiz attempt with rating calculation', async () => {
+      const config = {
+        questionCount: 5,
+        questionTypes: ['birthYear', 'deathYear', 'profession'] as QuizQuestionType[],
+        selectedCategories: [],
+        selectedCountries: [],
+        timeRange: { start: -800, end: 2000 },
+      };
+
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            id: 123,
+          },
+        ])
+      );
+
+      const result = await quizService.saveQuizAttempt(1, 3, 5, 60000, config, config.questionTypes);
+
+      expect(result.attemptId).toBe(123);
+      expect(result.ratingPoints).toBeGreaterThan(0);
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO quiz_attempts'),
+        expect.arrayContaining([1, 3, 5, 60000])
+      );
+    });
+
+    it('should handle guest users (null userId)', async () => {
+      const config = {
+        questionCount: 3,
+        questionTypes: ['birthYear'] as QuizQuestionType[],
+        selectedCategories: [],
+        selectedCountries: [],
+        timeRange: { start: -800, end: 2000 },
+      };
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 456 }]));
+
+      const result = await quizService.saveQuizAttempt(null, 2, 3, 30000, config, config.questionTypes);
+
+      expect(result.attemptId).toBe(456);
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO quiz_attempts'),
+        expect.arrayContaining([null, 2, 3, 30000])
+      );
+    });
+
+    it('should include detailed answers and questions if provided', async () => {
+      const config = {
+        questionCount: 2,
+        questionTypes: ['birthYear', 'achievementsMatch'] as QuizQuestionType[],
+        selectedCategories: [],
+        selectedCountries: [],
+        timeRange: { start: -800, end: 2000 },
+      };
+
+      const detailedAnswers = [
+        {
+          questionId: '1',
+          answer: '1900',
+          isCorrect: true,
+          timeSpent: 5000,
+          questionType: 'birthYear' as QuizQuestionType,
+        },
+      ];
+
+      const questions = [
+        {
+          id: '1',
+          type: 'birthYear' as QuizQuestionType,
+          question: 'Test?',
+          correctAnswer: '1900',
+          data: {},
+        },
+      ];
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 789 }]));
+
+      const result = await quizService.saveQuizAttempt(
+        1,
+        1,
+        2,
+        15000,
+        config,
+        config.questionTypes,
+        detailedAnswers,
+        questions
+      );
+
+      expect(result.attemptId).toBe(789);
+    });
+  });
+
+  describe('getGlobalLeaderboard', () => {
+    it('should return top players and total count', async () => {
+      const topPlayersData = [
+        {
+          rank: 1, // ROW_NUMBER() result
+          user_id: 1,
+          username: 'Player1',
+          total_rating: 1500.5,
+          games_played: 20,
+          average_score: 85.5,
+          best_score: 100,
+        },
+        {
+          rank: 2,
+          user_id: 2,
+          username: 'Player2',
+          total_rating: 1200.3,
+          games_played: 15,
+          average_score: 80.0,
+          best_score: 95,
+        },
+      ];
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult(topPlayersData))
+        .mockResolvedValueOnce(createQueryResult([{ total: '150' }]));
+
+      const result = await quizService.getGlobalLeaderboard(undefined);
+
+      expect(result.topPlayers).toHaveLength(2);
+      expect(result.topPlayers[0].rank).toBe(1);
+      expect(result.topPlayers[0].totalRating).toBe(1500.5);
+      expect(result.topPlayers[1].rank).toBe(2);
+      expect(result.totalPlayers).toBe(150);
+      expect(result.userEntry).toBeUndefined();
+    });
+
+    it('should include user entry if not in top 100', async () => {
+      const topPlayersData = [
+        {
+          rank: 1,
+          user_id: 1,
+          username: 'Top1',
+          total_rating: 1000,
+          games_played: 10,
+          average_score: 90,
+          best_score: 100,
+        },
+      ];
+
+      const userEntryData = {
+        user_id: 999,
+        username: 'CurrentUser',
+        total_rating: 500,
+        games_played: 5,
+        average_score: 75,
+        best_score: 85,
+        user_rank: 120,
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult(topPlayersData))
+        .mockResolvedValueOnce(createQueryResult([{ total: '200' }]))
+        .mockResolvedValueOnce(createQueryResult([{ ...userEntryData, rank: userEntryData.user_rank }]));
+
+      const result = await quizService.getGlobalLeaderboard(999);
+
+      expect(result.userEntry).not.toBeNull();
+      expect(result.userEntry?.rank).toBe(120);
+      expect(result.userEntry?.userId).toBe(999);
+    });
+  });
+
+  describe('getUserQuizHistory', () => {
+    it('should return user history with proper mapping', async () => {
+      const historyData = [
+        {
+          attempt_id: 1,
+          shared_quiz_id: null,
+          quiz_title: null,
+          correct_answers: 5,
+          total_questions: 5,
+          total_time_ms: 45000,
+          rating_points: 120.5,
+          created_at: new Date('2025-01-15'),
+        },
+      ];
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult(historyData));
+
+      const result = await quizService.getUserQuizHistory(1, 20);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].attempt_id).toBe(1);
+      expect(result[0].correct_answers).toBe(5);
+    });
+
+    it('should apply limit parameter', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      await quizService.getUserQuizHistory(1, 5);
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('LIMIT'),
+        [1, 5]
+      );
+    });
+  });
+
+  describe('getSharedQuiz', () => {
+    it('should return quiz with questions', async () => {
+      const quizData = {
+        id: 1,
+        created_by: 1,
+        title: 'Test Quiz',
+        description: 'Test Description',
+        share_code: 'ABC12345',
+        config: { questionCount: 2 },
+        created_at: new Date(),
+      };
+
+      const questionsData = [
+        {
+          id: 1,
+          shared_quiz_id: 1,
+          question_index: 0,
+          question_type: 'birthYear',
+          question_text: 'Question 1',
+          question_data: { person: { id: 'p1', name: 'Test' } },
+        },
+      ];
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([quizData]))
+        .mockResolvedValueOnce(createQueryResult(questionsData));
+
+      const result = await quizService.getSharedQuiz('ABC12345');
+
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe(1);
+      expect(result?.title).toBe('Test Quiz');
+      expect(result?.questions).toHaveLength(1);
+    });
+
+    it('should return null if quiz not found', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      const result = await quizService.getSharedQuiz('NOTFOUND');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('startQuizSession', () => {
+    it('should create session with token and expiration', async () => {
+      const expiresAt = new Date(Date.now() + 7200000);
+      
+      // Мокируем возвращаемое значение pool.query
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            session_token: 'generated-token',
+            expires_at: expiresAt,
+          },
+        ])
+      );
+
+      const result = await quizService.startQuizSession(1, 1);
+
+      expect(typeof result.sessionToken).toBe('string');
+      expect(result.sessionToken.length).toBeGreaterThan(0);
+      expect(result.expiresAt).toBeInstanceOf(Date);
+      expect(mockPool.query).toHaveBeenCalled();
+    });
+
+    it('should work for guest users', async () => {
+      const expiresAt = new Date(Date.now() + 7200000);
+      
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            session_token: 'guest-token',
+            expires_at: expiresAt,
+          },
+        ])
+      );
+
+      const result = await quizService.startQuizSession(5, null);
+
+      expect(typeof result.sessionToken).toBe('string');
+      expect(result.sessionToken.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('checkAnswer', () => {
+    it('should validate answer and update session', async () => {
+      const sessionData = {
+        id: 1,
+        session_token: 'token123',
+        shared_quiz_id: 1,
+        user_id: 1,
+        current_question_index: 0,
+        answers: [],
+        started_at: new Date(),
+        expires_at: new Date(Date.now() + 3600000),
+      };
+
+      const questionData = {
+        id: 1,
+        question_type: 'birthYear',
+        question_data: {
+          id: '1',
+          type: 'birthYear' as QuizQuestionType,
+          question: 'When was X born?',
+          correctAnswer: '1900',
+          data: { person: { id: 'p1', name: 'Test' } },
+        },
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([sessionData]))
+        .mockResolvedValueOnce(createQueryResult([questionData]))
+        .mockResolvedValueOnce(createQueryResult([])); // Update
+
+      const result = await quizService.checkAnswer('token123', '1', '1900', 5000);
+
+      expect(result.isCorrect).toBe(true);
+      expect(mockPool.query).toHaveBeenCalledTimes(3);
+    });
+
+    it('should handle incorrect answers', async () => {
+      const sessionData = {
+        id: 1,
+        session_token: 'token',
+        shared_quiz_id: 1,
+        answers: [],
+        expires_at: new Date(Date.now() + 3600000),
+      };
+
+      const questionData = {
+        id: 1,
+        question_type: 'profession',
+        question_data: {
+          id: '1',
+          type: 'profession' as QuizQuestionType,
+          question: 'What was X profession?',
+          correctAnswer: 'Scientist',
+          data: {},
+        },
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([sessionData]))
+        .mockResolvedValueOnce(createQueryResult([questionData]))
+        .mockResolvedValueOnce(createQueryResult([]));
+
+      const result = await quizService.checkAnswer('token', '1', 'Artist', 10000);
+
+      expect(result.isCorrect).toBe(false);
+    });
+
+    it('should throw error for expired session', async () => {
+      const expiredSession = {
+        id: 1,
+        session_token: 'expired',
+        shared_quiz_id: 1,
+        answers: [],
+        expires_at: new Date(Date.now() - 3600000), // 1 hour ago
+      };
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult([expiredSession]));
+
+      await expect(quizService.checkAnswer('expired', '1', 'answer', 5000)).rejects.toThrow();
+    });
+
+    it('should throw error for invalid session token', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      await expect(quizService.checkAnswer('invalid', '1', 'answer', 5000)).rejects.toThrow();
+    });
+  });
+
+  // ============================================================================
   // Integration Note
   // ============================================================================
-  // Database-dependent methods (saveQuizAttempt, getGlobalLeaderboard, etc.)
-  // require complex mocking or actual integration tests with test database
-  // These are better covered by integration tests rather than unit tests
+  // Complex transaction methods (createSharedQuiz, finishQuiz) require
+  // extensive mocking and are better covered by integration tests
 });
+
