@@ -20,8 +20,11 @@ describe('api utils', () => {
         description: 'Test description',
         wiki_link: 'https://wikipedia.org/person-1',
         achievements: ['Achievement 1', 'Achievement 2'],
+        achievements_wiki: null,
+        achievement_years: null,
         image_url: 'https://example.com/image.jpg',
-        status: 'approved' as any,
+        status: 'approved',
+        created_by: 1,
       };
 
       const result = mapApiPersonRow(row);
@@ -59,7 +62,11 @@ describe('api utils', () => {
         description: null,
         wiki_link: null,
         achievements: [],
+        achievements_wiki: null,
+        achievement_years: null,
         image_url: null,
+        status: 'approved',
+        created_by: 1,
       };
 
       const result = mapApiPersonRow(row);
@@ -86,7 +93,11 @@ describe('api utils', () => {
         description: 'Author',
         wiki_link: null,
         achievements: [],
+        achievements_wiki: null,
+        achievement_years: null,
         image_url: null,
+        status: 'approved',
+        created_by: 2,
       };
 
       const result = mapApiPersonRow(row);
@@ -116,7 +127,7 @@ describe('api utils', () => {
             country_name: 'Англия',
           },
         ],
-      } as PersonWithRelations;
+      } as unknown as PersonWithRelations;
 
       const result = mapApiPersonRow(row);
 
@@ -146,7 +157,7 @@ describe('api utils', () => {
         achievements_wiki: ['https://wiki.org/1', 'https://wiki.org/2'],
         achievement_years: [1880, 1900],
         image_url: null,
-      } as PersonWithRelations;
+      } as unknown as PersonWithRelations;
 
       const result = mapApiPersonRow(row);
 
@@ -155,7 +166,7 @@ describe('api utils', () => {
     });
 
     it('should include status for moderation', () => {
-      const row: PersonsViewRow & { status: 'pending' } = {
+      const row: PersonsViewRow = {
         id: 'person-5',
         name: 'Pending Person',
         birth_year: 1900,
@@ -167,8 +178,11 @@ describe('api utils', () => {
         description: null,
         wiki_link: null,
         achievements: [],
+        achievements_wiki: null,
+        achievement_years: null,
         image_url: null,
         status: 'pending',
+        created_by: 3,
       };
 
       const result = mapApiPersonRow(row);
