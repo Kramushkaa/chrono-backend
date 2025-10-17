@@ -39,9 +39,7 @@ describe('ListsService', () => {
     });
 
     it('should throw error if title is empty', async () => {
-      await expect(listsService.createList('  ', 1)).rejects.toThrow(
-        'Название списка обязательно'
-      );
+      await expect(listsService.createList('  ', 1)).rejects.toThrow('Название списка обязательно');
     });
 
     it('should throw error if title is too long', async () => {
@@ -54,24 +52,31 @@ describe('ListsService', () => {
 
     it('should trim title before validation', async () => {
       const title = '  Test List  ';
-      mockPool.query.mockResolvedValueOnce(
-        createQueryResult([{ id: 1, title: 'Test List' }])
-      );
+      mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 1, title: 'Test List' }]));
 
       await listsService.createList(title, 1);
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        [1, 'Test List']
-      );
+      expect(mockPool.query).toHaveBeenCalledWith(expect.any(String), [1, 'Test List']);
     });
   });
 
   describe('getUserLists', () => {
     it('should return user lists with item counts', async () => {
       const listRows = [
-        { id: 1, owner_user_id: 1, title: 'List 1', created_at: new Date(), updated_at: new Date() },
-        { id: 2, owner_user_id: 1, title: 'List 2', created_at: new Date(), updated_at: new Date() },
+        {
+          id: 1,
+          owner_user_id: 1,
+          title: 'List 1',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+        {
+          id: 2,
+          owner_user_id: 1,
+          title: 'List 2',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
       ];
 
       const countRows = [
@@ -127,9 +132,7 @@ describe('ListsService', () => {
     it('should throw error if user is not owner', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([])); // No ownership
 
-      await expect(listsService.getListItems(1, 2)).rejects.toThrow(
-        'Нет прав на доступ к списку'
-      );
+      await expect(listsService.getListItems(1, 2)).rejects.toThrow('Нет прав на доступ к списку');
     });
   });
 
@@ -171,9 +174,9 @@ describe('ListsService', () => {
     it('should throw error for invalid item type', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 1 }])); // ownership check
 
-      await expect(
-        listsService.addListItem(1, 1, 'invalid' as any, 'test')
-      ).rejects.toThrow('Некорректный тип элемента');
+      await expect(listsService.addListItem(1, 1, 'invalid' as any, 'test')).rejects.toThrow(
+        'Некорректный тип элемента'
+      );
     });
   });
 
@@ -196,9 +199,7 @@ describe('ListsService', () => {
     it('should throw error if user is not owner', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([])); // No ownership
 
-      await expect(listsService.deleteList(1, 2)).rejects.toThrow(
-        'Нет прав на удаление списка'
-      );
+      await expect(listsService.deleteList(1, 2)).rejects.toThrow('Нет прав на удаление списка');
     });
   });
 
@@ -235,9 +236,7 @@ describe('ListsService', () => {
         ])
       );
 
-      await expect(listsService.shareList(1, 1)).rejects.toThrow(
-        'Нет прав на публикацию списка'
-      );
+      await expect(listsService.shareList(1, 1)).rejects.toThrow('Нет прав на публикацию списка');
     });
   });
 
@@ -255,9 +254,7 @@ describe('ListsService', () => {
 
       // Now copy the list
       mockPool.query
-        .mockResolvedValueOnce(
-          createQueryResult([{ id: 1, title: 'Original List' }])
-        ) // src list
+        .mockResolvedValueOnce(createQueryResult([{ id: 1, title: 'Original List' }])) // src list
         .mockResolvedValueOnce(createQueryResult([{ id: 2 }])) // insert new list
         .mockResolvedValueOnce(createQueryResult([])); // copy items
 
@@ -287,10 +284,9 @@ describe('ListsService', () => {
     });
 
     it('should throw error for invalid code', async () => {
-      await expect(
-        listsService.copyListFromShare('invalid-code', 1)
-      ).rejects.toThrow('Некорректный код');
+      await expect(listsService.copyListFromShare('invalid-code', 1)).rejects.toThrow(
+        'Некорректный код'
+      );
     });
   });
 });
-

@@ -36,11 +36,11 @@ export class ListsService {
    */
   async createList(title: string, userId: number): Promise<any> {
     const t = title.trim();
-    
+
     if (t.length === 0) {
       throw errors.badRequest('Название списка обязательно');
     }
-    
+
     if (t.length > 200) {
       throw errors.badRequest('Название списка слишком длинное (макс. 200)');
     }
@@ -86,10 +86,10 @@ export class ListsService {
    */
   async getListItems(listId: number, userId: number): Promise<ListItem[]> {
     // Проверка прав
-    const own = await this.pool.query(
-      'SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2',
-      [listId, userId]
-    );
+    const own = await this.pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2', [
+      listId,
+      userId,
+    ]);
 
     if (own.rowCount === 0) {
       throw errors.forbidden('Нет прав на доступ к списку');
@@ -113,10 +113,10 @@ export class ListsService {
     itemId: string | number
   ): Promise<any> {
     // Проверка прав
-    const own = await this.pool.query(
-      'SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2',
-      [listId, userId]
-    );
+    const own = await this.pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2', [
+      listId,
+      userId,
+    ]);
 
     if (own.rowCount === 0) {
       throw errors.forbidden('Нет прав на изменение списка');
@@ -192,19 +192,19 @@ export class ListsService {
    */
   async deleteListItem(listId: number, itemId: number, userId: number): Promise<void> {
     // Проверка прав
-    const own = await this.pool.query(
-      'SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2',
-      [listId, userId]
-    );
+    const own = await this.pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2', [
+      listId,
+      userId,
+    ]);
 
     if (own.rowCount === 0) {
       throw errors.forbidden('Нет прав на изменение списка');
     }
 
-    await this.pool.query(
-      'DELETE FROM list_items WHERE id = $1 AND list_id = $2',
-      [itemId, listId]
-    );
+    await this.pool.query('DELETE FROM list_items WHERE id = $1 AND list_id = $2', [
+      itemId,
+      listId,
+    ]);
   }
 
   /**
@@ -212,10 +212,10 @@ export class ListsService {
    */
   async deleteList(listId: number, userId: number): Promise<void> {
     // Проверка прав
-    const own = await this.pool.query(
-      'SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2',
-      [listId, userId]
-    );
+    const own = await this.pool.query('SELECT 1 FROM lists WHERE id = $1 AND owner_user_id = $2', [
+      listId,
+      userId,
+    ]);
 
     if (own.rowCount === 0) {
       throw errors.forbidden('Нет прав на удаление списка');
@@ -235,10 +235,9 @@ export class ListsService {
    * Создание share-кода для списка
    */
   async shareList(listId: number, userId: number): Promise<string> {
-    const own = await this.pool.query(
-      'SELECT owner_user_id, title FROM lists WHERE id = $1',
-      [listId]
-    );
+    const own = await this.pool.query('SELECT owner_user_id, title FROM lists WHERE id = $1', [
+      listId,
+    ]);
 
     if (own.rowCount === 0) {
       throw errors.notFound('Список не найден');
@@ -248,11 +247,9 @@ export class ListsService {
       throw errors.forbidden('Нет прав на публикацию списка');
     }
 
-    const code = jwt.sign(
-      { listId: Number(listId), owner: String(userId) },
-      this.jwtSecret,
-      { expiresIn: '365d' }
-    );
+    const code = jwt.sign({ listId: Number(listId), owner: String(userId) }, this.jwtSecret, {
+      expiresIn: '365d',
+    });
 
     return code;
   }
@@ -315,10 +312,7 @@ export class ListsService {
       throw errors.badRequest('Некорректный код');
     }
 
-    const src = await this.pool.query(
-      'SELECT id, title FROM lists WHERE id = $1',
-      [listId]
-    );
+    const src = await this.pool.query('SELECT id, title FROM lists WHERE id = $1', [listId]);
 
     if (src.rowCount === 0) {
       throw errors.notFound('Список не найден');
@@ -352,4 +346,3 @@ export class ListsService {
     return { id: newListId, title: finalTitle };
   }
 }
-

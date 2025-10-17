@@ -91,7 +91,7 @@ export function createPublicPersonRoutes(
           'validation_error',
           parsed.error.flatten()
         );
-      
+
       const {
         id,
         name,
@@ -187,13 +187,9 @@ export function createPublicPersonRoutes(
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const parsed = LifePeriodsSchema.safeParse(req.body || {});
-      
+
       if (!parsed.success) {
-        throw errors.badRequest(
-          'Некорректные периоды',
-          'validation_error',
-          parsed.error.flatten()
-        );
+        throw errors.badRequest('Некорректные периоды', 'validation_error', parsed.error.flatten());
       }
 
       const periods: Array<{
@@ -206,7 +202,7 @@ export function createPublicPersonRoutes(
       const role = (req as any).user?.role || 'user';
 
       await personsService.replacePersonLifePeriods(id, periods, userId, role);
-      
+
       res.json({ success: true });
     })
   );

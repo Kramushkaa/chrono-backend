@@ -3,7 +3,17 @@
  * Устраняет дублирование в periodsRoutes и achievementsRoutes
  */
 
-export type SqlOperator = '=' | '>' | '<' | '>=' | '<=' | 'LIKE' | 'ILIKE' | 'IN' | 'IS NULL' | 'IS NOT NULL';
+export type SqlOperator =
+  | '='
+  | '>'
+  | '<'
+  | '>='
+  | '<='
+  | 'LIKE'
+  | 'ILIKE'
+  | 'IN'
+  | 'IS NULL'
+  | 'IS NOT NULL';
 
 interface FilterCondition {
   field: string;
@@ -47,7 +57,7 @@ export class QueryBuilder {
       value: `%${term}%`,
       operator: '=' as SqlOperator, // Трюк: operator не используется для этого типа
     });
-    
+
     return this;
   }
 
@@ -57,7 +67,11 @@ export class QueryBuilder {
    * @param value - Числовое значение
    * @param operator - Оператор сравнения
    */
-  addNumericFilter(field: string, value: string | number | undefined, operator: SqlOperator = '='): this {
+  addNumericFilter(
+    field: string,
+    value: string | number | undefined,
+    operator: SqlOperator = '='
+  ): this {
     if (value === undefined || value === null || value === '') {
       return this;
     }
@@ -148,7 +162,7 @@ export function buildFilteredQuery(
 
   const { whereClause, params } = builder.build();
   const sql = baseQuery.replace(/WHERE 1=1/, `WHERE ${whereClause}`);
-  
+
   return { sql, params };
 }
 

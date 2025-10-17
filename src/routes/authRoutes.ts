@@ -79,14 +79,16 @@ export function createAuthRoutes(authController: AuthController): Router {
     await authController.checkAuth(req, res, next);
   });
 
-  // Маршруты для администраторов
-  // NOTE: Admin user management endpoints are stubbed for future implementation
-  // Planned features: user CRUD, roles, permissions, statistics
-  // Implementation planned when admin panel is developed
+  // ============================================================================
+  // Admin Routes - User Management (Not Implemented Yet)
+  // ============================================================================
+  // NOTE: These endpoints are placeholders for future admin panel functionality
+  // Will be implemented when UserService and admin UI are developed
+  // All endpoints return 501 Not Implemented status
+  // ============================================================================
 
   // Получение списка пользователей (только для админов)
   router.get('/users', authenticateToken, requireRoleMiddleware(['admin']), async (req, res) => {
-    // TODO: Реализовать получение списка пользователей
     res.status(501).json({
       success: false,
       error: 'Not implemented',
@@ -100,7 +102,6 @@ export function createAuthRoutes(authController: AuthController): Router {
     authenticateToken,
     requireRoleMiddleware(['admin']),
     async (req, res) => {
-      // TODO: Реализовать получение пользователя по ID
       res.status(501).json({
         success: false,
         error: 'Not implemented',
@@ -115,7 +116,6 @@ export function createAuthRoutes(authController: AuthController): Router {
     authenticateToken,
     requireRoleMiddleware(['admin']),
     async (req, res) => {
-      // TODO: Реализовать обновление пользователя
       res.status(501).json({
         success: false,
         error: 'Not implemented',
@@ -130,7 +130,6 @@ export function createAuthRoutes(authController: AuthController): Router {
     authenticateToken,
     requireRoleMiddleware(['admin']),
     async (req, res) => {
-      // TODO: Реализовать удаление пользователя
       res.status(501).json({
         success: false,
         error: 'Not implemented',
@@ -139,11 +138,12 @@ export function createAuthRoutes(authController: AuthController): Router {
     }
   );
 
-  // Маршруты для работы с ролями и разрешениями
+  // ============================================================================
+  // Admin Routes - Roles & Permissions (Not Implemented Yet)
+  // ============================================================================
 
   // Получение списка ролей (только для админов)
   router.get('/roles', authenticateToken, requireRoleMiddleware(['admin']), async (req, res) => {
-    // TODO: Реализовать получение списка ролей
     res.status(501).json({
       success: false,
       error: 'Not implemented',
@@ -157,7 +157,6 @@ export function createAuthRoutes(authController: AuthController): Router {
     authenticateToken,
     requireRoleMiddleware(['admin']),
     async (req, res) => {
-      // TODO: Реализовать получение списка разрешений
       res.status(501).json({
         success: false,
         error: 'Not implemented',
@@ -166,7 +165,9 @@ export function createAuthRoutes(authController: AuthController): Router {
     }
   );
 
-  // Маршруты для модераторов
+  // ============================================================================
+  // Moderator/Admin Routes - Statistics (Not Implemented Yet)
+  // ============================================================================
 
   // Получение статистики пользователей (для модераторов и админов)
   router.get(
@@ -174,7 +175,6 @@ export function createAuthRoutes(authController: AuthController): Router {
     authenticateToken,
     requireRoleMiddleware(['moderator', 'admin']),
     async (req, res) => {
-      // TODO: Реализовать получение статистики пользователей
       res.status(501).json({
         success: false,
         error: 'Not implemented',
@@ -183,7 +183,9 @@ export function createAuthRoutes(authController: AuthController): Router {
     }
   );
 
-  // Маршруты для проверки разрешений
+  // ============================================================================
+  // Permission Check Routes (Not Implemented Yet)
+  // ============================================================================
 
   // Проверка разрешения пользователя
   router.get('/check-permission/:permission', authenticateToken, async (req, res) => {
@@ -199,7 +201,6 @@ export function createAuthRoutes(authController: AuthController): Router {
       return;
     }
 
-    // TODO: Реализовать проверку разрешений через базу данных
     res.status(501).json({
       success: false,
       error: 'Not implemented',

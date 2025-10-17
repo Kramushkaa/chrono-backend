@@ -85,7 +85,15 @@ export class AchievementsService {
          WHERE person_id IS NOT NULL
          DO UPDATE SET wikipedia_url = EXCLUDED.wikipedia_url, image_url = EXCLUDED.image_url
          RETURNING *`,
-        [personId, countryId ?? null, year, description, wikipediaUrl ?? null, imageUrl ?? null, user.sub]
+        [
+          personId,
+          countryId ?? null,
+          year,
+          description,
+          wikipediaUrl ?? null,
+          imageUrl ?? null,
+          user.sub,
+        ]
       );
     } else {
       // Черновики и pending - без ON CONFLICT

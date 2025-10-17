@@ -1,5 +1,10 @@
 import { PersonsService } from '../../services/personsService';
-import { createMockPool, createMockTelegramService, createMockUser, createQueryResult } from '../mocks';
+import {
+  createMockPool,
+  createMockTelegramService,
+  createMockUser,
+  createQueryResult,
+} from '../mocks';
 import { errors } from '../../utils/errors';
 
 describe('PersonsService', () => {
@@ -120,17 +125,13 @@ describe('PersonsService', () => {
         status: 'approved',
       };
 
-      mockPool.query
-        .mockResolvedValueOnce(createQueryResult([personRow]))
-        .mockResolvedValueOnce(
-          createQueryResult([
-            {
-              periods: [
-                { startYear: 1900, endYear: 1950, countryId: 1, countryName: 'USA' },
-              ],
-            },
-          ])
-        );
+      mockPool.query.mockResolvedValueOnce(createQueryResult([personRow])).mockResolvedValueOnce(
+        createQueryResult([
+          {
+            periods: [{ startYear: 1900, endYear: 1950, countryId: 1, countryName: 'USA' }],
+          },
+        ])
+      );
 
       const result = await personsService.getPersonById('test-id');
 
@@ -165,9 +166,7 @@ describe('PersonsService', () => {
         deathYear: 2000,
         category: 'Scientist',
         description: 'Description',
-        lifePeriods: [
-          { countryId: 1, start: 1900, end: 2000 },
-        ],
+        lifePeriods: [{ countryId: 1, start: 1900, end: 2000 }],
       };
 
       const user = createMockUser();
@@ -210,9 +209,9 @@ describe('PersonsService', () => {
 
       const user = createMockUser();
 
-      await expect(
-        personsService.proposePersonWithLifePeriods(data, user, false)
-      ).rejects.toThrow('Database error');
+      await expect(personsService.proposePersonWithLifePeriods(data, user, false)).rejects.toThrow(
+        'Database error'
+      );
 
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
       expect(mockClient.release).toHaveBeenCalled();
@@ -231,9 +230,9 @@ describe('PersonsService', () => {
 
       const user = createMockUser();
 
-      await expect(
-        personsService.proposePersonWithLifePeriods(data, user, false)
-      ).rejects.toThrow('Для отправки на модерацию необходимо указать хотя бы один период жизни');
+      await expect(personsService.proposePersonWithLifePeriods(data, user, false)).rejects.toThrow(
+        'Для отправки на модерацию необходимо указать хотя бы один период жизни'
+      );
     });
 
     it('should validate life periods are within birth/death years', async () => {
@@ -259,9 +258,9 @@ describe('PersonsService', () => {
 
       const user = createMockUser();
 
-      await expect(
-        personsService.proposePersonWithLifePeriods(data, user, false)
-      ).rejects.toThrow('Периоды должны быть в пределах годов жизни');
+      await expect(personsService.proposePersonWithLifePeriods(data, user, false)).rejects.toThrow(
+        'Периоды должны быть в пределах годов жизни'
+      );
 
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
@@ -598,10 +597,12 @@ describe('PersonsService', () => {
       const result = await personsService.reviewPerson('test-id', 'approve', 1, 'Good');
 
       expect(result.status).toBe('approved');
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE persons'),
-        ['approved', 1, 'Good', 'test-id']
-      );
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE persons'), [
+        'approved',
+        1,
+        'Good',
+        'test-id',
+      ]);
     });
 
     it('should throw error if person is not pending', async () => {
@@ -614,9 +615,9 @@ describe('PersonsService', () => {
         ])
       );
 
-      await expect(
-        personsService.reviewPerson('test-id', 'approve', 1)
-      ).rejects.toThrow('Можно модерировать только личности в статусе pending');
+      await expect(personsService.reviewPerson('test-id', 'approve', 1)).rejects.toThrow(
+        'Можно модерировать только личности в статусе pending'
+      );
     });
   });
 
@@ -654,4 +655,3 @@ describe('PersonsService', () => {
     });
   });
 });
-

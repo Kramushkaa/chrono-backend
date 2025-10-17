@@ -7,7 +7,11 @@ import { CountResult } from '../types/database';
 import { TelegramService } from '../services/telegramService';
 import { AchievementsService } from '../services/achievementsService';
 
-export function createAchievementsRoutes(pool: Pool, telegramService: TelegramService, achievementsService: AchievementsService): Router {
+export function createAchievementsRoutes(
+  pool: Pool,
+  telegramService: TelegramService,
+  achievementsService: AchievementsService
+): Router {
   const router = Router();
 
   // Admin: pending achievements
@@ -19,7 +23,7 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
       const limit = req.query.limit as string | undefined;
       const offset = req.query.offset as string | undefined;
       const countOnly = String((req.query.count as string) || 'false') === 'true';
-      
+
       if (countOnly) {
         const count = await achievementsService.getPendingCount();
         res.json({ success: true, data: { count } });
@@ -42,7 +46,7 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
       const limit = req.query.limit as string | undefined;
       const offset = req.query.offset as string | undefined;
       const countOnly = String((req.query.count as string) || 'false') === 'true';
-      
+
       if (countOnly) {
         const count = await achievementsService.getUserAchievementsCount(req.user!.sub);
         res.json({ success: true, data: { count } });
@@ -104,7 +108,7 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
           'validation_error',
           parsed.error.flatten()
         );
-      
+
       const { year, description, wikipedia_url, image_url, saveAsDraft = false } = parsed.data;
 
       const result = await achievementsService.createAchievement(
@@ -136,16 +140,12 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
       const { id } = req.params;
       const { year, description, wikipedia_url, image_url } = req.body || {};
 
-      const result = await achievementsService.updateAchievement(
-        parseInt(id),
-        req.user!.sub,
-        {
-          year,
-          description,
-          wikipediaUrl: wikipedia_url,
-          imageUrl: image_url,
-        }
-      );
+      const result = await achievementsService.updateAchievement(parseInt(id), req.user!.sub, {
+        year,
+        description,
+        wikipediaUrl: wikipedia_url,
+        imageUrl: image_url,
+      });
 
       res.json({ success: true, data: result });
     })
@@ -252,7 +252,7 @@ export function createAchievementsRoutes(pool: Pool, telegramService: TelegramSe
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const { action, comment } = req.body || {};
-      
+
       if (!action || (action !== 'approve' && action !== 'reject')) {
         throw errors.badRequest('action должен быть approve или reject');
       }

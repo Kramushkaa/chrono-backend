@@ -63,17 +63,17 @@ export function buildInsertWithStatus(
 ): { sql: string; values: any[] } {
   const status = determineContentStatus(user, saveAsDraft);
   const allFields = { ...fields, status, created_by: user.sub };
-  
+
   const columns = Object.keys(allFields);
   const placeholders = columns.map((_, idx) => `$${idx + 1}`);
   const values = Object.values(allFields);
-  
+
   const sql = `
     INSERT INTO ${table} (${columns.join(', ')})
     VALUES (${placeholders.join(', ')})
     RETURNING *
   `;
-  
+
   return { sql, values };
 }
 

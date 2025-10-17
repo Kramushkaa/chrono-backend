@@ -615,11 +615,23 @@ export class PersonsService {
     user: User,
     saveAsDraft: boolean
   ): Promise<void> {
-    const { id, name, birthYear, deathYear, category, description, imageUrl, wikiLink, lifePeriods } = data;
+    const {
+      id,
+      name,
+      birthYear,
+      deathYear,
+      category,
+      description,
+      imageUrl,
+      wikiLink,
+      lifePeriods,
+    } = data;
 
     // Валидация: для не-черновиков требуются периоды
     if (!saveAsDraft && (!lifePeriods || lifePeriods.length === 0)) {
-      throw errors.badRequest('Для отправки на модерацию необходимо указать хотя бы один период жизни');
+      throw errors.badRequest(
+        'Для отправки на модерацию необходимо указать хотя бы один период жизни'
+      );
     }
 
     const status = determineContentStatus(user, saveAsDraft);
@@ -663,11 +675,7 @@ export class PersonsService {
           if (!Number.isInteger(p.countryId) || p.countryId <= 0) {
             throw errors.badRequest('Некорректная страна');
           }
-          if (
-            !Number.isInteger(p.start) ||
-            !Number.isInteger(p.end) ||
-            p.start > p.end
-          ) {
+          if (!Number.isInteger(p.start) || !Number.isInteger(p.end) || p.start > p.end) {
             throw errors.badRequest('Некорректный период проживания');
           }
           if (p.start < birthYear || p.end > deathYear) {
@@ -676,15 +684,12 @@ export class PersonsService {
         }
 
         // Сортируем по году начала
-        const sortedPeriods = [...lifePeriods].sort(
-          (a, b) => a.start - b.start || a.end - b.end
-        );
+        const sortedPeriods = [...lifePeriods].sort((a, b) => a.start - b.start || a.end - b.end);
 
         // Удаляем существующие периоды
-        await client.query(
-          `DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`,
-          [id]
-        );
+        await client.query(`DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`, [
+          id,
+        ]);
 
         // Вставляем новые периоды
         for (const p of sortedPeriods) {
@@ -781,11 +786,7 @@ export class PersonsService {
           if (!Number.isInteger(p.countryId) || p.countryId <= 0) {
             throw errors.badRequest('Некорректная страна');
           }
-          if (
-            !Number.isInteger(p.start) ||
-            !Number.isInteger(p.end) ||
-            p.start > p.end
-          ) {
+          if (!Number.isInteger(p.start) || !Number.isInteger(p.end) || p.start > p.end) {
             throw errors.badRequest('Некорректный период проживания');
           }
           if (p.start < currentBirthYear || p.end > currentDeathYear) {
@@ -794,15 +795,12 @@ export class PersonsService {
         }
 
         // Сортируем по году начала
-        const sortedPeriods = [...lifePeriods].sort(
-          (a, b) => a.start - b.start || a.end - b.end
-        );
+        const sortedPeriods = [...lifePeriods].sort((a, b) => a.start - b.start || a.end - b.end);
 
         // Удаляем существующие периоды
-        await client.query(
-          `DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`,
-          [personId]
-        );
+        await client.query(`DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`, [
+          personId,
+        ]);
 
         // Вставляем новые периоды (как черновики)
         for (const p of sortedPeriods) {
@@ -1092,12 +1090,12 @@ export class PersonsService {
     for (let i = 1; i < norm.length; i++) {
       const prev = norm[i - 1];
       const cur = norm[i];
-      
+
       // Запрещаем пересечения
       if (cur.start_year < prev.end_year) {
         throw errors.badRequest('Периоды стран не должны пересекаться');
       }
-      
+
       // Запрещаем пропуски
       if (cur.start_year > prev.end_year + 1) {
         throw errors.badRequest('Периоды стран должны покрывать все годы жизни без пропусков');
@@ -1111,10 +1109,9 @@ export class PersonsService {
       const periodStatus = role === 'admin' || role === 'moderator' ? 'approved' : 'pending';
 
       // Удаляем старые периоды
-      await client.query(
-        `DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`,
-        [personId]
-      );
+      await client.query(`DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`, [
+        personId,
+      ]);
 
       // Вставляем новые
       for (const p of norm) {

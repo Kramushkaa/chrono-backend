@@ -1,6 +1,6 @@
 /**
  * Job для очистки истекших quiz sessions
- * 
+ *
  * Использование:
  * 1. Вызывать из server.ts при старте: await cleanupExpiredQuizSessions(pool)
  * 2. Настроить в cron (например, каждые 6 часов): cron pattern 0 star-slash-6 star star star
@@ -29,7 +29,7 @@ export async function cleanupExpiredQuizSessions(pool: Pool): Promise<CleanupRes
     `);
 
     const deletedCount = result.rowCount || 0;
-    
+
     if (deletedCount > 0) {
       console.log(`🧹 [Cleanup] Удалено просроченных quiz sessions: ${deletedCount}`);
     }
@@ -63,7 +63,7 @@ export async function cleanupOldFinishedQuizSessions(
     `);
 
     const deletedCount = result.rowCount || 0;
-    
+
     if (deletedCount > 0) {
       console.log(`🧹 [Cleanup] Удалено старых завершённых quiz sessions: ${deletedCount}`);
     }
@@ -90,7 +90,7 @@ export async function runQuizSessionsCleanup(
   daysOld: number = 90
 ): Promise<{ expired: CleanupResult; oldFinished?: CleanupResult }> {
   const expired = await cleanupExpiredQuizSessions(pool);
-  
+
   let oldFinished: CleanupResult | undefined;
   if (cleanOldFinished) {
     oldFinished = await cleanupOldFinishedQuizSessions(pool, daysOld);
@@ -98,4 +98,3 @@ export async function runQuizSessionsCleanup(
 
   return { expired, oldFinished };
 }
-

@@ -127,7 +127,16 @@ export class PeriodsService {
       `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [personId, startYear, endYear, periodType, countryId ?? null, comment ?? null, status, user.sub]
+      [
+        personId,
+        startYear,
+        endYear,
+        periodType,
+        countryId ?? null,
+        comment ?? null,
+        status,
+        user.sub,
+      ]
     );
 
     // Telegram уведомление (если не черновик)
@@ -233,10 +242,7 @@ export class PeriodsService {
   /**
    * Получение pending периодов (для модераторов)
    */
-  async getPendingPeriods(
-    limit?: number,
-    offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  async getPendingPeriods(limit?: number, offset?: number): Promise<{ data: any[]; meta: any }> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -279,10 +285,9 @@ export class PeriodsService {
     reviewerId: number,
     comment?: string
   ): Promise<any> {
-    const checkRes = await this.pool.query(
-      'SELECT id, status FROM periods WHERE id = $1',
-      [periodId]
-    );
+    const checkRes = await this.pool.query('SELECT id, status FROM periods WHERE id = $1', [
+      periodId,
+    ]);
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Период не найден');
@@ -343,7 +348,13 @@ export class PeriodsService {
 
     // Проверка пересечений с исключением текущего периода
     const newPeriodType = updates.periodType ?? period.period_type;
-    await this.validatePeriodOverlap(newPersonId, newPeriodType, newStartYear, newEndYear, periodId);
+    await this.validatePeriodOverlap(
+      newPersonId,
+      newPeriodType,
+      newStartYear,
+      newEndYear,
+      periodId
+    );
 
     // Динамически строим UPDATE
     const fields: string[] = [];
@@ -390,10 +401,9 @@ export class PeriodsService {
    * Отправка черновика на модерацию
    */
   async submitDraft(periodId: number, userId: number): Promise<any> {
-    const checkRes = await this.pool.query(
-      'SELECT created_by, status FROM periods WHERE id = $1',
-      [periodId]
-    );
+    const checkRes = await this.pool.query('SELECT created_by, status FROM periods WHERE id = $1', [
+      periodId,
+    ]);
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Период не найден');
@@ -473,10 +483,9 @@ export class PeriodsService {
    * Удаление периода (только свои черновики)
    */
   async deletePeriod(periodId: number, userId: number): Promise<void> {
-    const checkRes = await this.pool.query(
-      'SELECT created_by, status FROM periods WHERE id = $1',
-      [periodId]
-    );
+    const checkRes = await this.pool.query('SELECT created_by, status FROM periods WHERE id = $1', [
+      periodId,
+    ]);
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Период не найден');
@@ -516,4 +525,3 @@ export class PeriodsService {
     return result.rows[0]?.cnt || 0;
   }
 }
-

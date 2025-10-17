@@ -28,3 +28,4 @@ COMMENT ON INDEX idx_quiz_attempts_shared_leaderboard IS 'Optimizes shared quiz 
 COMMENT ON INDEX idx_quiz_attempts_global_leaderboard IS 'Optimizes global leaderboard queries by rating';
 COMMENT ON INDEX idx_quiz_attempts_user_history IS 'Optimizes user quiz history queries';
 
+

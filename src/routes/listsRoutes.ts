@@ -94,12 +94,7 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
         throw errors.badRequest('Некорректный тип элемента');
       }
 
-      const result = await listsService.addListItem(
-        Number(listId),
-        userId,
-        item_type,
-        itemId
-      );
+      const result = await listsService.addListItem(Number(listId), userId, item_type, itemId);
 
       if (result.message === 'already_exists') {
         res.status(200).json({ success: true, data: result.data, message: 'already_exists' });

@@ -5,14 +5,16 @@ import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
  */
 export const createMockPool = (): jest.Mocked<Pool> => {
   const mockClient: Partial<jest.Mocked<PoolClient>> = {
-    query: jest.fn(),
+    query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     release: jest.fn(),
   };
 
   const mockPool: Partial<jest.Mocked<Pool>> = {
-    query: jest.fn(),
+    query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     connect: jest.fn().mockResolvedValue(mockClient),
-    end: jest.fn(),
+    end: jest.fn().mockResolvedValue(undefined),
+    on: jest.fn(),
+    removeListener: jest.fn(),
   };
 
   return mockPool as jest.Mocked<Pool>;
@@ -52,4 +54,3 @@ export const createMockUser = (overrides?: Partial<any>) => ({
   role: 'user',
   ...overrides,
 });
-

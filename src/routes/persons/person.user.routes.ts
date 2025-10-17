@@ -52,7 +52,7 @@ export function createUserPersonRoutes(
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const parsed = PersonEditPayloadSchema.safeParse(req.body || {});
-      
+
       if (!parsed.success) {
         throw errors.badRequest(
           'Некорректные данные правки',
@@ -63,16 +63,17 @@ export function createUserPersonRoutes(
 
       const userId = (req as any).user!.sub;
       const payload = sanitizePayload(parsed.data);
-      
+
       // Преобразуем периоды из frontend формата
       const rawLifePeriods = req.body?.lifePeriods || [];
-      const lifePeriods = rawLifePeriods.length > 0 
-        ? rawLifePeriods.map((lp: any) => ({
-            countryId: Number(lp.countryId),
-            start: Number(lp.start),
-            end: Number(lp.end),
-          }))
-        : undefined;
+      const lifePeriods =
+        rawLifePeriods.length > 0
+          ? rawLifePeriods.map((lp: any) => ({
+              countryId: Number(lp.countryId),
+              start: Number(lp.start),
+              end: Number(lp.end),
+            }))
+          : undefined;
 
       await personsService.updatePersonWithLifePeriods(id, userId, payload, lifePeriods);
 

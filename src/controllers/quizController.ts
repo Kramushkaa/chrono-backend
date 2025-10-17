@@ -495,7 +495,7 @@ export class QuizController {
         return;
       }
 
-      // Prepare detailed answers with full question data
+      // Prepare detailed answers with full question data (including data field)
       const detailedAnswers = result.attempt.questions?.map((question, index) => {
         const userAnswer = result.attempt.answers?.find(a => a.questionId === question.id);
         return {
@@ -507,6 +507,7 @@ export class QuizController {
           isCorrect: userAnswer?.isCorrect || false,
           timeSpent: userAnswer?.timeSpent || 0,
           explanation: question.explanation,
+          data: question.data, // Include full question data for rendering
         };
       }) || [];
 
