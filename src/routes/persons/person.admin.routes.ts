@@ -115,7 +115,7 @@ export function createAdminPersonRoutes(
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const { action, comment } = req.body || {};
-      
+
       if (!action || (action !== 'approve' && action !== 'reject')) {
         throw errors.badRequest('action должен быть approve или reject');
       }

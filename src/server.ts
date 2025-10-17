@@ -8,6 +8,7 @@ import { QuizService } from './services/quizService';
 import { AchievementsService } from './services/achievementsService';
 import { PeriodsService } from './services/periodsService';
 import { PersonsService } from './services/personsService';
+import { ListsService } from './services/listsService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler } from './middleware/auth';
@@ -35,6 +36,7 @@ const quizService = new QuizService(pool);
 const achievementsService = new AchievementsService(pool, telegramService);
 const periodsService = new PeriodsService(pool, telegramService);
 const personsService = new PersonsService(pool, telegramService);
+const listsService = new ListsService(pool);
 const authController = new AuthController(authService, telegramService);
 
 // Создание Express приложения
@@ -121,7 +123,7 @@ app.use('/api', createPeriodsRoutes(pool, telegramService, periodsService));
 app.use('/api', createMetaRoutes(pool));
 
 // Lists routes
-app.use('/api', createListsRoutes(pool));
+app.use('/api', createListsRoutes(pool, listsService));
 
 // Quiz routes
 app.use('/api', createQuizRoutes(pool));

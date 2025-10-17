@@ -14,9 +14,10 @@ export function createPersonRoutes(
   const router = Router();
 
   // Combine all person routes
+  // User routes must be registered before public routes to avoid /persons/mine being matched by /persons/:id
   router.use(createAdminPersonRoutes(pool, telegramService, personsService));
-  router.use(createPublicPersonRoutes(pool, telegramService, personsService));
   router.use(createUserPersonRoutes(pool, telegramService, personsService));
+  router.use(createPublicPersonRoutes(pool, telegramService, personsService));
 
   return router;
 }
