@@ -63,9 +63,9 @@ describe('PeriodsService', () => {
     it('should throw error when person not found', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(
-        periodsService.validatePeriodYears(1950, 1970, 'nonexistent')
-      ).rejects.toThrow('Личность не найдена');
+      await expect(periodsService.validatePeriodYears(1950, 1970, 'nonexistent')).rejects.toThrow(
+        'Личность не найдена'
+      );
     });
 
     it('should throw error when period starts before birth year', async () => {
@@ -111,10 +111,12 @@ describe('PeriodsService', () => {
         periodsService.validatePeriodOverlap('person-1', 'life', 1950, 1970)
       ).resolves.not.toThrow();
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('int4range'),
-        ['person-1', 'life', 1950, 1970]
-      );
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('int4range'), [
+        'person-1',
+        'life',
+        1950,
+        1970,
+      ]);
     });
 
     it('should throw error when overlap detected', async () => {
@@ -138,10 +140,13 @@ describe('PeriodsService', () => {
 
       await periodsService.validatePeriodOverlap('person-1', 'life', 1950, 1970, 5);
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('AND id != $5'),
-        ['person-1', 'life', 1950, 1970, 5]
-      );
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('AND id != $5'), [
+        'person-1',
+        'life',
+        1950,
+        1970,
+        5,
+      ]);
     });
   });
 
@@ -737,10 +742,9 @@ describe('PeriodsService', () => {
       const result = await periodsService.getPeriodsByPerson('person-1');
 
       expect(result).toHaveLength(2);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE person_id = $1'),
-        ['person-1']
-      );
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('WHERE person_id = $1'), [
+        'person-1',
+      ]);
     });
   });
 
@@ -957,7 +961,9 @@ describe('PeriodsService', () => {
       const count = await periodsService.getPendingCount();
 
       expect(count).toBe(8);
-      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining("WHERE status = 'pending'"));
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining("WHERE status = 'pending'")
+      );
     });
 
     it('should return 0 when no pending periods', async () => {
@@ -969,4 +975,3 @@ describe('PeriodsService', () => {
     });
   });
 });
-

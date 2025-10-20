@@ -447,12 +447,8 @@ describe('Auth Middleware', () => {
 
       logRequest(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('GET')
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('/api/persons')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('GET'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('/api/persons'));
       expect(mockNext).toHaveBeenCalledWith();
     });
 
@@ -536,4 +532,3 @@ describe('Auth Middleware', () => {
     });
   });
 });
-

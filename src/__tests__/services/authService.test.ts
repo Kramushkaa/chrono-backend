@@ -200,7 +200,9 @@ describe('AuthService', () => {
     it('should throw error when user not found', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(authService.loginUser(validLoginData)).rejects.toThrow('Неверный email или пароль');
+      await expect(authService.loginUser(validLoginData)).rejects.toThrow(
+        'Неверный email или пароль'
+      );
     });
 
     it('should throw error for wrong password', async () => {
@@ -217,7 +219,9 @@ describe('AuthService', () => {
         ])
       );
 
-      await expect(authService.loginUser(validLoginData)).rejects.toThrow('Неверный email или пароль');
+      await expect(authService.loginUser(validLoginData)).rejects.toThrow(
+        'Неверный email или пароль'
+      );
     });
 
     it('should throw error when account is blocked', async () => {
@@ -594,7 +598,9 @@ describe('AuthService', () => {
         )
         .mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(authService.resetPassword('valid-token', 'NewPassword123!')).resolves.not.toThrow();
+      await expect(
+        authService.resetPassword('valid-token', 'NewPassword123!')
+      ).resolves.not.toThrow();
 
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE users'),
@@ -736,7 +742,9 @@ describe('AuthService', () => {
     it('should throw error when user not found', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(authService.resendEmailVerification(999)).rejects.toThrow('Пользователь не найден');
+      await expect(authService.resendEmailVerification(999)).rejects.toThrow(
+        'Пользователь не найден'
+      );
     });
 
     it('should allow resending after token expiration', async () => {
@@ -761,4 +769,3 @@ describe('AuthService', () => {
     });
   });
 });
-

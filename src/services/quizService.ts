@@ -196,7 +196,7 @@ export class QuizService {
     questions?: QuizQuestion[]
   ): Promise<{ attemptId: number; ratingPoints: number }> {
     // Prepare detailed answers for rating calculation (without questionId and answer)
-    const answersForRating = detailedAnswers?.map((a) => ({
+    const answersForRating = detailedAnswers?.map(a => ({
       isCorrect: a.isCorrect,
       timeSpent: a.timeSpent,
       questionType: a.questionType,
@@ -617,10 +617,9 @@ export class QuizService {
     const attemptId = attemptResult.rows[0].id;
 
     // Mark session as finished (instead of deleting)
-    await this.pool.query(
-      'UPDATE quiz_sessions SET finished_at = NOW() WHERE session_token = $1',
-      [sessionToken]
-    );
+    await this.pool.query('UPDATE quiz_sessions SET finished_at = NOW() WHERE session_token = $1', [
+      sessionToken,
+    ]);
 
     // Prepare detailed results
     const detailedResults: DetailedQuestionResult[] = questions.map(question => {
@@ -696,7 +695,10 @@ export class QuizService {
   /**
    * Get detailed attempt by ID (for viewing history of any quiz type)
    */
-  async getAttemptDetail(attemptId: number, userId: number): Promise<{
+  async getAttemptDetail(
+    attemptId: number,
+    userId: number
+  ): Promise<{
     attempt: QuizAttemptDB;
     quizTitle?: string;
   } | null> {

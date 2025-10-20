@@ -1,6 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
-import { authenticateToken, requireRoleMiddleware, requireVerifiedEmail, rateLimit } from '../middleware/auth';
+import {
+  authenticateToken,
+  requireRoleMiddleware,
+  requireVerifiedEmail,
+  rateLimit,
+} from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
 import { parseLimitOffset, paginateRows } from '../utils/api';
 import { CountResult } from '../types/database';

@@ -1,10 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController';
-import {
-  authenticateToken,
-  requireRoleMiddleware,
-  rateLimit,
-} from '../middleware/auth';
+import { authenticateToken, requireRoleMiddleware, rateLimit } from '../middleware/auth';
 
 export function createAuthRoutes(authController: AuthController): Router {
   const router = Router();
@@ -24,7 +20,9 @@ export function createAuthRoutes(authController: AuthController): Router {
   router.post('/refresh', (req, res, next) => authController.refreshToken(req, res, next));
 
   // Запрос на восстановление пароля
-  router.post('/forgot-password', (req, res, next) => authController.forgotPassword(req, res, next));
+  router.post('/forgot-password', (req, res, next) =>
+    authController.forgotPassword(req, res, next)
+  );
 
   // Сброс пароля
   router.post('/reset-password', (req, res, next) => authController.resetPassword(req, res, next));
@@ -34,24 +32,36 @@ export function createAuthRoutes(authController: AuthController): Router {
   router.get('/verify-email', (req, res, next) => authController.verifyEmail(req, res, next));
 
   // Повторная отправка письма подтверждения
-  router.post('/resend-verification', authenticateToken, (req, res, next) => authController.resendVerification(req, res, next));
+  router.post('/resend-verification', authenticateToken, (req, res, next) =>
+    authController.resendVerification(req, res, next)
+  );
 
   // Защищенные маршруты (требуют аутентификации)
 
   // Выход пользователя
-  router.post('/logout', authenticateToken, (req, res, next) => authController.logout(req, res, next));
+  router.post('/logout', authenticateToken, (req, res, next) =>
+    authController.logout(req, res, next)
+  );
 
   // Получение профиля пользователя
-  router.get('/profile', authenticateToken, (req, res, next) => authController.getProfile(req, res, next));
+  router.get('/profile', authenticateToken, (req, res, next) =>
+    authController.getProfile(req, res, next)
+  );
 
   // Обновление профиля пользователя
-  router.put('/profile', authenticateToken, (req, res, next) => authController.updateProfile(req, res, next));
+  router.put('/profile', authenticateToken, (req, res, next) =>
+    authController.updateProfile(req, res, next)
+  );
 
   // Изменение пароля
-  router.put('/change-password', authenticateToken, (req, res, next) => authController.changePassword(req, res, next));
+  router.put('/change-password', authenticateToken, (req, res, next) =>
+    authController.changePassword(req, res, next)
+  );
 
   // Проверка статуса аутентификации
-  router.get('/check', authenticateToken, (req, res, next) => authController.checkAuth(req, res, next));
+  router.get('/check', authenticateToken, (req, res, next) =>
+    authController.checkAuth(req, res, next)
+  );
 
   // ============================================================================
   // Admin Routes - User Management (Not Implemented Yet)

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PersonsService } from '../../services/personsService';
 import {
   createMockPool,
@@ -5,7 +6,11 @@ import {
   createMockUser,
   createQueryResult,
 } from '../mocks';
-import { errors } from '../../utils/errors';
+import { errors as _errors } from '../../utils/errors';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Pool } from 'pg';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { TelegramService } from '../../services/telegramService';
 
 describe('PersonsService', () => {
   let personsService: PersonsService;
@@ -684,7 +689,8 @@ describe('PersonsService', () => {
       const dataWithoutPeriods = { ...personData, lifePeriods: [] };
 
       const mockClient = {
-        query: jest.fn()
+        query: jest
+          .fn()
           .mockResolvedValueOnce(createQueryResult([])) // INSERT person
           .mockResolvedValue(createQueryResult([])),
         release: jest.fn(),
@@ -751,7 +757,8 @@ describe('PersonsService', () => {
       };
 
       const mockClient = {
-        query: jest.fn()
+        query: jest
+          .fn()
           .mockResolvedValueOnce(createQueryResult([])) // INSERT person
           .mockResolvedValueOnce(createQueryResult([])) // DELETE periods
           .mockResolvedValueOnce(createQueryResult([])) // INSERT period 1
@@ -780,7 +787,8 @@ describe('PersonsService', () => {
   describe('revertPersonToDraft - edge cases', () => {
     it('should successfully revert pending person to draft', async () => {
       const mockClient = {
-        query: jest.fn()
+        query: jest
+          .fn()
           .mockResolvedValueOnce(createQueryResult([])) // BEGIN
           .mockResolvedValueOnce(createQueryResult([])) // UPDATE persons
           .mockResolvedValueOnce(createQueryResult([])), // UPDATE periods
@@ -913,7 +921,10 @@ describe('PersonsService', () => {
       );
 
       expect(result.data.length).toBeGreaterThan(0);
-      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('WHERE'), expect.any(Array));
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE'),
+        expect.any(Array)
+      );
     });
 
     it('should handle search query', async () => {
@@ -978,10 +989,9 @@ describe('PersonsService', () => {
       const result = await personsService.getPersonsByIds(['person-1', 'person-2', 'person-3']);
 
       expect(result).toHaveLength(3);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('generate_series'),
-        [['person-1', 'person-2', 'person-3']]
-      );
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('generate_series'), [
+        ['person-1', 'person-2', 'person-3'],
+      ]);
     });
 
     it('should return empty array for empty IDs', async () => {

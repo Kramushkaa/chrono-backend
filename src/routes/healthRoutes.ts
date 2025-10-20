@@ -80,4 +80,3 @@ export function createHealthRoutes(pool: Pool): Router {
 
   return router;
 }
-

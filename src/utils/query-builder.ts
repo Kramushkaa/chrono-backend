@@ -165,4 +165,3 @@ export function buildFilteredQuery(
 
   return { sql, params };
 }
-

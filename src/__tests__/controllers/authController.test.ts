@@ -96,11 +96,7 @@ describe('AuthController', () => {
       mockRequest.body = registerData;
       mockAuthService.registerUser.mockResolvedValue(mockUser);
 
-      await authController.register(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.register(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockAuthService.registerUser).toHaveBeenCalledWith(registerData);
       expect(mockTelegramService.notifyNewRegistration).toHaveBeenCalledWith(
@@ -139,11 +135,7 @@ describe('AuthController', () => {
       mockAuthService.registerUser.mockResolvedValue(mockUser);
       mockEmailService.sendVerificationEmail.mockRejectedValue(new Error('Email service down'));
 
-      await authController.register(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.register(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(201);
       expect(mockResponse.json).toHaveBeenCalled();
@@ -154,11 +146,7 @@ describe('AuthController', () => {
       mockRequest.body = { email: 'invalid' };
       mockAuthService.registerUser.mockRejectedValue(new Error('Invalid email format'));
 
-      await authController.register(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.register(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -176,11 +164,7 @@ describe('AuthController', () => {
       };
       mockAuthService.registerUser.mockResolvedValue(mockUser);
 
-      await authController.register(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.register(mockRequest as Request, mockResponse as Response, mockNext);
 
       const response = (mockResponse.json as jest.Mock).mock.calls[0][0];
       expect(response).toHaveProperty('success', true);
@@ -278,11 +262,7 @@ describe('AuthController', () => {
       mockRequest.body = { refresh_token: 'valid-refresh-token' };
       mockAuthService.refreshAccessToken.mockResolvedValue(refreshResult);
 
-      await authController.refreshToken(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.refreshToken(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockAuthService.refreshAccessToken).toHaveBeenCalledWith('valid-refresh-token');
       expect(mockResponse.status).toHaveBeenCalledWith(200);
@@ -300,11 +280,7 @@ describe('AuthController', () => {
     it('should handle missing refresh token', async () => {
       mockRequest.body = {};
 
-      await authController.refreshToken(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.refreshToken(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -320,11 +296,7 @@ describe('AuthController', () => {
         new Error('Invalid or expired refresh token')
       );
 
-      await authController.refreshToken(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.refreshToken(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -703,11 +675,7 @@ describe('AuthController', () => {
       mockRequest.body = { token: 'verification-token' };
       mockAuthService.verifyEmail.mockResolvedValue(mockUser);
 
-      await authController.verifyEmail(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.verifyEmail(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockAuthService.verifyEmail).toHaveBeenCalledWith('verification-token');
       expect(mockTelegramService.notifyEmailVerified).toHaveBeenCalledWith(
@@ -728,11 +696,7 @@ describe('AuthController', () => {
       mockRequest.query = { token: 'verification-token' };
       mockAuthService.verifyEmail.mockResolvedValue(mockUser);
 
-      await authController.verifyEmail(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.verifyEmail(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockAuthService.verifyEmail).toHaveBeenCalledWith('verification-token');
       expect(mockResponse.status).toHaveBeenCalledWith(200);
@@ -742,11 +706,7 @@ describe('AuthController', () => {
       mockRequest.body = { token: 'invalid-token' };
       mockAuthService.verifyEmail.mockRejectedValue(new Error('Invalid verification token'));
 
-      await authController.verifyEmail(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.verifyEmail(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -759,11 +719,7 @@ describe('AuthController', () => {
       mockRequest.body = {};
       mockRequest.query = {};
 
-      await authController.verifyEmail(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await authController.verifyEmail(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -900,4 +856,3 @@ describe('AuthController', () => {
     });
   });
 });
-

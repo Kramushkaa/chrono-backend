@@ -1,4 +1,5 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { TelegramService } from '../services/telegramService';
 
 /**
  * Mock Pool для тестирования
@@ -37,13 +38,21 @@ export const createQueryResult = <T extends QueryResultRow = any>(
 /**
  * Mock TelegramService
  */
-export const createMockTelegramService = () => ({
-  notifyPersonCreated: jest.fn().mockResolvedValue(undefined),
-  notifyAchievementCreated: jest.fn().mockResolvedValue(undefined),
-  notifyPeriodCreated: jest.fn().mockResolvedValue(undefined),
-  notifyPersonEditProposed: jest.fn().mockResolvedValue(undefined),
-  sendAdminNotification: jest.fn().mockResolvedValue(undefined),
-});
+export const createMockTelegramService = () =>
+  ({
+    notifyPersonCreated: jest.fn().mockResolvedValue(undefined),
+    notifyAchievementCreated: jest.fn().mockResolvedValue(undefined),
+    notifyPeriodCreated: jest.fn().mockResolvedValue(undefined),
+    notifyPersonEditProposed: jest.fn().mockResolvedValue(undefined),
+    notifyNewRegistration: jest.fn().mockResolvedValue(undefined),
+    notifyVerificationEmailSent: jest.fn().mockResolvedValue(undefined),
+    notifyEmailVerified: jest.fn().mockResolvedValue(undefined),
+    notifyPersonReviewed: jest.fn().mockResolvedValue(undefined),
+    notifyAchievementReviewed: jest.fn().mockResolvedValue(undefined),
+    notifyPeriodReviewed: jest.fn().mockResolvedValue(undefined),
+    sendTestMessage: jest.fn().mockResolvedValue(undefined),
+    sendAdminNotification: jest.fn().mockResolvedValue(undefined),
+  }) as any;
 
 /**
  * Mock User для тестов

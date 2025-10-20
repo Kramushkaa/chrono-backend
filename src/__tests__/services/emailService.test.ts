@@ -11,7 +11,7 @@ describe('EmailService', () => {
   beforeEach(() => {
     // Set up environment BEFORE creating service
     process.env.PUBLIC_APP_URL = 'https://chrono.ninja';
-    
+
     emailService = new EmailService();
     mockSendEmail = emailModule.sendEmail as jest.MockedFunction<typeof emailModule.sendEmail>;
     mockSendEmail.mockResolvedValue();
@@ -146,4 +146,3 @@ describe('EmailService', () => {
     });
   });
 });
-

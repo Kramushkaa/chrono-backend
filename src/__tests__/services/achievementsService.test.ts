@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AchievementsService } from '../../services/achievementsService';
 import {
   createMockPool,
@@ -5,7 +6,11 @@ import {
   createMockUser,
   createQueryResult,
 } from '../mocks';
-import { errors } from '../../utils/errors';
+import { errors as _errors } from '../../utils/errors';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Pool } from 'pg';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { TelegramService } from '../../services/telegramService';
 
 describe('AchievementsService', () => {
   let achievementsService: AchievementsService;
@@ -489,7 +494,7 @@ describe('AchievementsService', () => {
     it('should handle pagination for user achievements', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
-      const result = await achievementsService.getUserAchievements(1, 5, 10);
+      await achievementsService.getUserAchievements(1, 5, 10);
 
       expect(mockPool.query).toHaveBeenCalledWith(expect.any(String), [1, 6, 10]);
     });
@@ -771,7 +776,9 @@ describe('AchievementsService', () => {
       const count = await achievementsService.getPendingCount();
 
       expect(count).toBe(15);
-      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining("WHERE status = 'pending'"));
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining("WHERE status = 'pending'")
+      );
     });
 
     it('should return 0 when no pending achievements', async () => {

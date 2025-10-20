@@ -484,4 +484,3 @@ export class AchievementsService {
     return result.rows[0]?.cnt || 0;
   }
 }
-

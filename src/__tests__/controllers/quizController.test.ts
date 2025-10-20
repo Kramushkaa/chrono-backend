@@ -440,18 +440,9 @@ describe('QuizController', () => {
         isCorrect: true,
       });
 
-      await quizController.checkAnswer(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await quizController.checkAnswer(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockQuizService.checkAnswer).toHaveBeenCalledWith(
-        'session-123',
-        'q1',
-        '1900',
-        5000
-      );
+      expect(mockQuizService.checkAnswer).toHaveBeenCalledWith('session-123', 'q1', '1900', 5000);
       expect(mockResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
@@ -464,15 +455,9 @@ describe('QuizController', () => {
 
     it('should handle invalid session', async () => {
       mockRequest.body = validAnswerData;
-      mockQuizService.checkAnswer.mockRejectedValue(
-        new Error('Invalid or expired session')
-      );
+      mockQuizService.checkAnswer.mockRejectedValue(new Error('Invalid or expired session'));
 
-      await quizController.checkAnswer(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await quizController.checkAnswer(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.json).toHaveBeenCalledWith(
@@ -489,11 +474,7 @@ describe('QuizController', () => {
         timeSpent: -100, // Negative time
       };
 
-      await quizController.checkAnswer(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await quizController.checkAnswer(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.json).toHaveBeenCalledWith(
@@ -541,9 +522,7 @@ describe('QuizController', () => {
 
     it('should handle invalid/expired session', async () => {
       mockRequest.body = { sessionToken: 'expired-session' };
-      mockQuizService.finishQuizSession.mockRejectedValue(
-        new Error('Invalid or expired session')
-      );
+      mockQuizService.finishQuizSession.mockRejectedValue(new Error('Invalid or expired session'));
 
       await quizController.finishSharedQuiz(
         mockRequest as Request,
@@ -570,9 +549,25 @@ describe('QuizController', () => {
       (mockRequest as any).user = { id: 1 };
       mockQuizService.getGlobalLeaderboard.mockResolvedValue({
         topPlayers: [
-          { rank: 1, userId: 2, username: 'user2', totalRating: 1000, gamesPlayed: 10, averageScore: 85, bestScore: 100 },
+          {
+            rank: 1,
+            userId: 2,
+            username: 'user2',
+            totalRating: 1000,
+            gamesPlayed: 10,
+            averageScore: 85,
+            bestScore: 100,
+          },
         ],
-        userEntry: { rank: 5, userId: 1, username: 'user1', totalRating: 500, gamesPlayed: 5, averageScore: 75, bestScore: 95 },
+        userEntry: {
+          rank: 5,
+          userId: 1,
+          username: 'user1',
+          totalRating: 500,
+          gamesPlayed: 5,
+          averageScore: 75,
+          bestScore: 95,
+        },
         totalPlayers: 100,
       });
 
@@ -598,7 +593,15 @@ describe('QuizController', () => {
       (mockRequest as any).user = undefined;
       mockQuizService.getGlobalLeaderboard.mockResolvedValue({
         topPlayers: [
-          { rank: 1, userId: 1, username: 'user1', totalRating: 1000, gamesPlayed: 10, averageScore: 80, bestScore: 100 },
+          {
+            rank: 1,
+            userId: 1,
+            username: 'user1',
+            totalRating: 1000,
+            gamesPlayed: 10,
+            averageScore: 80,
+            bestScore: 100,
+          },
         ],
         userEntry: undefined,
         totalPlayers: 100,
@@ -632,11 +635,7 @@ describe('QuizController', () => {
         recentAttempts: [],
       });
 
-      await quizController.getUserStats(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await quizController.getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockQuizService.getUserStats).toHaveBeenCalledWith(1);
       expect(mockResponse.json).toHaveBeenCalledWith(
@@ -652,11 +651,7 @@ describe('QuizController', () => {
     it('should require authentication', async () => {
       (mockRequest as any).user = undefined;
 
-      await quizController.getUserStats(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await quizController.getUserStats(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith(
@@ -680,9 +675,25 @@ describe('QuizController', () => {
       mockQuizService.getSharedQuizLeaderboard.mockResolvedValue({
         quizTitle: 'Test Quiz',
         entries: [
-          { rank: 1, userId: 2, username: 'user2', correctAnswers: 10, totalQuestions: 10, totalTimeMs: 60000, completedAt: new Date().toISOString() },
+          {
+            rank: 1,
+            userId: 2,
+            username: 'user2',
+            correctAnswers: 10,
+            totalQuestions: 10,
+            totalTimeMs: 60000,
+            completedAt: new Date().toISOString(),
+          },
         ],
-        userEntry: { rank: 3, userId: 1, username: 'user1', correctAnswers: 9, totalQuestions: 10, totalTimeMs: 70000, completedAt: new Date().toISOString() },
+        userEntry: {
+          rank: 3,
+          userId: 1,
+          username: 'user1',
+          correctAnswers: 9,
+          totalQuestions: 10,
+          totalTimeMs: 70000,
+          completedAt: new Date().toISOString(),
+        },
         totalAttempts: 50,
       });
 
@@ -703,9 +714,7 @@ describe('QuizController', () => {
 
     it('should handle quiz not found', async () => {
       mockRequest.params = { shareCode: 'INVALID' };
-      mockQuizService.getSharedQuizLeaderboard.mockRejectedValue(
-        new Error('Quiz not found')
-      );
+      mockQuizService.getSharedQuizLeaderboard.mockRejectedValue(new Error('Quiz not found'));
 
       await quizController.getSharedQuizLeaderboard(
         mockRequest as Request,
@@ -738,10 +747,7 @@ describe('QuizController', () => {
         mockNext
       );
 
-      expect(mockQuizService.getSharedQuizLeaderboard).toHaveBeenCalledWith(
-        'ABC123',
-        undefined
-      );
+      expect(mockQuizService.getSharedQuizLeaderboard).toHaveBeenCalledWith('ABC123', undefined);
       expect(mockResponse.json).toHaveBeenCalled();
     });
   });
@@ -1026,4 +1032,3 @@ describe('QuizController', () => {
     });
   });
 });
-

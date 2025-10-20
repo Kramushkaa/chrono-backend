@@ -19,7 +19,11 @@ export class AuthController {
   private telegramService: TelegramService;
   private emailService: EmailService;
 
-  constructor(authService: AuthService, telegramService: TelegramService, emailService: EmailService) {
+  constructor(
+    authService: AuthService,
+    telegramService: TelegramService,
+    emailService: EmailService
+  ) {
     this.authService = authService;
     this.telegramService = telegramService;
     this.emailService = emailService;

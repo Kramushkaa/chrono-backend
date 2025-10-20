@@ -312,4 +312,3 @@ describe('query-builder.ts Utils', () => {
     });
   });
 });
-

@@ -10,11 +10,7 @@ export class EmailService {
   /**
    * Send verification email to user
    */
-  async sendVerificationEmail(
-    email: string,
-    token: string,
-    userName?: string
-  ): Promise<void> {
+  async sendVerificationEmail(email: string, token: string, userName?: string): Promise<void> {
     const verifyUrl = `${this.baseUrl}/profile?verify_token=${encodeURIComponent(token)}`;
     const displayName = userName || email;
 
@@ -36,11 +32,7 @@ export class EmailService {
   /**
    * Send password reset email to user
    */
-  async sendPasswordResetEmail(
-    email: string,
-    token: string,
-    userName?: string
-  ): Promise<void> {
+  async sendPasswordResetEmail(email: string, token: string, userName?: string): Promise<void> {
     const resetUrl = `${this.baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
     const displayName = userName || email;
 
@@ -86,4 +78,3 @@ export class EmailService {
     await sendEmail(email, 'Добро пожаловать — Хронониндзя', html);
   }
 }
-

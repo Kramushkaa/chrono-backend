@@ -496,20 +496,21 @@ export class QuizController {
       }
 
       // Prepare detailed answers with full question data (including data field)
-      const detailedAnswers = result.attempt.questions?.map((question, index) => {
-        const userAnswer = result.attempt.answers?.find(a => a.questionId === question.id);
-        return {
-          questionId: question.id,
-          question: question.question,
-          questionType: question.type,
-          userAnswer: userAnswer?.answer || '',
-          correctAnswer: question.correctAnswer,
-          isCorrect: userAnswer?.isCorrect || false,
-          timeSpent: userAnswer?.timeSpent || 0,
-          explanation: question.explanation,
-          data: question.data, // Include full question data for rendering
-        };
-      }) || [];
+      const detailedAnswers =
+        result.attempt.questions?.map((question, index) => {
+          const userAnswer = result.attempt.answers?.find(a => a.questionId === question.id);
+          return {
+            questionId: question.id,
+            question: question.question,
+            questionType: question.type,
+            userAnswer: userAnswer?.answer || '',
+            correctAnswer: question.correctAnswer,
+            isCorrect: userAnswer?.isCorrect || false,
+            timeSpent: userAnswer?.timeSpent || 0,
+            explanation: question.explanation,
+            data: question.data, // Include full question data for rendering
+          };
+        }) || [];
 
       res.json({
         success: true,
