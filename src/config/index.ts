@@ -19,6 +19,12 @@ export const config = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
     ssl: process.env.DB_SSL === 'true',
+    pool: {
+      max: parseInt(process.env.DB_POOL_MAX || '20'),
+      idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
+      connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000'),
+    },
+    sslCert: process.env.DB_SSL_CA,
   },
 
   // Настройки JWT
@@ -67,8 +73,10 @@ export const config = {
 // Проверка обязательных переменных окружения
 export const validateConfig = (): void => {
   const requiredEnvVars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+  const criticalEnvVars = ['JWT_SECRET'];
 
   const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  const criticalMissingVars = criticalEnvVars.filter(varName => !process.env[varName]);
 
   if (missingVars.length > 0) {
     console.warn('⚠️  Предупреждение: Отсутствуют следующие переменные окружения:');
@@ -76,17 +84,35 @@ export const validateConfig = (): void => {
     console.warn('   Используются значения по умолчанию.');
   }
 
-  // Проверка JWT секрета в продакшене
-  if (
-    config.server.nodeEnv === 'production' &&
-    config.jwt.secret === 'your-super-secret-jwt-key-change-in-production'
-  ) {
-    console.error('❌ ОШИБКА: JWT_SECRET должен быть изменен в продакшене!');
-    process.exit(1);
+  // Критичные переменные должны быть установлены в production
+  if (config.server.nodeEnv === 'production') {
+    if (criticalMissingVars.length > 0) {
+      console.error('❌ ОШИБКА: В production должны быть установлены следующие переменные:');
+      criticalMissingVars.forEach(varName => console.error(`   - ${varName}`));
+      process.exit(1);
+    }
+
+    // Проверка JWT секрета в продакшене
+    if (config.jwt.secret === 'your-super-secret-jwt-key-change-in-production') {
+      console.error('❌ ОШИБКА: JWT_SECRET должен быть изменен в продакшене!');
+      process.exit(1);
+    }
+
+    // Проверка CORS в продакшене
+    if (process.env.CORS === '*' || process.env.CORS_ORIGIN === '*' || process.env.CORS_ORIGINS === '*') {
+      console.error('❌ ОШИБКА: CORS не может быть "*" в продакшене!');
+      process.exit(1);
+    }
   }
 };
 
 // Экспорт типов для конфигурации
+export interface DatabasePoolConfig {
+  max: number;
+  idleTimeoutMillis: number;
+  connectionTimeoutMillis: number;
+}
+
 export interface DatabaseConfig {
   host: string;
   port: number;
@@ -94,6 +120,8 @@ export interface DatabaseConfig {
   user: string;
   password: string;
   ssl: boolean;
+  pool: DatabasePoolConfig;
+  sslCert?: string;
 }
 
 export interface JWTConfig {

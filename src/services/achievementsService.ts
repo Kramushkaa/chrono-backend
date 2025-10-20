@@ -4,6 +4,7 @@ import { QueryBuilder } from '../utils/query-builder';
 import { errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset, PaginationDefaults } from '../utils/api';
 import { TelegramService } from './telegramService';
+import { AchievementRow } from '../types/database';
 
 export interface AchievementCreateData {
   personId?: string;
@@ -61,7 +62,7 @@ export class AchievementsService {
     data: AchievementCreateData,
     user: User,
     saveAsDraft: boolean = false
-  ): Promise<any> {
+  ): Promise<AchievementRow> {
     const { personId, countryId, year, description, wikipediaUrl, imageUrl } = data;
 
     // Валидация годов для достижений личности

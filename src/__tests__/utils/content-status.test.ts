@@ -61,7 +61,7 @@ describe('content-status utils', () => {
     });
 
     it('should return false for unknown role', () => {
-      const user: User = { sub: 4, role: 'guest' };
+      const user = { sub: 4, role: 'guest' as any } as User;
       expect(canApproveDirectly(user)).toBe(false);
     });
   });
@@ -87,7 +87,7 @@ describe('content-status utils', () => {
     });
 
     it('should return false for unknown role', () => {
-      const user: User = { sub: 4, role: 'contributor' };
+      const user = { sub: 4, role: 'contributor' as any } as User;
       expect(canModerateContent(user)).toBe(false);
     });
   });

@@ -21,11 +21,14 @@ import { createPeriodsRoutes } from './routes/periodsRoutes';
 import { createMetaRoutes } from './routes/metaRoutes';
 import { createQuizRoutes } from './routes/quizRoutes';
 import { createHealthRoutes } from './routes/healthRoutes';
-import { config } from './config';
+import { config, validateConfig } from './config';
 import { cleanupExpiredQuizSessions } from './jobs/cleanup-quiz-sessions';
 
 // Загрузка переменных окружения
 dotenv.config();
+
+// Валидация конфигурации перед запуском
+validateConfig();
 
 // Конфигурация базы данных
 const pool = createPool();

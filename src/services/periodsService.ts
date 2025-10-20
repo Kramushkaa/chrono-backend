@@ -4,6 +4,7 @@ import { QueryBuilder } from '../utils/query-builder';
 import { errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset, PaginationDefaults } from '../utils/api';
 import { TelegramService } from './telegramService';
+import { PeriodRow } from '../types/database';
 
 export interface PeriodCreateData {
   personId: string;
@@ -110,7 +111,7 @@ export class PeriodsService {
     data: PeriodCreateData,
     user: User,
     saveAsDraft: boolean = false
-  ): Promise<any> {
+  ): Promise<PeriodRow> {
     const { personId, startYear, endYear, periodType, countryId, comment } = data;
 
     // Валидация

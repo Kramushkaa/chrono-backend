@@ -4,6 +4,7 @@ import { errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset, PaginationDefaults, mapApiPersonRow } from '../utils/api';
 import { TelegramService } from './telegramService';
 import { sanitizePayload, PersonPayload, applyPayloadToPerson } from '../routes/persons/helpers';
+import { PersonRow } from '../types/database';
 
 export interface PersonCreateData {
   name: string;
@@ -39,7 +40,7 @@ export class PersonsService {
     data: PersonCreateData,
     user: User,
     saveAsDraft: boolean = false
-  ): Promise<any> {
+  ): Promise<PersonRow> {
     const { name, birthYear, deathYear, category, description, imageUrl, wikiLink } = data;
 
     // Генерация ID из имени

@@ -10,25 +10,67 @@ export function createHealthRoutes(pool: Pool): Router {
    * Returns 200 if the service is healthy, 503 otherwise
    */
   router.get('/health', async (req: Request, res: Response) => {
+    const startTime = Date.now();
     const healthCheck = {
       uptime: process.uptime(),
       message: 'OK',
       timestamp: new Date().toISOString(),
-      database: 'checking...',
+      database: {
+        status: 'checking',
+        responseTime: 0,
+      },
+      pool: {
+        totalConnections: pool.totalCount,
+        idleConnections: pool.idleCount,
+        waitingClients: pool.waitingCount,
+      },
     };
 
     try {
-      // Check database connection
+      // Check database connection with timing
+      const dbStartTime = Date.now();
       await pool.query('SELECT NOW()');
-      healthCheck.database = 'connected';
-      healthCheck.message = 'OK';
+      const dbResponseTime = Date.now() - dbStartTime;
+      
+      healthCheck.database = {
+        status: 'connected',
+        responseTime: dbResponseTime,
+      };
+
+      // Check if response time is acceptable (should be < 1000ms)
+      if (dbResponseTime > 1000) {
+        healthCheck.message = 'Database slow response';
+        res.status(200).json({
+          success: true,
+          ...healthCheck,
+          warning: 'Database response time is higher than expected',
+        });
+        return;
+      }
+
+      // Check pool health
+      const isPoolHealthy = pool.totalCount < pool.options.max * 0.9; // Less than 90% capacity
+      
+      if (!isPoolHealthy) {
+        healthCheck.message = 'Pool near capacity';
+        res.status(200).json({
+          success: true,
+          ...healthCheck,
+          warning: 'Connection pool is near capacity',
+        });
+        return;
+      }
 
       res.status(200).json({
         success: true,
         ...healthCheck,
       });
     } catch (error) {
-      healthCheck.database = 'disconnected';
+      const dbResponseTime = Date.now() - startTime;
+      healthCheck.database = {
+        status: 'disconnected',
+        responseTime: dbResponseTime,
+      };
       healthCheck.message = 'Database connection failed';
 
       res.status(503).json({

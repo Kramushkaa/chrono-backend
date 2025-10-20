@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { asyncHandler } from '../utils/errors';
 import { DTO_VERSION as DTO_VERSION_BE } from '../dtoDescriptors';
+import { cache } from '../utils/cache';
 
 export function createMetaRoutes(pool: Pool): Router {
   const router = Router();
@@ -33,6 +34,14 @@ export function createMetaRoutes(pool: Pool): Router {
   router.get(
     '/categories',
     asyncHandler(async (_req: Request, res: Response) => {
+      const cacheKey = 'categories';
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        res.json(cached);
+        return;
+      }
+
       // Возвращаем только категории одобренных личностей
       const query = `
         SELECT DISTINCT category 
@@ -42,7 +51,10 @@ export function createMetaRoutes(pool: Pool): Router {
          ORDER BY category`;
       const result = await pool.query(query);
       const categories = result.rows.map(row => row.category);
-      res.json({ success: true, data: categories });
+      
+      const response = { success: true, data: categories };
+      cache.set(cacheKey, response, 300000); // 5 минут
+      res.json(response);
     })
   );
 
@@ -50,9 +62,20 @@ export function createMetaRoutes(pool: Pool): Router {
   router.get(
     '/countries',
     asyncHandler(async (_req: Request, res: Response) => {
+      const cacheKey = 'countries';
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        res.json(cached);
+        return;
+      }
+
       const result = await pool.query('SELECT name FROM v_countries ORDER BY name');
       const countries = result.rows.map(r => r.name);
-      res.json({ success: true, data: countries });
+      
+      const response = { success: true, data: countries };
+      cache.set(cacheKey, response, 300000); // 5 минут
+      res.json(response);
     })
   );
 
@@ -60,8 +83,19 @@ export function createMetaRoutes(pool: Pool): Router {
   router.get(
     '/countries/options',
     asyncHandler(async (_req: Request, res: Response) => {
+      const cacheKey = 'countries_options';
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        res.json(cached);
+        return;
+      }
+
       const result = await pool.query('SELECT id, name FROM countries ORDER BY name');
-      res.json({ success: true, data: result.rows });
+      
+      const response = { success: true, data: result.rows };
+      cache.set(cacheKey, response, 300000); // 5 минут
+      res.json(response);
     })
   );
 
@@ -69,6 +103,14 @@ export function createMetaRoutes(pool: Pool): Router {
   router.get(
     '/stats',
     asyncHandler(async (_req: Request, res: Response) => {
+      const cacheKey = 'stats';
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        res.json(cached);
+        return;
+      }
+
       const statsResult = await pool.query(`
       SELECT 
         COUNT(*) as total_persons,
@@ -93,7 +135,19 @@ export function createMetaRoutes(pool: Pool): Router {
         categories: categoryStatsResult.rows,
         countries: countryStatsResult.rows,
       };
-      res.json({ success: true, data: stats });
+      
+      const response = { success: true, data: stats };
+      cache.set(cacheKey, response, 120000); // 2 минуты (статистика обновляется чаще)
+      res.json(response);
+    })
+  );
+
+  // Cache management endpoint (для разработки)
+  router.post(
+    '/cache/clear',
+    asyncHandler(async (_req: Request, res: Response) => {
+      cache.clearAll();
+      res.json({ success: true, message: 'Cache cleared' });
     })
   );
 
