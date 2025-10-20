@@ -45,7 +45,6 @@
     "express": "^4.19.2",
     "helmet": "^6.2.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2",
     "node-telegram-bot-api": "^0.66.0",
     "nodemailer": "^7.0.5",
     "pg": "^8.11.3",
@@ -59,7 +58,6 @@
     "@types/helmet": "^4.0.0",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^2.0.0",
     "@types/node": "^20.10.0",
     "@types/node-telegram-bot-api": "^0.64.11",
     "@types/nodemailer": "^6.4.17",
@@ -77,5 +75,10 @@
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.1",
     "typescript": "^5.3.2"
+  },
+  "overrides": {
+    "form-data": "^2.5.4",
+    "tough-cookie": "^4.1.4",
+    "request": "^2.88.2"
   }
 }
