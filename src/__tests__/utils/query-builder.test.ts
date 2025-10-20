@@ -80,7 +80,7 @@ describe('query-builder.ts Utils', () => {
 
       it('should wrap search term with percent signs', () => {
         builder.addSearch(['description'], 'test');
-        const { whereClause, params } = builder.build();
+        const { params } = builder.build();
 
         expect(params[0]).toBe('%test%');
       });

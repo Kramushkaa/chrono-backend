@@ -497,7 +497,7 @@ export class QuizController {
 
       // Prepare detailed answers with full question data (including data field)
       const detailedAnswers =
-        result.attempt.questions?.map((question, index) => {
+        result.attempt.questions?.map((question) => {
           const userAnswer = result.attempt.answers?.find(a => a.questionId === question.id);
           return {
             questionId: question.id,

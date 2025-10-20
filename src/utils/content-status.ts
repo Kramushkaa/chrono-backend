@@ -4,7 +4,7 @@
  */
 
 export type ContentStatus = 'draft' | 'pending' | 'approved' | 'rejected';
-export type UserRole = 'admin' | 'moderator' | 'user' | string;
+export type UserRole = 'admin' | 'moderator' | 'user';
 
 export interface User {
   sub: number;

@@ -19,7 +19,7 @@ export function createHealthRoutes(pool: Pool): Router {
 
     try {
       // Check database connection
-      const result = await pool.query('SELECT NOW()');
+      await pool.query('SELECT NOW()');
       healthCheck.database = 'connected';
       healthCheck.message = 'OK';
 

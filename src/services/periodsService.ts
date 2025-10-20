@@ -148,7 +148,7 @@ export class PeriodsService {
           startYear,
           endYear,
           userEmail,
-          status as 'pending' | 'approved',
+          status === 'approved' ? 'approved' : 'pending',
           personName
         )
         .catch(err => console.warn('Telegram notification failed (period created):', err));

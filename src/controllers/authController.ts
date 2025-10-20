@@ -9,8 +9,6 @@ import {
   ChangePasswordRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
-  VerifyEmailRequest,
-  User,
 } from '../types/auth';
 import { errors } from '../utils/errors';
 

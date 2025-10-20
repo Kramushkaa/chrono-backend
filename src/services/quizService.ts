@@ -5,8 +5,6 @@ import type {
   QuizQuestionType,
   QuizSetupConfig,
   QuizAttemptDB,
-  SharedQuizDB,
-  SharedQuizQuestionDB,
   QuizSessionDB,
   QuizSessionAnswer,
   GlobalLeaderboardEntry,

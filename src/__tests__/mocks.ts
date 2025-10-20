@@ -1,5 +1,6 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { TelegramService } from '../services/telegramService';
+import { UserRole } from '../utils/content-status';
 
 /**
  * Mock Pool для тестирования
@@ -57,9 +58,9 @@ export const createMockTelegramService = () =>
 /**
  * Mock User для тестов
  */
-export const createMockUser = (overrides?: Partial<any>) => ({
+export const createMockUser = (overrides?: Partial<{ sub: number; email: string; role: UserRole }>) => ({
   sub: 1,
   email: 'test@example.com',
-  role: 'user',
+  role: 'user' as UserRole,
   ...overrides,
 });

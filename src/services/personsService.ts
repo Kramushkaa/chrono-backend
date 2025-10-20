@@ -73,7 +73,7 @@ export class PersonsService {
     if (status !== 'draft') {
       const userEmail = user.email || 'unknown';
       this.telegramService
-        .notifyPersonCreated(name, userEmail, status as 'pending' | 'approved', id)
+        .notifyPersonCreated(name, userEmail, status === 'approved' ? 'approved' : 'pending', id)
         .catch(err => console.warn('Telegram notification failed (person created):', err));
     }
 
@@ -707,7 +707,7 @@ export class PersonsService {
       if (status !== 'draft') {
         const userEmail = user.email || 'unknown';
         this.telegramService
-          .notifyPersonCreated(name, userEmail, status as 'pending' | 'approved', id)
+          .notifyPersonCreated(name, userEmail, status === 'approved' ? 'approved' : 'pending', id)
           .catch(err => console.warn('Telegram notification failed (person proposed):', err));
       }
     } catch (error) {

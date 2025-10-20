@@ -7,8 +7,7 @@ import {
   rateLimit,
 } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
-import { paginateRows, parseLimitOffset } from '../utils/api';
-import { CountResult } from '../types/database';
+import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { PeriodsService } from '../services/periodsService';
 
@@ -53,7 +52,7 @@ export function createPeriodsRoutes(
         },
         {
           sub: req.user!.sub,
-          role: req.user!.role,
+          role: req.user!.role as UserRole,
           email: req.user?.email,
         },
         saveAsDraft
@@ -94,7 +93,7 @@ export function createPeriodsRoutes(
         },
         {
           sub: req.user!.sub,
-          role: req.user!.role,
+          role: req.user!.role as UserRole,
           email: req.user?.email,
         },
         saveAsDraft

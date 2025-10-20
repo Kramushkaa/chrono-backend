@@ -1,7 +1,6 @@
 import { Pool } from 'pg';
 import {
   User,
-  UserSession,
   RegisterRequest,
   LoginRequest,
   UpdateProfileRequest,

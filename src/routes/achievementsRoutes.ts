@@ -7,8 +7,7 @@ import {
   rateLimit,
 } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
-import { parseLimitOffset, paginateRows } from '../utils/api';
-import { CountResult } from '../types/database';
+import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { AchievementsService } from '../services/achievementsService';
 
@@ -129,7 +128,7 @@ export function createAchievementsRoutes(
         },
         {
           sub: req.user!.sub,
-          role: req.user!.role,
+          role: req.user!.role as UserRole,
           email: req.user?.email,
         },
         saveAsDraft

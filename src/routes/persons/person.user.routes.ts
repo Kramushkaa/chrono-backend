@@ -107,7 +107,6 @@ export function createUserPersonRoutes(
       const countOnly = String((req.query.count as string) || 'false') === 'true';
 
       if (countOnly) {
-        const count = await personsService.getUserPersonsCount(userId);
         // Фильтруем только черновики
         const draftCount = await pool.query(
           `SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1 AND status = 'draft'`,
