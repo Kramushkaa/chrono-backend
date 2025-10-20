@@ -6,11 +6,6 @@ import {
   createMockUser,
   createQueryResult,
 } from '../mocks';
-import { errors as _errors } from '../../utils/errors';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Pool } from 'pg';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { TelegramService } from '../../services/telegramService';
 
 describe('PersonsService', () => {
   let personsService: PersonsService;

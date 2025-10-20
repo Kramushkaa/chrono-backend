@@ -2,8 +2,6 @@
 import { QuizService } from '../../services/quizService';
 import { createMockPool, createQueryResult } from '../mocks';
 import type { QuizQuestionType } from '@chrononinja/dto';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Pool } from 'pg';
 
 describe('QuizService', () => {
   let quizService: QuizService;

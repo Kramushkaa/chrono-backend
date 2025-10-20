@@ -5,7 +5,6 @@ import {
   createMockUser,
   createQueryResult,
 } from '../mocks';
-import { errors } from '../../utils/errors';
 
 describe('PeriodsService', () => {
   let periodsService: PeriodsService;
