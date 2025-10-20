@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ApiError, errors } from '../utils/errors';
 import { verifyAccessToken, hasPermission, requireRole } from '../utils/auth';
 import { JWTPayload } from '../types/auth';
+import { logger } from '../utils/logger';
 
 // Расширение типа Request для добавления пользователя
 declare global {
@@ -39,6 +40,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
+    logger.authError('Missing authentication token', undefined, getClientIp(req));
     next(errors.unauthorized('Токен доступа не предоставлен', 'token_missing'));
     return;
   }
@@ -46,6 +48,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   try {
     const decoded = verifyAccessToken(token);
     if (!decoded) {
+      logger.authError('Invalid token format or signature', undefined, getClientIp(req));
       next(errors.unauthorized('Недействительный токен доступа', 'invalid_token'));
       return;
     }
@@ -53,6 +56,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     req.user = decoded;
     next();
   } catch (error) {
+    logger.authError('Token verification failed', undefined, getClientIp(req));
     next(errors.unauthorized('Недействительный токен доступа', 'invalid_token'));
   }
 };

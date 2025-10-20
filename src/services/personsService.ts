@@ -5,6 +5,8 @@ import { paginateRows, parseLimitOffset, PaginationDefaults, mapApiPersonRow } f
 import { TelegramService } from './telegramService';
 import { sanitizePayload, PersonPayload, applyPayloadToPerson } from '../routes/persons/helpers';
 import { PersonRow } from '../types/database';
+import { logger } from '../utils/logger';
+import { BaseService } from './BaseService';
 
 export interface PersonCreateData {
   name: string;
@@ -24,12 +26,11 @@ export interface PersonFilters {
   q?: string;
 }
 
-export class PersonsService {
-  private pool: Pool;
+export class PersonsService extends BaseService {
   private telegramService: TelegramService;
 
   constructor(pool: Pool, telegramService: TelegramService) {
-    this.pool = pool;
+    super(pool);
     this.telegramService = telegramService;
   }
 
@@ -52,7 +53,7 @@ export class PersonsService {
 
     const status = determineContentStatus(user, saveAsDraft);
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery<PersonRow>(
       `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
@@ -67,7 +68,12 @@ export class PersonsService {
         wikiLink ?? null,
         status,
         user.sub,
-      ]
+      ],
+      {
+        userId: user.sub,
+        action: 'createPerson',
+        params: { name, birthYear, deathYear, category },
+      }
     );
 
     // Telegram уведомление (если не черновик)
@@ -75,8 +81,15 @@ export class PersonsService {
       const userEmail = user.email || 'unknown';
       this.telegramService
         .notifyPersonCreated(name, userEmail, status === 'approved' ? 'approved' : 'pending', id)
-        .catch(err => console.warn('Telegram notification failed (person created):', err));
+        .catch(err => logger.error('Telegram notification failed (person created)', { error: err }));
     }
+
+    logger.info('Person created successfully', {
+      userId: user.sub,
+      personId: id,
+      name,
+      status,
+    });
 
     return result.rows[0];
   }

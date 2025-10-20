@@ -10,6 +10,30 @@ import { asyncHandler, errors } from '../utils/errors';
 import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { AchievementsService } from '../services/achievementsService';
+import { validateQuery, validateParams, commonSchemas } from '../middleware/validation';
+import { z } from 'zod';
+
+// Валидационные схемы
+const achievementsSchemas = {
+  // Схема для пагинации
+  pagination: commonSchemas.pagination,
+  
+  // Схема для ID достижения  
+  achievementId: z.object({
+    id: commonSchemas.numericId,
+  }),
+
+  // Схема для lookup achievements (опциональный ids)
+  lookupByIds: z.object({
+    ids: z
+      .string()
+      .optional()
+      .transform(val => val ? val.split(',').map(id => parseInt(id.trim(), 10)) : [])
+      .refine(ids => ids.every(id => !Number.isNaN(id) && id > 0), {
+        message: 'Все ID должны быть положительными числами',
+      }),
+  }),
+};
 
 export function createAchievementsRoutes(
   pool: Pool,
@@ -26,10 +50,11 @@ export function createAchievementsRoutes(
     '/admin/achievements/pending',
     authenticateToken,
     requireRoleMiddleware(['moderator', 'admin']),
+    validateQuery(achievementsSchemas.pagination),
     asyncHandler(async (req: Request, res: Response) => {
-      const limit = req.query.limit as string | undefined;
-      const offset = req.query.offset as string | undefined;
-      const countOnly = String((req.query.count as string) || 'false') === 'true';
+      const limit = req.query.limit as number | undefined;
+      const offset = req.query.offset as number | undefined;
+      const countOnly = req.query.count as boolean | undefined;
 
       if (countOnly) {
         const count = await achievementsService.getPendingCount();
@@ -38,8 +63,8 @@ export function createAchievementsRoutes(
       }
 
       const { data, meta } = await achievementsService.getPendingAchievements(
-        limit ? parseInt(limit) : undefined,
-        offset ? parseInt(offset) : undefined
+        limit,
+        offset
       );
       res.json({ success: true, data, meta });
     })
@@ -49,10 +74,11 @@ export function createAchievementsRoutes(
   router.get(
     '/achievements/mine',
     authenticateToken,
+    validateQuery(achievementsSchemas.pagination),
     asyncHandler(async (req: Request, res: Response) => {
-      const limit = req.query.limit as string | undefined;
-      const offset = req.query.offset as string | undefined;
-      const countOnly = String((req.query.count as string) || 'false') === 'true';
+      const limit = req.query.limit as number | undefined;
+      const offset = req.query.offset as number | undefined;
+      const countOnly = req.query.count as boolean | undefined;
 
       if (countOnly) {
         const count = await achievementsService.getUserAchievementsCount(req.user!.sub);
@@ -62,8 +88,8 @@ export function createAchievementsRoutes(
 
       const { data, meta } = await achievementsService.getUserAchievements(
         req.user!.sub,
-        limit ? parseInt(limit) : undefined,
-        offset ? parseInt(offset) : undefined
+        limit,
+        offset
       );
       res.json({ success: true, data, meta });
     })
@@ -162,9 +188,10 @@ export function createAchievementsRoutes(
   router.delete(
     '/achievements/:id',
     authenticateToken,
+    validateParams(achievementsSchemas.achievementId),
     asyncHandler(async (req: Request, res: Response) => {
-      const { id } = req.params;
-      await achievementsService.deleteAchievement(parseInt(id), req.user!.sub);
+      const { id } = req.params as unknown as { id: number };
+      await achievementsService.deleteAchievement(id, req.user!.sub);
       res.json({ success: true });
     })
   );
@@ -208,17 +235,10 @@ export function createAchievementsRoutes(
   // Lookup achievements by ids
   router.get(
     '/achievements/lookup/by-ids',
+    validateQuery(achievementsSchemas.lookupByIds),
     asyncHandler(async (req: Request, res: Response) => {
-      const raw = (req.query.ids || '').toString().trim();
-      if (!raw) {
-        res.json({ success: true, data: [] });
-        return;
-      }
-      const ids = raw
-        .split(',')
-        .map((s: string) => parseInt(s, 10))
-        .filter((n: number) => Number.isInteger(n));
-      if (ids.length === 0) {
+      const ids = req.query.ids as unknown as number[];
+      if (!ids || ids.length === 0) {
         res.json({ success: true, data: [] });
         return;
       }
