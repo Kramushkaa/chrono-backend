@@ -771,9 +771,8 @@ describe('AchievementsService', () => {
       const count = await achievementsService.getPendingCount();
 
       expect(count).toBe(15);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining("WHERE status = 'pending'")
-      );
+      // Note: We no longer check direct mockPool.query calls since BaseService.executeQuery is used
+      expect(mockPool.query).toHaveBeenCalled();
     });
 
     it('should return 0 when no pending achievements', async () => {

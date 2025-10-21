@@ -189,7 +189,14 @@ export const logRequest = (req: Request, res: Response, next: NextFunction): voi
     }
   }
 
-  console.log(`[${timestamp}] ${method} ${url} - User: ${userInfo} - IP: ${ip} - UA: ${shortUA}`);
+  logger.info('Request', {
+    timestamp,
+    method,
+    url,
+    userInfo,
+    ip,
+    userAgent: shortUA,
+  });
 
   next();
 };
@@ -201,7 +208,7 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
-  console.error('Error:', err);
+  logger.error('Request error', { error: err });
 
   if (err instanceof ApiError) {
     res

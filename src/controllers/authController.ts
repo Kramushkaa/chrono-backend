@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/authService';
 import { TelegramService } from '../services/telegramService';
 import { EmailService } from '../services/emailService';
+import { logger } from '../utils/logger';
 import {
   RegisterRequest,
   LoginRequest,
@@ -36,7 +37,11 @@ export class AuthController {
       // Отправка уведомления в Telegram о новой регистрации (неблокирующее)
       this.telegramService
         .notifyNewRegistration(user.email, user.username, user.full_name)
-        .catch(err => console.warn('Telegram notification failed (registration):', err));
+        .catch(err =>
+          logger.warn('Telegram notification failed (registration)', {
+            errorMessage: err instanceof Error ? err.message : String(err),
+          })
+        );
 
       // Отправка письма с подтверждением email (best-effort)
       try {
@@ -51,9 +56,15 @@ export class AuthController {
         // Отправка уведомления в Telegram об отправке письма подтверждения (неблокирующее)
         this.telegramService
           .notifyVerificationEmailSent(user.email, false)
-          .catch(err => console.warn('Telegram notification failed (verification sent):', err));
+          .catch(err =>
+            logger.warn('Telegram notification failed (verification sent)', {
+              errorMessage: err instanceof Error ? err.message : String(err),
+            })
+          );
       } catch (err) {
-        console.warn('Email verification send failed:', err);
+        logger.warn('Email verification send failed', {
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
       }
 
       res.status(201).json({
@@ -78,7 +89,7 @@ export class AuthController {
   // Вход пользователя
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      console.log('🔐 Login attempt:', {
+      logger.info('Login attempt', {
         login: (req.body && (req.body.login || req.body.email)) || 'no-body',
         bodyType: typeof req.body,
       });
@@ -107,7 +118,9 @@ export class AuthController {
         },
       });
     } catch (error) {
-      console.error('🔐 Login error:', error);
+      logger.error('Login error', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       next(errors.unauthorized(error instanceof Error ? error.message : 'Ошибка при входе'));
     }
   }
@@ -319,7 +332,11 @@ export class AuthController {
       // Отправка уведомления в Telegram о подтверждении email (неблокирующее)
       this.telegramService
         .notifyEmailVerified(user.email, user.username)
-        .catch(err => console.warn('Telegram notification failed (email verified):', err));
+        .catch(err =>
+          logger.warn('Telegram notification failed (email verified)', {
+            errorMessage: err instanceof Error ? err.message : String(err),
+          })
+        );
 
       res.status(200).json({
         success: true,
@@ -347,9 +364,15 @@ export class AuthController {
         // Отправка уведомления в Telegram о повторной отправке письма (неблокирующее)
         this.telegramService
           .notifyVerificationEmailSent(email, true)
-          .catch(err => console.warn('Telegram notification failed (resend verification):', err));
+          .catch(err =>
+            logger.warn('Telegram notification failed (resend verification)', {
+              errorMessage: err instanceof Error ? err.message : String(err),
+            })
+          );
       } catch (err) {
-        console.warn('Resend verification send failed:', err);
+        logger.warn('Resend verification send failed', {
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
       }
 
       res.status(200).json({ success: true, message: 'Письмо отправлено повторно' });

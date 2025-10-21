@@ -10,6 +10,52 @@ import { asyncHandler, errors } from '../utils/errors';
 import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { PeriodsService } from '../services/periodsService';
+import {
+  validateQuery,
+  validateBody,
+  validateParams,
+  commonSchemas,
+} from '../middleware/validation';
+import { z } from 'zod';
+
+// Валидационные схемы для periods
+const periodsSchemas = {
+  // Схема для пагинации
+  pagination: commonSchemas.pagination,
+
+  // Схема для ID периода
+  periodId: z.object({
+    id: commonSchemas.numericId,
+  }),
+
+  // Схема для создания периода
+  createPeriod: z.object({
+    start_year: commonSchemas.year,
+    end_year: commonSchemas.year,
+    description: z.string().min(1, 'Описание обязательно'),
+    type: z.string().min(1, 'Тип периода обязателен'),
+    country_id: z.number().int().positive().optional().nullable(),
+    person_id: z.string().min(1, 'ID личности обязателен'),
+    saveAsDraft: z.boolean().optional().default(false),
+  }),
+
+  // Схема для обновления периода
+  updatePeriod: z.object({
+    start_year: commonSchemas.year.optional(),
+    end_year: commonSchemas.year.optional(),
+    period_type: z.string().min(1, 'Тип периода обязателен').optional(),
+    country_id: z.number().int().positive().optional().nullable(),
+    comment: z.string().optional(),
+  }),
+};
+
+// Helper function для преобразования роли пользователя из JWT в UserRole
+function getUserRole(userRole: string): UserRole {
+  if (userRole === 'admin' || userRole === 'moderator' || userRole === 'user') {
+    return userRole;
+  }
+  return 'user'; // fallback для неизвестных ролей
+}
 
 export function createPeriodsRoutes(
   pool: Pool,
@@ -26,6 +72,7 @@ export function createPeriodsRoutes(
     '/periods',
     authenticateToken,
     requireVerifiedEmail,
+    validateBody(periodsSchemas.createPeriod),
     asyncHandler(async (req: Request, res: Response) => {
       const {
         start_year,
@@ -35,11 +82,7 @@ export function createPeriodsRoutes(
         country_id,
         person_id,
         saveAsDraft = false,
-      } = req.body || {};
-
-      if (!start_year || !end_year || !description || !type || !person_id) {
-        throw errors.badRequest('start_year, end_year, description, type и person_id обязательны');
-      }
+      } = req.body;
 
       const result = await periodsService.createPeriod(
         {
@@ -52,7 +95,7 @@ export function createPeriodsRoutes(
         },
         {
           sub: req.user!.sub,
-          role: req.user!.role as UserRole,
+          role: getUserRole(req.user!.role),
           email: req.user?.email,
         },
         saveAsDraft
@@ -93,7 +136,7 @@ export function createPeriodsRoutes(
         },
         {
           sub: req.user!.sub,
-          role: req.user!.role as UserRole,
+          role: getUserRole(req.user!.role),
           email: req.user?.email,
         },
         saveAsDraft
@@ -108,11 +151,13 @@ export function createPeriodsRoutes(
     '/periods/:id',
     authenticateToken,
     requireVerifiedEmail,
+    validateParams(periodsSchemas.periodId),
+    validateBody(periodsSchemas.updatePeriod),
     asyncHandler(async (req: Request, res: Response) => {
-      const { id } = req.params;
-      const { start_year, end_year, period_type, country_id, comment } = req.body || {};
+      const { id } = req.params as unknown as { id: number };
+      const { start_year, end_year, period_type, country_id, comment } = req.body;
 
-      const result = await periodsService.updatePeriod(parseInt(id), req.user!.sub, {
+      const result = await periodsService.updatePeriod(id, req.user!.sub, {
         startYear: start_year,
         endYear: end_year,
         periodType: period_type,
@@ -129,9 +174,10 @@ export function createPeriodsRoutes(
     '/periods/:id/submit',
     authenticateToken,
     requireVerifiedEmail,
+    validateParams(periodsSchemas.periodId),
     asyncHandler(async (req: Request, res: Response) => {
-      const { id } = req.params;
-      const result = await periodsService.submitDraft(parseInt(id), req.user!.sub);
+      const { id } = req.params as unknown as { id: number };
+      const result = await periodsService.submitDraft(id, req.user!.sub);
       res.json({ success: true, data: result });
     })
   );
@@ -140,9 +186,10 @@ export function createPeriodsRoutes(
   router.delete(
     '/periods/:id',
     authenticateToken,
+    validateParams(periodsSchemas.periodId),
     asyncHandler(async (req: Request, res: Response) => {
-      const { id } = req.params;
-      await periodsService.deletePeriod(parseInt(id), req.user!.sub);
+      const { id } = req.params as unknown as { id: number };
+      await periodsService.deletePeriod(id, req.user!.sub);
       res.json({ success: true });
     })
   );
@@ -151,10 +198,11 @@ export function createPeriodsRoutes(
   router.get(
     '/periods/drafts',
     authenticateToken,
+    validateQuery(periodsSchemas.pagination),
     asyncHandler(async (req: Request, res: Response) => {
-      const limit = req.query.limit as string | undefined;
-      const offset = req.query.offset as string | undefined;
-      const countOnly = String((req.query.count as string) || 'false') === 'true';
+      const limit = req.query.limit as number | undefined;
+      const offset = req.query.offset as number | undefined;
+      const countOnly = req.query.count as boolean | undefined;
 
       if (countOnly) {
         const count = await periodsService.getUserDrafts(req.user!.sub, 1, 0);
@@ -162,11 +210,7 @@ export function createPeriodsRoutes(
         return;
       }
 
-      const { data, meta } = await periodsService.getUserDrafts(
-        req.user!.sub,
-        limit ? parseInt(limit) : undefined,
-        offset ? parseInt(offset) : undefined
-      );
+      const { data, meta } = await periodsService.getUserDrafts(req.user!.sub, limit, offset);
       res.json({ success: true, data, meta });
     })
   );
@@ -176,10 +220,11 @@ export function createPeriodsRoutes(
     '/admin/periods/pending',
     authenticateToken,
     requireRoleMiddleware(['moderator', 'admin']),
+    validateQuery(periodsSchemas.pagination),
     asyncHandler(async (req: Request, res: Response) => {
-      const limit = req.query.limit as string | undefined;
-      const offset = req.query.offset as string | undefined;
-      const countOnly = String((req.query.count as string) || 'false') === 'true';
+      const limit = req.query.limit as number | undefined;
+      const offset = req.query.offset as number | undefined;
+      const countOnly = req.query.count as boolean | undefined;
 
       if (countOnly) {
         const count = await periodsService.getPendingCount();
@@ -187,10 +232,7 @@ export function createPeriodsRoutes(
         return;
       }
 
-      const { data, meta } = await periodsService.getPendingPeriods(
-        limit ? parseInt(limit) : undefined,
-        offset ? parseInt(offset) : undefined
-      );
+      const { data, meta } = await periodsService.getPendingPeriods(limit, offset);
       res.json({ success: true, data, meta });
     })
   );
@@ -269,7 +311,10 @@ export function createPeriodsRoutes(
   router.get(
     '/periods/lookup/by-ids',
     asyncHandler(async (req: Request, res: Response) => {
-      const raw = (req.query.ids || '').toString().trim();
+      const idsParam = req.query.ids;
+      const raw = Array.isArray(idsParam)
+        ? idsParam.map(String).join(',')
+        : (idsParam as string) || '';
       if (!raw) {
         res.json({ success: true, data: [] });
         return;

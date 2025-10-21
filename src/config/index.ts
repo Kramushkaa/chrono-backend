@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -79,28 +80,34 @@ export const validateConfig = (): void => {
   const criticalMissingVars = criticalEnvVars.filter(varName => !process.env[varName]);
 
   if (missingVars.length > 0) {
-    console.warn('⚠️  Предупреждение: Отсутствуют следующие переменные окружения:');
-    missingVars.forEach(varName => console.warn(`   - ${varName}`));
-    console.warn('   Используются значения по умолчанию.');
+    logger.warn('Предупреждение: Отсутствуют следующие переменные окружения', {
+      missingVars,
+      message: 'Используются значения по умолчанию',
+    });
   }
 
   // Критичные переменные должны быть установлены в production
   if (config.server.nodeEnv === 'production') {
     if (criticalMissingVars.length > 0) {
-      console.error('❌ ОШИБКА: В production должны быть установлены следующие переменные:');
-      criticalMissingVars.forEach(varName => console.error(`   - ${varName}`));
+      logger.error('ОШИБКА: В production должны быть установлены следующие переменные', {
+        criticalMissingVars,
+      });
       process.exit(1);
     }
 
     // Проверка JWT секрета в продакшене
     if (config.jwt.secret === 'your-super-secret-jwt-key-change-in-production') {
-      console.error('❌ ОШИБКА: JWT_SECRET должен быть изменен в продакшене!');
+      logger.error('ОШИБКА: JWT_SECRET должен быть изменен в продакшене!');
       process.exit(1);
     }
 
     // Проверка CORS в продакшене
-    if (process.env.CORS === '*' || process.env.CORS_ORIGIN === '*' || process.env.CORS_ORIGINS === '*') {
-      console.error('❌ ОШИБКА: CORS не может быть "*" в продакшене!');
+    if (
+      process.env.CORS === '*' ||
+      process.env.CORS_ORIGIN === '*' ||
+      process.env.CORS_ORIGINS === '*'
+    ) {
+      logger.error('ОШИБКА: CORS не может быть "*" в продакшене!');
       process.exit(1);
     }
   }

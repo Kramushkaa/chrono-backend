@@ -19,6 +19,22 @@ export const createMockPool = (): jest.Mocked<Pool> => {
     removeListener: jest.fn(),
   };
 
+  // Add health check properties as configurable
+  Object.defineProperty(mockPool, 'totalCount', { value: 0, writable: true, configurable: true });
+  Object.defineProperty(mockPool, 'idleCount', { value: 0, writable: true, configurable: true });
+  Object.defineProperty(mockPool, 'waitingCount', { value: 0, writable: true, configurable: true });
+  Object.defineProperty(mockPool, 'options', {
+    value: {
+      max: 20,
+      maxUses: 0,
+      allowExitOnIdle: false,
+      maxLifetimeSeconds: 0,
+      idleTimeoutMillis: 0,
+    },
+    writable: true,
+    configurable: true,
+  });
+
   return mockPool as jest.Mocked<Pool>;
 };
 
@@ -58,7 +74,9 @@ export const createMockTelegramService = () =>
 /**
  * Mock User для тестов
  */
-export const createMockUser = (overrides?: Partial<{ sub: number; email: string; role: UserRole }>) => ({
+export const createMockUser = (
+  overrides?: Partial<{ sub: number; email: string; role: UserRole }>
+) => ({
   sub: 1,
   email: 'test@example.com',
   role: 'user' as UserRole,

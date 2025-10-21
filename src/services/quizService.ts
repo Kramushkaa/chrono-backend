@@ -1,5 +1,7 @@
 import { Pool } from 'pg';
 import * as crypto from 'crypto';
+import { BaseService } from './BaseService';
+import { logger } from '../utils/logger';
 import type {
   QuizQuestion,
   QuizQuestionType,
@@ -15,11 +17,9 @@ import type {
   DetailedQuestionResult,
 } from '@chrononinja/dto';
 
-export class QuizService {
-  private pool: Pool;
-
+export class QuizService extends BaseService {
   constructor(pool: Pool) {
-    this.pool = pool;
+    super(pool);
   }
 
   // ============================================================================
@@ -225,7 +225,10 @@ export class QuizService {
       questions ? JSON.stringify(questions) : null,
     ];
 
-    const result = await this.pool.query(query, values);
+    const result = await this.executeQuery(query, values, {
+      action: 'saveQuizAttempt',
+      params: { userId, correctAnswers, totalQuestions },
+    });
     return {
       attemptId: result.rows[0].id,
       ratingPoints,
@@ -251,7 +254,10 @@ export class QuizService {
 
       // Check if code already exists
       const checkQuery = 'SELECT id FROM shared_quizzes WHERE share_code = $1';
-      const result = await this.pool.query(checkQuery, [code]);
+      const result = await this.executeQuery(checkQuery, [code], {
+        action: 'generateShareCode_check',
+        params: { code },
+      });
 
       if (result.rows.length === 0) {
         return code;
@@ -367,7 +373,10 @@ export class QuizService {
       JOIN users u ON sq.creator_user_id = u.id
       WHERE sq.share_code = $1
     `;
-    const quizResult = await this.pool.query(quizQuery, [shareCode]);
+    const quizResult = await this.executeQuery(quizQuery, [shareCode], {
+      action: 'getSharedQuiz',
+      params: { shareCode },
+    });
 
     if (quizResult.rows.length === 0) {
       return null;
@@ -382,7 +391,10 @@ export class QuizService {
       WHERE shared_quiz_id = $1
       ORDER BY question_index ASC
     `;
-    const questionsResult = await this.pool.query(questionsQuery, [quiz.id]);
+    const questionsResult = await this.executeQuery(questionsQuery, [quiz.id], {
+      action: 'getSharedQuiz_questions',
+      params: { quizId: quiz.id },
+    });
 
     // Strip correct answers from questions
     const questions: QuizQuestionWithoutAnswer[] = questionsResult.rows.map(row => {
@@ -423,13 +435,14 @@ export class QuizService {
       RETURNING expires_at
     `;
 
-    const result = await this.pool.query(query, [
-      sharedQuizId,
-      userId,
-      sessionToken,
-      JSON.stringify([]),
-      expiresAt,
-    ]);
+    const result = await this.executeQuery(
+      query,
+      [sharedQuizId, userId, sessionToken, JSON.stringify([]), expiresAt],
+      {
+        action: 'startQuizSession',
+        params: { sharedQuizId, userId },
+      }
+    );
 
     return {
       sessionToken,
@@ -448,7 +461,10 @@ export class QuizService {
         AND finished_at IS NULL
     `;
 
-    const result = await this.pool.query(query, [sessionToken]);
+    const result = await this.executeQuery(query, [sessionToken], {
+      action: 'getQuizSession',
+      params: { sessionToken },
+    });
 
     if (result.rows.length === 0) {
       return null;
@@ -483,10 +499,14 @@ export class QuizService {
       FROM shared_quiz_questions
       WHERE shared_quiz_id = $1 AND (question_data->>'id')::text = $2
     `;
-    const questionResult = await this.pool.query(questionQuery, [
-      session.shared_quiz_id,
-      questionId,
-    ]);
+    const questionResult = await this.executeQuery(
+      questionQuery,
+      [session.shared_quiz_id, questionId],
+      {
+        action: 'checkAnswer_getQuestion',
+        params: { sessionToken, questionId },
+      }
+    );
 
     if (questionResult.rows.length === 0) {
       throw new Error('Question not found');
@@ -510,7 +530,10 @@ export class QuizService {
       SET answers = $1
       WHERE session_token = $2
     `;
-    await this.pool.query(updateQuery, [JSON.stringify(updatedAnswers), sessionToken]);
+    await this.executeQuery(updateQuery, [JSON.stringify(updatedAnswers), sessionToken], {
+      action: 'checkAnswer_updateSession',
+      params: { sessionToken, questionId },
+    });
 
     return { isCorrect };
   }
@@ -567,7 +590,10 @@ export class QuizService {
       WHERE shared_quiz_id = $1
       ORDER BY question_index ASC
     `;
-    const questionsResult = await this.pool.query(questionsQuery, [session.shared_quiz_id]);
+    const questionsResult = await this.executeQuery(questionsQuery, [session.shared_quiz_id], {
+      action: 'finishQuizSession_getQuestions',
+      params: { sessionToken },
+    });
     const questions = questionsResult.rows.map(row => row.question_data as QuizQuestion);
 
     // Calculate results
@@ -603,21 +629,33 @@ export class QuizService {
       RETURNING id
     `;
 
-    const attemptResult = await this.pool.query(attemptQuery, [
-      session.user_id,
-      session.shared_quiz_id,
-      correctAnswers,
-      totalQuestions,
-      totalTimeMs,
-      ratingPoints,
-    ]);
+    const attemptResult = await this.executeQuery(
+      attemptQuery,
+      [
+        session.user_id,
+        session.shared_quiz_id,
+        correctAnswers,
+        totalQuestions,
+        totalTimeMs,
+        ratingPoints,
+      ],
+      {
+        action: 'finishQuizSession_saveAttempt',
+        params: { sessionToken, correctAnswers, totalQuestions },
+      }
+    );
 
     const attemptId = attemptResult.rows[0].id;
 
     // Mark session as finished (instead of deleting)
-    await this.pool.query('UPDATE quiz_sessions SET finished_at = NOW() WHERE session_token = $1', [
-      sessionToken,
-    ]);
+    await this.executeQuery(
+      'UPDATE quiz_sessions SET finished_at = NOW() WHERE session_token = $1',
+      [sessionToken],
+      {
+        action: 'finishQuizSession_markFinished',
+        params: { sessionToken, attemptId },
+      }
+    );
 
     // Prepare detailed results
     const detailedResults: DetailedQuestionResult[] = questions.map(question => {
@@ -686,7 +724,10 @@ export class QuizService {
       LIMIT $2
     `;
 
-    const result = await this.pool.query(query, [userId, limit]);
+    const result = await this.executeQuery(query, [userId, limit], {
+      action: 'getUserQuizHistory',
+      params: { userId, limit },
+    });
     return result.rows;
   }
 
@@ -709,7 +750,10 @@ export class QuizService {
       WHERE qa.id = $1 AND qa.user_id = $2
     `;
 
-    const result = await this.pool.query(query, [attemptId, userId]);
+    const result = await this.executeQuery(query, [attemptId, userId], {
+      action: 'getAttemptDetail',
+      params: { attemptId, userId },
+    });
 
     if (result.rows.length === 0) {
       return null;
@@ -752,7 +796,10 @@ export class QuizService {
       WHERE qs.session_token = $1 AND qs.finished_at IS NOT NULL
     `;
 
-    const sessionResult = await this.pool.query(sessionQuery, [sessionToken]);
+    const sessionResult = await this.executeQuery(sessionQuery, [sessionToken], {
+      action: 'getSessionDetail_getSession',
+      params: { sessionToken },
+    });
 
     if (sessionResult.rows.length === 0) {
       return null;
@@ -768,7 +815,10 @@ export class QuizService {
       ORDER BY question_index ASC
     `;
 
-    const questionsResult = await this.pool.query(questionsQuery, [session.shared_quiz_id]);
+    const questionsResult = await this.executeQuery(questionsQuery, [session.shared_quiz_id], {
+      action: 'getSessionDetail_getQuestions',
+      params: { sessionToken, sharedQuizId: session.shared_quiz_id },
+    });
     const questions = questionsResult.rows.map(row => row.question_data as QuizQuestion);
 
     return {
@@ -790,7 +840,10 @@ export class QuizService {
       RETURNING id
     `;
 
-    const result = await this.pool.query(query);
+    const result = await this.executeQuery(query, [], {
+      action: 'cleanupExpiredSessions',
+      params: {},
+    });
     return result.rows.length;
   }
 
@@ -829,7 +882,10 @@ export class QuizService {
       FROM player_stats
     `;
 
-    const topResult = await this.pool.query(topQuery);
+    const topResult = await this.executeQuery(topQuery, [], {
+      action: 'getGlobalLeaderboard_topPlayers',
+      params: { userId },
+    });
 
     const topPlayers: GlobalLeaderboardEntry[] = topResult.rows.map(row => ({
       rank: parseInt(row.rank),
@@ -847,7 +903,10 @@ export class QuizService {
       FROM quiz_attempts
       WHERE user_id IS NOT NULL
     `;
-    const countResult = await this.pool.query(countQuery);
+    const countResult = await this.executeQuery(countQuery, [], {
+      action: 'getGlobalLeaderboard_countPlayers',
+      params: { userId },
+    });
     const totalPlayers = parseInt(countResult.rows[0].total);
 
     // Get user entry if userId provided and not in top 100
@@ -875,7 +934,10 @@ export class QuizService {
         )
         SELECT * FROM ranked_players WHERE user_id = $1
       `;
-      const userResult = await this.pool.query(userQuery, [userId]);
+      const userResult = await this.executeQuery(userQuery, [userId], {
+        action: 'getGlobalLeaderboard_userEntry',
+        params: { userId },
+      });
 
       if (userResult.rows.length > 0) {
         const row = userResult.rows[0];
@@ -917,7 +979,10 @@ export class QuizService {
       FROM quiz_attempts
       WHERE user_id = $1
     `;
-    const statsResult = await this.pool.query(statsQuery, [userId]);
+    const statsResult = await this.executeQuery(statsQuery, [userId], {
+      action: 'getUserStats_getStats',
+      params: { userId },
+    });
     const stats = statsResult.rows[0];
 
     // Get rank
@@ -938,7 +1003,10 @@ export class QuizService {
       )
       SELECT rank FROM ranked_players WHERE user_id = $1
     `;
-    const rankResult = await this.pool.query(rankQuery, [userId]);
+    const rankResult = await this.executeQuery(rankQuery, [userId], {
+      action: 'getUserStats_getRank',
+      params: { userId },
+    });
     const rank = rankResult.rows.length > 0 ? parseInt(rankResult.rows[0].rank) : undefined;
 
     // Get recent attempts
@@ -952,7 +1020,10 @@ export class QuizService {
       ORDER BY qa.created_at DESC
       LIMIT 10
     `;
-    const attemptsResult = await this.pool.query(attemptsQuery, [userId]);
+    const attemptsResult = await this.executeQuery(attemptsQuery, [userId], {
+      action: 'getUserStats_getRecentAttempts',
+      params: { userId },
+    });
 
     const recentAttempts: QuizAttemptDTO[] = attemptsResult.rows.map(row => ({
       id: row.id,
@@ -990,7 +1061,10 @@ export class QuizService {
   }> {
     // Get quiz info
     const quizQuery = 'SELECT id, title FROM shared_quizzes WHERE share_code = $1';
-    const quizResult = await this.pool.query(quizQuery, [shareCode]);
+    const quizResult = await this.executeQuery(quizQuery, [shareCode], {
+      action: 'getSharedQuizLeaderboard_getQuiz',
+      params: { shareCode, userId },
+    });
 
     if (quizResult.rows.length === 0) {
       throw new Error('Quiz not found');
@@ -1019,7 +1093,10 @@ export class QuizService {
       ORDER BY rank
       LIMIT 100
     `;
-    const entriesResult = await this.pool.query(entriesQuery, [quiz.id]);
+    const entriesResult = await this.executeQuery(entriesQuery, [quiz.id], {
+      action: 'getSharedQuizLeaderboard_getEntries',
+      params: { shareCode, userId, quizId: quiz.id },
+    });
 
     const entries: SharedQuizLeaderboardEntry[] = entriesResult.rows.map(row => ({
       rank: parseInt(row.rank),
@@ -1033,7 +1110,10 @@ export class QuizService {
 
     // Get total attempts
     const countQuery = 'SELECT COUNT(*) as total FROM quiz_attempts WHERE shared_quiz_id = $1';
-    const countResult = await this.pool.query(countQuery, [quiz.id]);
+    const countResult = await this.executeQuery(countQuery, [quiz.id], {
+      action: 'getSharedQuizLeaderboard_getTotalAttempts',
+      params: { shareCode, userId, quizId: quiz.id },
+    });
     const totalAttempts = parseInt(countResult.rows[0].total);
 
     // Get user entry if not in top 100
@@ -1057,7 +1137,10 @@ export class QuizService {
         )
         SELECT * FROM ranked_attempts WHERE user_id = $2
       `;
-      const userResult = await this.pool.query(userQuery, [quiz.id, userId]);
+      const userResult = await this.executeQuery(userQuery, [quiz.id, userId], {
+        action: 'getSharedQuizLeaderboard_getUserEntry',
+        params: { shareCode, userId, quizId: quiz.id },
+      });
 
       if (userResult.rows.length > 0) {
         const row = userResult.rows[0];

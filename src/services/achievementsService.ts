@@ -5,6 +5,8 @@ import { errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset, PaginationDefaults } from '../utils/api';
 import { TelegramService } from './telegramService';
 import { AchievementRow } from '../types/database';
+import { BaseService } from './BaseService';
+import { logger } from '../utils/logger';
 
 export interface AchievementCreateData {
   personId?: string;
@@ -23,12 +25,11 @@ export interface AchievementFilters {
   yearTo?: number;
 }
 
-export class AchievementsService {
-  private pool: Pool;
+export class AchievementsService extends BaseService {
   private telegramService: TelegramService;
 
   constructor(pool: Pool, telegramService: TelegramService) {
-    this.pool = pool;
+    super(pool);
     this.telegramService = telegramService;
   }
 
@@ -36,9 +37,10 @@ export class AchievementsService {
    * Валидация года достижения относительно годов жизни личности
    */
   async validateAchievementYears(year: number, personId: string): Promise<void> {
-    const personRes = await this.pool.query(
+    const personRes = await this.executeQuery(
       'SELECT birth_year, death_year, name FROM persons WHERE id = $1',
-      [personId]
+      [personId],
+      { action: 'validateAchievementYears', params: { year, personId } }
     );
 
     if (personRes.rowCount === 0) {
@@ -72,14 +74,18 @@ export class AchievementsService {
 
     const status = determineContentStatus(user, saveAsDraft);
     const personName = personId
-      ? (await this.pool.query('SELECT name FROM persons WHERE id = $1', [personId])).rows[0]?.name
+      ? (
+          await this.executeQuery('SELECT name FROM persons WHERE id = $1', [personId], {
+            action: 'getPersonName',
+          })
+        ).rows[0]?.name
       : null;
 
     let result;
 
     if (status === 'approved' && personId) {
       // Админы/модераторы - с ON CONFLICT для дедупликации
-      result = await this.pool.query(
+      result = await this.executeQuery(
         `INSERT INTO achievements (person_id, country_id, year, description, wikipedia_url, image_url, status, created_by)
          VALUES ($1, $2, $3, btrim($4), $5, $6, 'approved', $7)
          ON CONFLICT (person_id, year, lower(btrim(description)))
@@ -94,11 +100,12 @@ export class AchievementsService {
           wikipediaUrl ?? null,
           imageUrl ?? null,
           user.sub,
-        ]
+        ],
+        { action: 'createAchievement', params: { status, personId, year, saveAsDraft } }
       );
     } else {
       // Черновики и pending - без ON CONFLICT
-      result = await this.pool.query(
+      result = await this.executeQuery(
         `INSERT INTO achievements (person_id, country_id, year, description, wikipedia_url, image_url, status, created_by)
          VALUES ($1, $2, $3, btrim($4), $5, $6, $7, $8)
          RETURNING *`,
@@ -111,7 +118,8 @@ export class AchievementsService {
           imageUrl ?? null,
           status,
           user.sub,
-        ]
+        ],
+        { action: 'createAchievementDraft', params: { status, personId, year, saveAsDraft } }
       );
     }
 
@@ -120,7 +128,9 @@ export class AchievementsService {
       const userEmail = user.email || 'unknown';
       this.telegramService
         .notifyAchievementCreated(description, year, userEmail, status, personName)
-        .catch(err => console.warn('Telegram notification failed (achievement created):', err));
+        .catch(err =>
+          logger.warn('Telegram notification failed (achievement created)', { error: err })
+        );
     }
 
     return result.rows[0];
@@ -165,7 +175,10 @@ export class AchievementsService {
     `;
 
     params.push(limitParam + 1, offsetParam);
-    const result = await this.pool.query(sql, params);
+    const result = await this.executeQuery(sql, params, {
+      action: 'getAchievements',
+      params: { filters, limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -208,7 +221,10 @@ export class AchievementsService {
        LIMIT $2 OFFSET $3
     `;
 
-    const result = await this.pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [userId, limitParam + 1, offsetParam], {
+      action: 'getUserAchievements',
+      params: { userId, limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -252,7 +268,10 @@ export class AchievementsService {
        LIMIT $1 OFFSET $2
     `;
 
-    const result = await this.pool.query(sql, [limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [limitParam + 1, offsetParam], {
+      action: 'getPendingAchievements',
+      params: { limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -266,9 +285,13 @@ export class AchievementsService {
     comment?: string
   ): Promise<any> {
     // Проверяем существование
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT id, status, created_by FROM achievements WHERE id = $1',
-      [achievementId]
+      [achievementId],
+      {
+        action: 'reviewAchievement_check',
+        params: { achievementId, action, reviewerId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -283,12 +306,16 @@ export class AchievementsService {
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `UPDATE achievements
        SET status = $1, reviewed_by = $2, review_comment = $3, updated_at = NOW()
        WHERE id = $4
        RETURNING *`,
-      [newStatus, reviewerId, comment ?? null, achievementId]
+      [newStatus, reviewerId, comment ?? null, achievementId],
+      {
+        action: 'reviewAchievement_update',
+        params: { achievementId, action, reviewerId },
+      }
     );
 
     return result.rows[0];
@@ -303,9 +330,13 @@ export class AchievementsService {
     updates: Partial<AchievementCreateData>
   ): Promise<any> {
     // Проверяем права
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT created_by, status FROM achievements WHERE id = $1',
-      [achievementId]
+      [achievementId],
+      {
+        action: 'updateAchievement_check',
+        params: { achievementId, userId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -355,7 +386,10 @@ export class AchievementsService {
     const sql = `UPDATE achievements SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
     values.push(achievementId);
 
-    const result = await this.pool.query(sql, values);
+    const result = await this.executeQuery(sql, values, {
+      action: 'updateAchievement_update',
+      params: { achievementId, userId },
+    });
     return result.rows[0];
   }
 
@@ -363,9 +397,13 @@ export class AchievementsService {
    * Отправка черновика на модерацию
    */
   async submitDraft(achievementId: number, userId: number): Promise<any> {
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT created_by, status FROM achievements WHERE id = $1',
-      [achievementId]
+      [achievementId],
+      {
+        action: 'submitDraft_check',
+        params: { achievementId, userId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -382,9 +420,13 @@ export class AchievementsService {
       throw errors.badRequest('Можно отправлять только черновики');
     }
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `UPDATE achievements SET status = 'pending', updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [achievementId]
+      [achievementId],
+      {
+        action: 'submitDraft_update',
+        params: { achievementId, userId },
+      }
     );
 
     return result.rows[0];
@@ -423,7 +465,10 @@ export class AchievementsService {
        LIMIT $2 OFFSET $3
     `;
 
-    const result = await this.pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [userId, limitParam + 1, offsetParam], {
+      action: 'getUserDrafts',
+      params: { userId, limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -431,9 +476,13 @@ export class AchievementsService {
    * Получение достижений по person_id
    */
   async getAchievementsByPerson(personId: string): Promise<any[]> {
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       'SELECT id, person_id, year, description, wikipedia_url, image_url FROM v_approved_achievements WHERE person_id = $1 ORDER BY year ASC',
-      [personId]
+      [personId],
+      {
+        action: 'getAchievementsByPerson',
+        params: { personId },
+      }
     );
     return result.rows;
   }
@@ -442,9 +491,13 @@ export class AchievementsService {
    * Удаление достижения (только свои черновики)
    */
   async deleteAchievement(achievementId: number, userId: number): Promise<void> {
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT created_by, status FROM achievements WHERE id = $1',
-      [achievementId]
+      [achievementId],
+      {
+        action: 'deleteAchievement_check',
+        params: { achievementId, userId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -461,16 +514,23 @@ export class AchievementsService {
       throw errors.badRequest('Можно удалять только черновики');
     }
 
-    await this.pool.query('DELETE FROM achievements WHERE id = $1', [achievementId]);
+    await this.executeQuery('DELETE FROM achievements WHERE id = $1', [achievementId], {
+      action: 'deleteAchievement_delete',
+      params: { achievementId, userId },
+    });
   }
 
   /**
    * Получение количества достижений пользователя
    */
   async getUserAchievementsCount(userId: number): Promise<number> {
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `SELECT COALESCE(achievements_count, 0) AS cnt FROM v_user_content_counts WHERE created_by = $1`,
-      [userId]
+      [userId],
+      {
+        action: 'getUserAchievementsCount',
+        params: { userId },
+      }
     );
     return result.rows[0]?.cnt || 0;
   }
@@ -479,8 +539,13 @@ export class AchievementsService {
    * Получение количества pending достижений
    */
   async getPendingCount(): Promise<number> {
-    const result = await this.pool.query(
-      `SELECT COUNT(*)::int AS cnt FROM achievements WHERE status = 'pending'`
+    const result = await this.executeQuery(
+      `SELECT COUNT(*)::int AS cnt FROM achievements WHERE status = 'pending'`,
+      [],
+      {
+        action: 'getPendingCount',
+        params: {},
+      }
     );
     return result.rows[0]?.cnt || 0;
   }

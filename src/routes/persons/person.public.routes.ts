@@ -10,6 +10,12 @@ import { errors, mapPgError, asyncHandler } from '../../utils/errors';
 import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../../utils/api';
 import { TelegramService } from '../../services/telegramService';
 import { sanitizePayload } from './helpers';
+import {
+  validateQuery,
+  validateParams,
+  validateBody,
+  commonSchemas,
+} from '../../middleware/validation';
 
 import { PersonsService } from '../../services/personsService';
 
@@ -23,6 +29,7 @@ export function createPublicPersonRoutes(
   // --- Public persons listing with filters/pagination ---
   router.get(
     '/persons',
+    validateQuery(commonSchemas.pagination.and(commonSchemas.personSearch)),
     asyncHandler(async (req: Request, res: Response) => {
       const category = req.query.category;
       const country = req.query.country;
@@ -50,6 +57,7 @@ export function createPublicPersonRoutes(
   // Person details
   router.get(
     '/persons/:id',
+    validateParams(commonSchemas.personId),
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       if (!id) {
@@ -64,6 +72,7 @@ export function createPublicPersonRoutes(
   // Persons lookup by ids (ordered)
   router.get(
     '/persons/lookup/by-ids',
+    validateQuery(commonSchemas.personLookup),
     asyncHandler(async (req: Request, res: Response) => {
       const raw = ((req.query.ids as string) || '').toString().trim();
       if (!raw) {

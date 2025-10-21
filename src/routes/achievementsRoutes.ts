@@ -10,15 +10,20 @@ import { asyncHandler, errors } from '../utils/errors';
 import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { AchievementsService } from '../services/achievementsService';
-import { validateQuery, validateParams, commonSchemas } from '../middleware/validation';
+import {
+  validateQuery,
+  validateParams,
+  validateBody,
+  commonSchemas,
+} from '../middleware/validation';
 import { z } from 'zod';
 
 // Валидационные схемы
 const achievementsSchemas = {
   // Схема для пагинации
   pagination: commonSchemas.pagination,
-  
-  // Схема для ID достижения  
+
+  // Схема для ID достижения
   achievementId: z.object({
     id: commonSchemas.numericId,
   }),
@@ -28,7 +33,7 @@ const achievementsSchemas = {
     ids: z
       .string()
       .optional()
-      .transform(val => val ? val.split(',').map(id => parseInt(id.trim(), 10)) : [])
+      .transform(val => (val ? val.split(',').map(id => parseInt(id.trim(), 10)) : []))
       .refine(ids => ids.every(id => !Number.isNaN(id) && id > 0), {
         message: 'Все ID должны быть положительными числами',
       }),
@@ -62,10 +67,7 @@ export function createAchievementsRoutes(
         return;
       }
 
-      const { data, meta } = await achievementsService.getPendingAchievements(
-        limit,
-        offset
-      );
+      const { data, meta } = await achievementsService.getPendingAchievements(limit, offset);
       res.json({ success: true, data, meta });
     })
   );
@@ -169,6 +171,7 @@ export function createAchievementsRoutes(
     '/achievements/:id',
     authenticateToken,
     requireVerifiedEmail,
+    validateBody(commonSchemas.updateAchievement),
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const { year, description, wikipedia_url, image_url } = req.body || {};

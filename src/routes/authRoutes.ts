@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController';
 import { authenticateToken, requireRoleMiddleware, rateLimit } from '../middleware/auth';
+import { validateBody, commonSchemas } from '../middleware/validation';
 
 export function createAuthRoutes(authController: AuthController): Router {
   const router = Router();
@@ -11,10 +12,14 @@ export function createAuthRoutes(authController: AuthController): Router {
   // Публичные маршруты (не требуют аутентификации)
 
   // Регистрация пользователя
-  router.post('/register', (req, res, next) => authController.register(req, res, next));
+  router.post('/register', validateBody(commonSchemas.register), (req, res, next) =>
+    authController.register(req, res, next)
+  );
 
   // Вход пользователя
-  router.post('/login', (req, res, next) => authController.login(req, res, next));
+  router.post('/login', validateBody(commonSchemas.login), (req, res, next) =>
+    authController.login(req, res, next)
+  );
 
   // Обновление токена доступа
   router.post('/refresh', (req, res, next) => authController.refreshToken(req, res, next));
@@ -54,8 +59,11 @@ export function createAuthRoutes(authController: AuthController): Router {
   );
 
   // Изменение пароля
-  router.put('/change-password', authenticateToken, (req, res, next) =>
-    authController.changePassword(req, res, next)
+  router.put(
+    '/change-password',
+    authenticateToken,
+    validateBody(commonSchemas.changePassword),
+    (req, res, next) => authController.changePassword(req, res, next)
   );
 
   // Проверка статуса аутентификации

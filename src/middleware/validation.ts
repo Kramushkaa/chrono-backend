@@ -75,14 +75,14 @@ export const commonSchemas = {
     limit: z
       .string()
       .optional()
-      .transform(val => val ? parseInt(val, 10) : undefined)
+      .transform(val => (val ? parseInt(val, 10) : undefined))
       .refine(val => !val || (val > 0 && val <= 1000), {
         message: 'limit должен быть от 1 до 1000',
       }),
     offset: z
       .string()
       .optional()
-      .transform(val => val ? parseInt(val, 10) : undefined)
+      .transform(val => (val ? parseInt(val, 10) : undefined))
       .refine(val => !val || val >= 0, {
         message: 'offset не может быть отрицательным',
       }),
@@ -108,4 +108,101 @@ export const commonSchemas = {
     .refine(val => !Number.isNaN(val) && val > 0, {
       message: 'ID должен быть положительным числом',
     }),
+
+  // Auth schemas
+  register: z.object({
+    email: z.string().email('Некорректный email'),
+    password: z.string().min(8, 'Пароль должен содержать минимум 8 символов'),
+    username: z.string().optional(),
+    fullName: z.string().optional(),
+  }),
+
+  login: z.object({
+    email: z.string().email('Некорректный email'),
+    password: z.string().min(1, 'Пароль обязателен'),
+  }),
+
+  changePassword: z.object({
+    currentPassword: z.string().min(1, 'Текущий пароль обязателен'),
+    newPassword: z.string().min(8, 'Новый пароль должен содержать минимум 8 символов'),
+  }),
+
+  // Content schemas
+  updateAchievement: z.object({
+    year: z.number().int().min(-3000).max(2100).optional(),
+    description: z.string().max(2000, 'Описание слишком длинное').optional(),
+    wikipedia_url: z.string().url('Некорректный URL Википедии').optional().nullable(),
+    image_url: z.string().url('Некорректный URL изображения').optional().nullable(),
+  }),
+
+  // Person schemas
+  personId: z.object({
+    id: z.string().min(1, 'ID персоны не может быть пустым'),
+  }),
+
+  // Person search/filter schemas
+  personSearch: z.object({
+    q: z.string().optional(),
+    category: z.string().optional(),
+    country: z.string().optional(),
+    startYear: z.string().optional(),
+    endYear: z.string().optional(),
+    year_from: z.string().optional(),
+    year_to: z.string().optional(),
+  }),
+
+  // Person lookup by IDs
+  personLookup: z.object({
+    ids: z.string().optional(),
+  }),
+};
+
+// Quiz schemas
+export const quizSchemas = {
+  // Share code validation
+  shareCode: z.object({
+    shareCode: z.string().min(1, 'Код викторины не может быть пустым'),
+  }),
+
+  // Attempt ID validation
+  attemptId: z.object({
+    attemptId: z
+      .string()
+      .min(1)
+      .transform(val => parseInt(val, 10))
+      .refine(val => !Number.isNaN(val) && val > 0, {
+        message: 'ID попытки должен быть положительным числом',
+      }),
+  }),
+
+  // Session token validation
+  sessionToken: z.object({
+    sessionToken: z.string().min(1, 'Токен сессии не может быть пустым'),
+  }),
+
+  // Quiz attempt validation
+  saveQuizAttempt: z.object({
+    correctAnswers: z
+      .number()
+      .int()
+      .min(0, 'Количество правильных ответов не может быть отрицательным'),
+    totalQuestions: z.number().int().min(1, 'Общее количество вопросов должно быть больше 0'),
+    totalTimeMs: z.number().int().min(0, 'Время не может быть отрицательным'),
+    config: z.any().optional(),
+    questionTypes: z.array(z.string()).optional(),
+    answers: z.array(z.any()).optional(),
+    questions: z.array(z.any()).optional(),
+  }),
+
+  // Check answer validation
+  checkAnswer: z.object({
+    sessionToken: z.string().min(1, 'Токен сессии обязателен'),
+    questionId: z.number().int().positive('ID вопроса должен быть положительным числом'),
+    answer: z.any(), // Answer can be of different types
+  }),
+
+  // Finish quiz validation
+  finishQuiz: z.object({
+    sessionToken: z.string().min(1, 'Токен сессии обязателен'),
+  }),
 };

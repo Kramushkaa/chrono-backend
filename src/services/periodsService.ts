@@ -5,6 +5,8 @@ import { errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset, PaginationDefaults } from '../utils/api';
 import { TelegramService } from './telegramService';
 import { PeriodRow } from '../types/database';
+import { BaseService } from './BaseService';
+import { logger } from '../utils/logger';
 
 export interface PeriodCreateData {
   personId: string;
@@ -24,12 +26,11 @@ export interface PeriodFilters {
   yearTo?: number;
 }
 
-export class PeriodsService {
-  private pool: Pool;
+export class PeriodsService extends BaseService {
   private telegramService: TelegramService;
 
   constructor(pool: Pool, telegramService: TelegramService) {
-    this.pool = pool;
+    super(pool);
     this.telegramService = telegramService;
   }
 
@@ -45,9 +46,13 @@ export class PeriodsService {
       throw errors.badRequest('start_year должен быть меньше end_year');
     }
 
-    const personRes = await this.pool.query(
+    const personRes = await this.executeQuery(
       'SELECT id, birth_year, death_year, name FROM persons WHERE id = $1',
-      [personId]
+      [personId],
+      {
+        action: 'validatePeriodYears',
+        params: { startYear, endYear, personId },
+      }
     );
 
     if (personRes.rowCount === 0) {
@@ -94,7 +99,10 @@ export class PeriodsService {
       params.push(excludeId);
     }
 
-    const result = await this.pool.query(sql, params);
+    const result = await this.executeQuery(sql, params, {
+      action: 'validatePeriodOverlap',
+      params: { personId, periodType, startYear, endYear, excludeId },
+    });
 
     if (result.rowCount && result.rowCount > 0) {
       const overlapping = result.rows[0];
@@ -124,7 +132,7 @@ export class PeriodsService {
 
     const status = determineContentStatus(user, saveAsDraft);
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
@@ -137,7 +145,11 @@ export class PeriodsService {
         comment ?? null,
         status,
         user.sub,
-      ]
+      ],
+      {
+        action: 'createPeriod',
+        params: { personId, startYear, endYear, periodType, userId: user.sub, saveAsDraft },
+      }
     );
 
     // Telegram уведомление (если не черновик)
@@ -152,7 +164,7 @@ export class PeriodsService {
           status === 'approved' ? 'approved' : 'pending',
           personName
         )
-        .catch(err => console.warn('Telegram notification failed (period created):', err));
+        .catch(err => logger.warn('Telegram notification failed (period created)', { error: err }));
     }
 
     return result.rows[0];
@@ -198,7 +210,10 @@ export class PeriodsService {
     `;
 
     params.push(limitParam + 1, offsetParam);
-    const result = await this.pool.query(sql, params);
+    const result = await this.executeQuery(sql, params, {
+      action: 'getPeriods',
+      params: { filters, limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -236,7 +251,10 @@ export class PeriodsService {
        LIMIT $2 OFFSET $3
     `;
 
-    const result = await this.pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [userId, limitParam + 1, offsetParam], {
+      action: 'getUserPeriods',
+      params: { userId, limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -273,7 +291,10 @@ export class PeriodsService {
        LIMIT $1 OFFSET $2
     `;
 
-    const result = await this.pool.query(sql, [limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [limitParam + 1, offsetParam], {
+      action: 'getPendingPeriods',
+      params: { limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -286,9 +307,14 @@ export class PeriodsService {
     reviewerId: number,
     comment?: string
   ): Promise<any> {
-    const checkRes = await this.pool.query('SELECT id, status FROM periods WHERE id = $1', [
-      periodId,
-    ]);
+    const checkRes = await this.executeQuery(
+      'SELECT id, status FROM periods WHERE id = $1',
+      [periodId],
+      {
+        action: 'reviewPeriod_check',
+        params: { periodId, action, reviewerId },
+      }
+    );
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Период не найден');
@@ -302,12 +328,16 @@ export class PeriodsService {
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `UPDATE periods
        SET status = $1, reviewed_by = $2, review_comment = $3, updated_at = NOW()
        WHERE id = $4
        RETURNING *`,
-      [newStatus, reviewerId, comment ?? null, periodId]
+      [newStatus, reviewerId, comment ?? null, periodId],
+      {
+        action: 'reviewPeriod_update',
+        params: { periodId, action, reviewerId },
+      }
     );
 
     return result.rows[0];
@@ -321,9 +351,13 @@ export class PeriodsService {
     userId: number,
     updates: Partial<PeriodCreateData>
   ): Promise<any> {
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT created_by, status, person_id, period_type, start_year, end_year FROM periods WHERE id = $1',
-      [periodId]
+      [periodId],
+      {
+        action: 'updatePeriod_check',
+        params: { periodId, userId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -394,7 +428,10 @@ export class PeriodsService {
     const sql = `UPDATE periods SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
     values.push(periodId);
 
-    const result = await this.pool.query(sql, values);
+    const result = await this.executeQuery(sql, values, {
+      action: 'updatePeriod_update',
+      params: { periodId, userId },
+    });
     return result.rows[0];
   }
 
@@ -402,9 +439,14 @@ export class PeriodsService {
    * Отправка черновика на модерацию
    */
   async submitDraft(periodId: number, userId: number): Promise<any> {
-    const checkRes = await this.pool.query('SELECT created_by, status FROM periods WHERE id = $1', [
-      periodId,
-    ]);
+    const checkRes = await this.executeQuery(
+      'SELECT created_by, status FROM periods WHERE id = $1',
+      [periodId],
+      {
+        action: 'submitDraft_check',
+        params: { periodId, userId },
+      }
+    );
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Период не найден');
@@ -420,9 +462,13 @@ export class PeriodsService {
       throw errors.badRequest('Можно отправлять только черновики');
     }
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `UPDATE periods SET status = 'pending', updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [periodId]
+      [periodId],
+      {
+        action: 'submitDraft_update',
+        params: { periodId, userId },
+      }
     );
 
     return result.rows[0];
@@ -462,7 +508,10 @@ export class PeriodsService {
        LIMIT $2 OFFSET $3
     `;
 
-    const result = await this.pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [userId, limitParam + 1, offsetParam], {
+      action: 'getUserDrafts',
+      params: { userId, limitParam, offsetParam },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -470,12 +519,16 @@ export class PeriodsService {
    * Получение периодов по person_id
    */
   async getPeriodsByPerson(personId: string): Promise<any[]> {
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `SELECT id, person_id, start_year, end_year, period_type, country_id, country_name
        FROM v_approved_periods
        WHERE person_id = $1
        ORDER BY start_year ASC`,
-      [personId]
+      [personId],
+      {
+        action: 'getPeriodsByPerson',
+        params: { personId },
+      }
     );
     return result.rows;
   }
@@ -484,9 +537,14 @@ export class PeriodsService {
    * Удаление периода (только свои черновики)
    */
   async deletePeriod(periodId: number, userId: number): Promise<void> {
-    const checkRes = await this.pool.query('SELECT created_by, status FROM periods WHERE id = $1', [
-      periodId,
-    ]);
+    const checkRes = await this.executeQuery(
+      'SELECT created_by, status FROM periods WHERE id = $1',
+      [periodId],
+      {
+        action: 'deletePeriod_check',
+        params: { periodId, userId },
+      }
+    );
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Период не найден');
@@ -502,16 +560,23 @@ export class PeriodsService {
       throw errors.badRequest('Можно удалять только черновики');
     }
 
-    await this.pool.query('DELETE FROM periods WHERE id = $1', [periodId]);
+    await this.executeQuery('DELETE FROM periods WHERE id = $1', [periodId], {
+      action: 'deletePeriod_delete',
+      params: { periodId, userId },
+    });
   }
 
   /**
    * Получение количества периодов пользователя
    */
   async getUserPeriodsCount(userId: number): Promise<number> {
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `SELECT COALESCE(periods_count, 0) AS cnt FROM v_user_content_counts WHERE created_by = $1`,
-      [userId]
+      [userId],
+      {
+        action: 'getUserPeriodsCount',
+        params: { userId },
+      }
     );
     return result.rows[0]?.cnt || 0;
   }
@@ -520,8 +585,13 @@ export class PeriodsService {
    * Получение количества pending периодов
    */
   async getPendingCount(): Promise<number> {
-    const result = await this.pool.query(
-      `SELECT COUNT(*)::int AS cnt FROM periods WHERE status = 'pending'`
+    const result = await this.executeQuery(
+      `SELECT COUNT(*)::int AS cnt FROM periods WHERE status = 'pending'`,
+      [],
+      {
+        action: 'getPendingCount',
+        params: {},
+      }
     );
     return result.rows[0]?.cnt || 0;
   }

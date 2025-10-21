@@ -10,6 +10,20 @@ describe('Health Routes', () => {
 
   beforeEach(() => {
     mockPool = createMockPool();
+    // Set up pool properties for health checks
+    Object.defineProperty(mockPool, 'totalCount', { value: 0, writable: true });
+    Object.defineProperty(mockPool, 'idleCount', { value: 0, writable: true });
+    Object.defineProperty(mockPool, 'waitingCount', { value: 0, writable: true });
+    Object.defineProperty(mockPool, 'options', {
+      value: {
+        max: 20,
+        maxUses: 0,
+        allowExitOnIdle: false,
+        maxLifetimeSeconds: 0,
+        idleTimeoutMillis: 0,
+      },
+      writable: true,
+    });
     app = express();
     app.use('/', createHealthRoutes(mockPool));
   });
@@ -24,6 +38,9 @@ describe('Health Routes', () => {
 
   describe('GET /health', () => {
     it('should return 200 when database is connected', async () => {
+      // Mock pool properties that healthRoutes checks
+      Object.defineProperty(mockPool, 'totalCount', { value: 5, writable: true });
+      Object.defineProperty(mockPool, 'idleCount', { value: 3, writable: true });
       (mockPool.query as jest.Mock).mockResolvedValue(createQueryResult([{ now: new Date() }]));
 
       const response = await request(app).get('/health');
@@ -32,7 +49,15 @@ describe('Health Routes', () => {
       expect(response.body).toMatchObject({
         success: true,
         message: 'OK',
-        database: 'connected',
+        database: {
+          status: 'connected',
+          responseTime: expect.any(Number),
+        },
+        pool: {
+          totalConnections: 5,
+          idleConnections: 3,
+          waitingClients: 0,
+        },
       });
       expect(response.body).toHaveProperty('uptime');
       expect(response.body).toHaveProperty('timestamp');
@@ -40,6 +65,9 @@ describe('Health Routes', () => {
     });
 
     it('should return 503 when database is disconnected', async () => {
+      // Mock pool properties that healthRoutes needs
+      Object.defineProperty(mockPool, 'totalCount', { value: 5, writable: true });
+      Object.defineProperty(mockPool, 'idleCount', { value: 3, writable: true });
       (mockPool.query as jest.Mock).mockRejectedValue(new Error('Connection refused'));
 
       const response = await request(app).get('/health');
@@ -48,7 +76,10 @@ describe('Health Routes', () => {
       expect(response.body).toMatchObject({
         success: false,
         message: 'Database connection failed',
-        database: 'disconnected',
+        database: {
+          status: 'disconnected',
+          responseTime: expect.any(Number),
+        },
         error: 'Connection refused',
       });
       expect(response.body).toHaveProperty('uptime');
@@ -56,7 +87,10 @@ describe('Health Routes', () => {
     });
 
     it('should include uptime and timestamp in response', async () => {
-      (mockPool.query as jest.Mock).mockResolvedValue(createQueryResult([{}]));
+      // Mock pool properties that healthRoutes checks
+      Object.defineProperty(mockPool, 'totalCount', { value: 5, writable: true });
+      Object.defineProperty(mockPool, 'idleCount', { value: 3, writable: true });
+      (mockPool.query as jest.Mock).mockResolvedValue(createQueryResult([{ now: new Date() }]));
 
       const response = await request(app).get('/health');
 

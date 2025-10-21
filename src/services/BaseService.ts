@@ -1,6 +1,6 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { logger } from '../utils/logger';
-import { errors } from '../utils/errors';
+import { errors, ApiError } from '../utils/errors';
 
 export interface ErrorContext {
   userId?: number;
@@ -26,7 +26,7 @@ export class BaseService {
     context?: ErrorContext
   ): Promise<QueryResult<T>> {
     const startTime = Date.now();
-    
+
     try {
       logger.debug('Executing database query', {
         query: query.substring(0, 200) + (query.length > 200 ? '...' : ''),
@@ -35,7 +35,7 @@ export class BaseService {
       });
 
       const result = await this.pool.query<T>(query, params);
-      
+
       const duration = Date.now() - startTime;
       logger.slowQuery(duration, query.substring(0, 200), params);
 
@@ -43,28 +43,31 @@ export class BaseService {
     } catch (error) {
       const duration = Date.now() - startTime;
       const dbError = error as Error;
-      
+
       logger.dbError('Query execution failed', dbError, query, params);
-      
+
       // Определяем тип ошибки и выбрасываем соответствующую ApiError
-      if (dbError.message.includes('duplicate key') || dbError.message.includes('UNIQUE constraint')) {
+      if (
+        dbError.message.includes('duplicate key') ||
+        dbError.message.includes('UNIQUE constraint')
+      ) {
         throw errors.conflict('Запись с такими данными уже существует', 'duplicate_entry');
       }
-      
+
       if (dbError.message.includes('foreign key constraint')) {
         throw errors.badRequest('Связанная запись не найдена', 'foreign_key_violation');
       }
-      
+
       if (dbError.message.includes('not found') || dbError.message.includes('no rows')) {
         throw errors.notFound('Запись не найдена');
       }
-      
+
       // Перебрасываем остальные ошибки как внутренние
       logger.serviceError(this.constructor.name, 'executeQuery', dbError, {
         duration,
         ...context,
       });
-      
+
       throw errors.server('Произошла ошибка при работе с базой данных');
     }
   }
@@ -72,11 +75,9 @@ export class BaseService {
   /**
    * Выполнить транзакцию
    */
-  protected async executeTransaction<T>(
-    callback: (client: PoolClient) => Promise<T>
-  ): Promise<T> {
+  protected async executeTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
-    
+
     try {
       await client.query('BEGIN');
       const result = await callback(client);
@@ -116,7 +117,8 @@ export class BaseService {
       );
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('not found')) {
+      // ApiError from executeQuery with code 'not_found'
+      if (error instanceof ApiError && error.code === 'not_found') {
         if (errorMessage) {
           throw errors.notFound(errorMessage);
         }

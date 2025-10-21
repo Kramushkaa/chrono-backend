@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PersonEditPayloadSchema } from '../../dto';
 import { Pool } from 'pg';
 import { authenticateToken } from '../../middleware/auth';
+import { validateParams, commonSchemas } from '../../middleware/validation';
 import { errors, asyncHandler } from '../../utils/errors';
 import { parseLimitOffset, paginateRows, mapApiPersonRow } from '../../utils/api';
 import { TelegramService } from '../../services/telegramService';
@@ -49,6 +50,7 @@ export function createUserPersonRoutes(
   router.put(
     '/persons/:id',
     authenticateToken,
+    validateParams(commonSchemas.personId),
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const parsed = PersonEditPayloadSchema.safeParse(req.body || {});
@@ -85,6 +87,7 @@ export function createUserPersonRoutes(
   router.post(
     '/persons/:id/submit',
     authenticateToken,
+    validateParams(commonSchemas.personId),
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
       const userId = (req as any).user!.sub;

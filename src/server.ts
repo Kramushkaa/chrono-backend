@@ -23,6 +23,7 @@ import { createQuizRoutes } from './routes/quizRoutes';
 import { createHealthRoutes } from './routes/healthRoutes';
 import { config, validateConfig } from './config';
 import { cleanupExpiredQuizSessions } from './jobs/cleanup-quiz-sessions';
+import { logger } from './utils/logger';
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -66,7 +67,7 @@ const allowedOriginPatterns = rawOrigins
 const isProd = process.env.NODE_ENV === 'production';
 
 if (isProd && allowedOriginPatterns.includes('*')) {
-  console.error('❌ В продакшене CORS_ORIGINS не может быть "*". Укажите явные источники.');
+  logger.error('В продакшене CORS_ORIGINS не может быть "*". Укажите явные источники.');
   process.exit(1);
 }
 
@@ -237,35 +238,40 @@ async function startServer() {
   try {
     // Проверка подключения к базе данных
     const client = await pool.connect();
-    console.log('✅ Подключение к базе данных установлено');
+    logger.info('Подключение к базе данных установлено');
     client.release();
 
     // Очистка истекших незавершённых сессий квизов
     try {
       const result = await cleanupExpiredQuizSessions(pool);
       if (result.deletedCount > 0) {
-        console.log(`🧹 Очищено просроченных quiz сессий: ${result.deletedCount}`);
+        logger.info('Очищено просроченных quiz сессий', { deletedCount: result.deletedCount });
       }
     } catch (error) {
-      console.error('⚠️ Ошибка при очистке quiz сессий:', error);
+      logger.error('Ошибка при очистке quiz сессий', { error: error instanceof Error ? error : new Error(String(error)) });
     }
 
     // Запуск сервера
     app.listen(PORT, () => {
-      console.log(`🚀 Хронониндзя API сервер запущен на порту ${PORT}`);
-      console.log(`📊 API доступен по адресу: http://localhost:${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
-      console.log(`👥 Persons API: http://localhost:${PORT}/api/persons`);
-      console.log(`📈 Stats API: http://localhost:${PORT}/api/stats`);
+      logger.info('Хронониндзя API сервер запущен', {
+        port: PORT,
+        nodeEnv: process.env.NODE_ENV,
+      });
+      logger.info('API endpoints доступны', {
+        base: `http://localhost:${PORT}`,
+        health: `http://localhost:${PORT}/api/health`,
+        auth: `http://localhost:${PORT}/api/auth`,
+        persons: `http://localhost:${PORT}/api/persons`,
+        stats: `http://localhost:${PORT}/api/stats`,
+      });
 
       // Логгирование CORS
       const isLocal = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
       const corsInfo = isLocal ? 'http://localhost:3000' : 'все домены (*)';
-      console.log(`🔗 CORS настроен для: ${corsInfo}`);
+      logger.info('CORS настроен', { corsInfo });
     });
   } catch (error) {
-    console.error('❌ Ошибка при запуске сервера:', error);
+    logger.error('Ошибка при запуске сервера', { error: error instanceof Error ? error : new Error(String(error)) });
     process.exit(1);
   }
 }
@@ -275,16 +281,16 @@ startServer();
 
 // Обработка завершения работы
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Получен сигнал завершения работы');
+  logger.info('Получен сигнал завершения работы (SIGINT)');
   await pool.end();
-  console.log('✅ Подключения к базе данных закрыты');
+  logger.info('Подключения к базе данных закрыты');
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n🛑 Получен сигнал завершения работы');
+  logger.info('Получен сигнал завершения работы (SIGTERM)');
   await pool.end();
-  console.log('✅ Подключения к базе данных закрыты');
+  logger.info('Подключения к базе данных закрыты');
   process.exit(0);
 });
 

@@ -1,4 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api';
+import { logger } from '../utils/logger';
 
 export class TelegramService {
   private bot: TelegramBot | null = null;
@@ -12,13 +13,13 @@ export class TelegramService {
       try {
         this.bot = new TelegramBot(botToken, { polling: false });
         this.isEnabled = true;
-        console.log('✅ Telegram notifications service initialized');
+        logger.info('Telegram notifications service initialized');
       } catch (error) {
-        console.warn('⚠️  Telegram service initialization failed:', error);
+        logger.error('Telegram service initialization failed', { error: error instanceof Error ? error : new Error(String(error)) });
         this.isEnabled = false;
       }
     } else {
-      console.warn('⚠️  Telegram notifications disabled: missing token or chat ID');
+      logger.warn('Telegram notifications disabled: missing token or chat ID');
     }
   }
 
@@ -46,9 +47,9 @@ export class TelegramService {
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: new registration (${userEmail})`);
+      logger.info('Telegram notification sent: new registration', { userEmail });
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification (registration):', error);
+      logger.error('Failed to send Telegram notification (registration)', { error: error instanceof Error ? error : new Error(String(error)), userEmail });
     }
   }
 
@@ -71,9 +72,13 @@ ${emoji} <b>${action} письма подтверждения</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: verification email (${userEmail})`);
+      logger.info('Telegram notification sent: verification email', { userEmail, isResend });
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification (verification email):', error);
+      logger.error('Failed to send Telegram notification (verification email)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        userEmail,
+        isResend,
+      });
     }
   }
 
@@ -96,9 +101,13 @@ ${emoji} <b>${action} письма подтверждения</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: email verified (${userEmail})`);
+      logger.info('Telegram notification sent: email verified', { userEmail, username });
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification (email verified):', error);
+      logger.error('Failed to send Telegram notification (email verified)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        userEmail,
+        username,
+      });
     }
   }
 
@@ -128,9 +137,20 @@ ${emoji} <b>Новая личность ${statusText}</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: person created (${personName})`);
+      logger.info('Telegram notification sent: person created', {
+        personName,
+        creatorEmail,
+        status,
+        personId,
+      });
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification (person created):', error);
+      logger.error('Failed to send Telegram notification (person created)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        personName,
+        creatorEmail,
+        status,
+        personId,
+      });
     }
   }
 
@@ -156,9 +176,18 @@ ${emoji} <b>Новая личность ${statusText}</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: person edit proposed (${personName})`);
+      logger.info('Telegram notification sent: person edit proposed', {
+        personName,
+        proposerEmail,
+        personId,
+      });
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification (person edit):', error);
+      logger.error('Failed to send Telegram notification (person edit)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        personName,
+        proposerEmail,
+        personId,
+      });
     }
   }
 
@@ -188,9 +217,20 @@ ${emoji} <b>Личность ${actionText}</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: person ${action} (${personName})`);
+      logger.info('Telegram notification sent: person reviewed', {
+        personName,
+        action,
+        reviewerEmail,
+        personId,
+      });
     } catch (error) {
-      console.error(`❌ Failed to send Telegram notification (person ${action}):`, error);
+      logger.error('Failed to send Telegram notification (person reviewed)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        personName,
+        action,
+        reviewerEmail,
+        personId,
+      });
     }
   }
 
@@ -227,9 +267,24 @@ ${emoji} <b>Новое достижение ${statusText}</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: achievement created (${year})`);
+      logger.info('Telegram notification sent: achievement created', {
+        description,
+        year,
+        creatorEmail,
+        status,
+        personName,
+        countryName,
+      });
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification (achievement created):', error);
+      logger.error('Failed to send Telegram notification (achievement created)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        description,
+        year,
+        creatorEmail,
+        status,
+        personName,
+        countryName,
+      });
     }
   }
 
@@ -259,9 +314,20 @@ ${emoji} <b>Достижение ${actionText}</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: achievement ${action} (${year})`);
+      logger.info('Telegram notification sent: achievement reviewed', {
+        description,
+        year,
+        action,
+        reviewerEmail,
+      });
     } catch (error) {
-      console.error(`❌ Failed to send Telegram notification (achievement ${action}):`, error);
+      logger.error('Failed to send Telegram notification (achievement reviewed)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        description,
+        year,
+        action,
+        reviewerEmail,
+      });
     }
   }
 
@@ -294,9 +360,24 @@ ${emoji} <b>Новый период ${statusText}</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: period created (${startYear}-${endYear})`);
+      logger.info('Telegram notification sent: period created', {
+        periodType,
+        startYear,
+        endYear,
+        creatorEmail,
+        status,
+        personName,
+      });
     } catch (error) {
-      console.error('❌ Failed to send Telegram notification (period created):', error);
+      logger.error('Failed to send Telegram notification (period created)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        periodType,
+        startYear,
+        endYear,
+        creatorEmail,
+        status,
+        personName,
+      });
     }
   }
 
@@ -327,9 +408,22 @@ ${emoji} <b>Период ${actionText}</b>
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log(`✅ Telegram notification sent: period ${action} (${startYear}-${endYear})`);
+      logger.info('Telegram notification sent: period reviewed', {
+        periodType,
+        startYear,
+        endYear,
+        action,
+        reviewerEmail,
+      });
     } catch (error) {
-      console.error(`❌ Failed to send Telegram notification (period ${action}):`, error);
+      logger.error('Failed to send Telegram notification (period reviewed)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        periodType,
+        startYear,
+        endYear,
+        action,
+        reviewerEmail,
+      });
     }
   }
 
@@ -338,7 +432,7 @@ ${emoji} <b>Период ${actionText}</b>
    */
   async sendTestMessage(): Promise<void> {
     if (!this.isEnabled || !this.bot) {
-      console.warn('⚠️  Telegram service is not enabled');
+      logger.warn('Telegram service is not enabled');
       return;
     }
 
@@ -352,9 +446,9 @@ Telegram notifications работают корректно!
 
     try {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
-      console.log('✅ Test Telegram message sent successfully');
+      logger.info('Test Telegram message sent successfully');
     } catch (error) {
-      console.error('❌ Failed to send test Telegram message:', error);
+      logger.error('Failed to send test Telegram message', { error: error instanceof Error ? error : new Error(String(error)) });
       throw error;
     }
   }

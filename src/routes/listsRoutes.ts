@@ -3,6 +3,41 @@ import { Pool } from 'pg';
 import { authenticateToken, rateLimit } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
 import { ListsService } from '../services/listsService';
+import {
+  validateQuery,
+  validateBody,
+  validateParams,
+  commonSchemas,
+} from '../middleware/validation';
+import { z } from 'zod';
+
+// Валидационные схемы для lists
+const listsSchemas = {
+  // Схема для ID списка
+  listId: z.object({
+    listId: commonSchemas.numericId,
+  }),
+
+  // Схема для кода шаринга
+  shareCode: z.object({
+    code: z.string().min(1, 'Код шаринга обязателен'),
+  }),
+
+  // Схема для создания списка
+  createList: z.object({
+    title: z.string().min(1, 'Название списка обязательно').max(255, 'Название слишком длинное'),
+  }),
+
+  // Схема для добавления элементов в список
+  addListItem: z.object({
+    item_type: z.enum(['person', 'achievement', 'period'], {
+      message: 'item_type должен быть person, achievement или period',
+    }),
+    person_id: z.string().optional(),
+    achievement_id: z.number().int().positive().optional(),
+    period_id: z.number().int().positive().optional(),
+  }),
+};
 
 export function createListsRoutes(pool: Pool, listsService: ListsService): Router {
   const router = Router();
@@ -14,11 +49,12 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   router.post(
     '/lists/:listId/share',
     authenticateToken,
+    validateParams(listsSchemas.listId),
     asyncHandler(async (req: Request, res: Response) => {
       const userId = req.user!.sub;
-      const { listId } = req.params;
+      const { listId } = req.params as unknown as { listId: number };
 
-      const code = await listsService.shareList(Number(listId), userId);
+      const code = await listsService.shareList(listId, userId);
 
       res.json({ success: true, data: { code } });
     })
@@ -27,8 +63,9 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   // Resolve a share token to list metadata and items (no auth required)
   router.get(
     '/list-shares/:code',
+    validateParams(listsSchemas.shareCode),
     asyncHandler(async (req: Request, res: Response) => {
-      const { code } = req.params;
+      const { code } = req.params as unknown as { code: string };
 
       try {
         const data = await listsService.getSharedList(code);
@@ -54,9 +91,10 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   router.post(
     '/lists',
     authenticateToken,
+    validateBody(listsSchemas.createList),
     asyncHandler(async (req: Request, res: Response) => {
       const userId = req.user!.sub;
-      const { title } = req.body || {};
+      const { title } = req.body;
 
       const result = await listsService.createList(title, userId);
 
@@ -68,11 +106,12 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   router.get(
     '/lists/:listId/items',
     authenticateToken,
+    validateParams(listsSchemas.listId),
     asyncHandler(async (req: Request, res: Response) => {
-      const { listId } = req.params;
+      const { listId } = req.params as unknown as { listId: number };
       const userId = req.user!.sub;
 
-      const data = await listsService.getListItems(Number(listId), userId);
+      const data = await listsService.getListItems(listId, userId);
 
       res.json({ success: true, data });
     })
@@ -81,9 +120,11 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   router.post(
     '/lists/:listId/items',
     authenticateToken,
+    validateParams(listsSchemas.listId),
+    validateBody(listsSchemas.addListItem),
     asyncHandler(async (req: Request, res: Response) => {
-      const { listId } = req.params;
-      const { item_type, person_id, achievement_id, period_id } = req.body || {};
+      const { listId } = req.params as unknown as { listId: number };
+      const { item_type, person_id, achievement_id, period_id } = req.body;
       const userId = req.user!.sub;
 
       let itemId: string | number;

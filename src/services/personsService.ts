@@ -81,7 +81,9 @@ export class PersonsService extends BaseService {
       const userEmail = user.email || 'unknown';
       this.telegramService
         .notifyPersonCreated(name, userEmail, status === 'approved' ? 'approved' : 'pending', id)
-        .catch(err => logger.error('Telegram notification failed (person created)', { error: err }));
+        .catch(err =>
+          logger.error('Telegram notification failed (person created)', { error: err })
+        );
     }
 
     logger.info('Person created successfully', {
@@ -165,7 +167,10 @@ export class PersonsService extends BaseService {
     query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limitParam + 1, offsetParam);
 
-    const result = await this.pool.query(query, params);
+    const result = await this.executeQuery(query, params, {
+      action: 'getPersons',
+      params: { filters, limit, offset },
+    });
     const persons = result.rows.map(mapApiPersonRow);
     return paginateRows(persons, limitParam, offsetParam);
   }
@@ -174,12 +179,13 @@ export class PersonsService extends BaseService {
    * Получение личности по ID
    */
   async getPersonById(id: string): Promise<any> {
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `SELECT v.*, p.status 
        FROM v_api_persons v 
        JOIN persons p ON p.id = v.id 
        WHERE v.id = $1`,
-      [id]
+      [id],
+      { action: 'getPersonById', params: { id } }
     );
 
     if (result.rows.length === 0) {
@@ -189,9 +195,10 @@ export class PersonsService extends BaseService {
     const row = result.rows[0];
 
     // Получаем периоды
-    const periodsRes = await this.pool.query(
+    const periodsRes = await this.executeQuery(
       'SELECT periods FROM v_person_periods WHERE person_id = $1',
-      [row.id]
+      [row.id],
+      { action: 'getPersonById_periods', params: { personId: row.id } }
     );
     const periods = periodsRes.rows[0]?.periods || [];
 
@@ -220,7 +227,10 @@ export class PersonsService extends BaseService {
        ORDER BY r.ord ASC
     `;
 
-    const result = await this.pool.query(sql, [ids]);
+    const result = await this.executeQuery(sql, [ids], {
+      action: 'getPersonsByIds',
+      params: { idsCount: ids.length },
+    });
     return result.rows.map(mapApiPersonRow);
   }
 
@@ -253,7 +263,10 @@ export class PersonsService extends BaseService {
        LIMIT $2 OFFSET $3
     `;
 
-    const result = await this.pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [userId, limitParam + 1, offsetParam], {
+      action: 'getUserPersons',
+      params: { userId, limit, offset },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -285,7 +298,10 @@ export class PersonsService extends BaseService {
        LIMIT $1 OFFSET $2
     `;
 
-    const result = await this.pool.query(sql, [limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [limitParam + 1, offsetParam], {
+      action: 'getPendingPersons',
+      params: { limit, offset },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -298,9 +314,14 @@ export class PersonsService extends BaseService {
     reviewerId: number,
     comment?: string
   ): Promise<any> {
-    const checkRes = await this.pool.query('SELECT id, status FROM persons WHERE id = $1', [
-      personId,
-    ]);
+    const checkRes = await this.executeQuery(
+      'SELECT id, status FROM persons WHERE id = $1',
+      [personId],
+      {
+        action: 'reviewPerson_check',
+        params: { personId },
+      }
+    );
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Личность не найдена');
@@ -314,12 +335,16 @@ export class PersonsService extends BaseService {
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `UPDATE persons
        SET status = $1, reviewed_by = $2, review_comment = $3, updated_at = NOW()
        WHERE id = $4
        RETURNING *`,
-      [newStatus, reviewerId, comment ?? null, personId]
+      [newStatus, reviewerId, comment ?? null, personId],
+      {
+        action: 'reviewPerson_update',
+        params: { personId, action, reviewerId },
+      }
     );
 
     return result.rows[0];
@@ -334,7 +359,10 @@ export class PersonsService extends BaseService {
     userId: number
   ): Promise<any> {
     // Проверяем существование личности
-    const personRes = await this.pool.query('SELECT id FROM persons WHERE id = $1', [personId]);
+    const personRes = await this.executeQuery('SELECT id FROM persons WHERE id = $1', [personId], {
+      action: 'proposeEdit_check',
+      params: { personId },
+    });
     if (personRes.rowCount === 0) {
       throw errors.notFound('Личность не найдена');
     }
@@ -342,11 +370,15 @@ export class PersonsService extends BaseService {
     // Санитизация и сохранение в person_edits
     const sanitized = sanitizePayload(payload);
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `INSERT INTO person_edits (person_id, proposer_user_id, payload, status)
        VALUES ($1, $2, $3, 'pending')
        RETURNING *`,
-      [personId, userId, JSON.stringify(sanitized)]
+      [personId, userId, JSON.stringify(sanitized)],
+      {
+        action: 'proposeEdit_insert',
+        params: { personId, userId },
+      }
     );
 
     return result.rows[0];
@@ -361,9 +393,13 @@ export class PersonsService extends BaseService {
     reviewerId: number,
     comment?: string
   ): Promise<any> {
-    const editRes = await this.pool.query(
+    const editRes = await this.executeQuery(
       'SELECT id, person_id, payload, status FROM person_edits WHERE id = $1',
-      [editId]
+      [editId],
+      {
+        action: 'reviewEdit_get',
+        params: { editId },
+      }
     );
 
     if (editRes.rowCount === 0) {
@@ -379,11 +415,15 @@ export class PersonsService extends BaseService {
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
     // Обновляем статус правки
-    await this.pool.query(
+    await this.executeQuery(
       `UPDATE person_edits
        SET status = $1, reviewed_by = $2, review_comment = $3
        WHERE id = $4`,
-      [newStatus, reviewerId, comment ?? null, editId]
+      [newStatus, reviewerId, comment ?? null, editId],
+      {
+        action: 'reviewEdit_update',
+        params: { editId, action, reviewerId },
+      }
     );
 
     // Если approved - применяем изменения к личности
@@ -392,7 +432,10 @@ export class PersonsService extends BaseService {
     }
 
     // Возвращаем обновлённую правку
-    const result = await this.pool.query('SELECT * FROM person_edits WHERE id = $1', [editId]);
+    const result = await this.executeQuery('SELECT * FROM person_edits WHERE id = $1', [editId], {
+      action: 'reviewEdit_get_result',
+      params: { editId },
+    });
     return result.rows[0];
   }
 
@@ -425,7 +468,10 @@ export class PersonsService extends BaseService {
        LIMIT $2 OFFSET $3
     `;
 
-    const result = await this.pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [userId, limitParam + 1, offsetParam], {
+      action: 'getUserDrafts',
+      params: { userId, limit, offset },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -437,9 +483,14 @@ export class PersonsService extends BaseService {
     userId: number,
     updates: Partial<PersonCreateData>
   ): Promise<any> {
-    const checkRes = await this.pool.query('SELECT created_by, status FROM persons WHERE id = $1', [
-      personId,
-    ]);
+    const checkRes = await this.executeQuery(
+      'SELECT created_by, status FROM persons WHERE id = $1',
+      [personId],
+      {
+        action: 'updatePerson_check',
+        params: { personId, userId },
+      }
+    );
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Личность не найдена');
@@ -500,7 +551,10 @@ export class PersonsService extends BaseService {
     const sql = `UPDATE persons SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
     values.push(personId);
 
-    const result = await this.pool.query(sql, values);
+    const result = await this.executeQuery(sql, values, {
+      action: 'updatePerson_update',
+      params: { personId, userId, fieldsCount: fields.length },
+    });
     return result.rows[0];
   }
 
@@ -508,9 +562,14 @@ export class PersonsService extends BaseService {
    * Отправка черновика на модерацию
    */
   async submitDraft(personId: string, userId: number): Promise<any> {
-    const checkRes = await this.pool.query('SELECT created_by, status FROM persons WHERE id = $1', [
-      personId,
-    ]);
+    const checkRes = await this.executeQuery(
+      'SELECT created_by, status FROM persons WHERE id = $1',
+      [personId],
+      {
+        action: 'submitDraft_check',
+        params: { personId, userId },
+      }
+    );
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Личность не найдена');
@@ -526,9 +585,13 @@ export class PersonsService extends BaseService {
       throw errors.badRequest('Можно отправлять только черновики');
     }
 
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `UPDATE persons SET status = 'pending', updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [personId]
+      [personId],
+      {
+        action: 'submitDraft_update',
+        params: { personId, userId },
+      }
     );
 
     return result.rows[0];
@@ -538,9 +601,14 @@ export class PersonsService extends BaseService {
    * Удаление личности (только свои черновики)
    */
   async deletePerson(personId: string, userId: number): Promise<void> {
-    const checkRes = await this.pool.query('SELECT created_by, status FROM persons WHERE id = $1', [
-      personId,
-    ]);
+    const checkRes = await this.executeQuery(
+      'SELECT created_by, status FROM persons WHERE id = $1',
+      [personId],
+      {
+        action: 'deletePerson_check',
+        params: { personId, userId },
+      }
+    );
 
     if (checkRes.rowCount === 0) {
       throw errors.notFound('Личность не найдена');
@@ -556,16 +624,23 @@ export class PersonsService extends BaseService {
       throw errors.badRequest('Можно удалять только черновики');
     }
 
-    await this.pool.query('DELETE FROM persons WHERE id = $1', [personId]);
+    await this.executeQuery('DELETE FROM persons WHERE id = $1', [personId], {
+      action: 'deletePerson_delete',
+      params: { personId, userId },
+    });
   }
 
   /**
    * Получение количества личностей пользователя
    */
   async getUserPersonsCount(userId: number): Promise<number> {
-    const result = await this.pool.query(
+    const result = await this.executeQuery(
       `SELECT COALESCE(persons_count, 0) AS cnt FROM v_user_content_counts WHERE created_by = $1`,
-      [userId]
+      [userId],
+      {
+        action: 'getUserPersonsCount',
+        params: { userId },
+      }
     );
     return result.rows[0]?.cnt || 0;
   }
@@ -574,8 +649,12 @@ export class PersonsService extends BaseService {
    * Получение количества pending личностей
    */
   async getPendingCount(): Promise<number> {
-    const result = await this.pool.query(
-      `SELECT COUNT(*)::int AS cnt FROM persons WHERE status = 'pending'`
+    const result = await this.executeQuery(
+      `SELECT COUNT(*)::int AS cnt FROM persons WHERE status = 'pending'`,
+      [],
+      {
+        action: 'getPendingCount',
+      }
     );
     return result.rows[0]?.cnt || 0;
   }
@@ -607,7 +686,10 @@ export class PersonsService extends BaseService {
        LIMIT $1 OFFSET $2
     `;
 
-    const result = await this.pool.query(sql, [limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [limitParam + 1, offsetParam], {
+      action: 'getPendingEdits',
+      params: { limit, offset },
+    });
     return paginateRows(result.rows, limitParam, offsetParam);
   }
 
@@ -722,7 +804,9 @@ export class PersonsService extends BaseService {
         const userEmail = user.email || 'unknown';
         this.telegramService
           .notifyPersonCreated(name, userEmail, status === 'approved' ? 'approved' : 'pending', id)
-          .catch(err => console.warn('Telegram notification failed (person proposed):', err));
+          .catch(err =>
+            logger.warn('Telegram notification failed (person proposed)', { error: err })
+          );
       }
     } catch (error) {
       await client.query('ROLLBACK');
@@ -741,9 +825,13 @@ export class PersonsService extends BaseService {
     updates: Partial<PersonCreateData>,
     lifePeriods?: Array<{ countryId: number; start: number; end: number }>
   ): Promise<void> {
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT created_by, status, birth_year, death_year FROM persons WHERE id = $1',
-      [personId]
+      [personId],
+      {
+        action: 'updatePersonWithLifePeriods_check',
+        params: { personId, userId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -839,9 +927,13 @@ export class PersonsService extends BaseService {
    * Отправка черновика на модерацию (с периодами жизни)
    */
   async submitPersonDraft(personId: string, userId: number, userEmail: string): Promise<any> {
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT created_by, status, name FROM persons WHERE id = $1',
-      [personId]
+      [personId],
+      {
+        action: 'submitPersonDraft_check',
+        params: { personId, userId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -884,7 +976,9 @@ export class PersonsService extends BaseService {
       // Отправка уведомления в Telegram
       this.telegramService
         .notifyPersonCreated(person.name, userEmail, 'pending', personId)
-        .catch(err => console.warn('Telegram notification failed (draft submitted):', err));
+        .catch(err =>
+          logger.warn('Telegram notification failed (draft submitted)', { error: err })
+        );
 
       return result.rows[0];
     } catch (error) {
@@ -899,9 +993,13 @@ export class PersonsService extends BaseService {
    * Возврат личности в черновики
    */
   async revertPersonToDraft(personId: string, userId: number): Promise<void> {
-    const checkRes = await this.pool.query(
+    const checkRes = await this.executeQuery(
       'SELECT id, status, created_by FROM persons WHERE id = $1',
-      [personId]
+      [personId],
+      {
+        action: 'revertPersonToDraft_check',
+        params: { personId, userId },
+      }
     );
 
     if (checkRes.rowCount === 0) {
@@ -985,7 +1083,10 @@ export class PersonsService extends BaseService {
        LIMIT $2 OFFSET $3
     `;
 
-    const result = await this.pool.query(sql, [userId, limitParam + 1, offsetParam]);
+    const result = await this.executeQuery(sql, [userId, limitParam + 1, offsetParam], {
+      action: 'getPersonDrafts',
+      params: { userId, limit, offset },
+    });
     const persons = result.rows.map(row => ({
       id: row.id,
       name: row.name,
@@ -1006,7 +1107,10 @@ export class PersonsService extends BaseService {
    * Получение периодов жизни личности
    */
   async getPersonLifePeriods(personId: string): Promise<any[]> {
-    const personRes = await this.pool.query('SELECT id FROM persons WHERE id = $1', [personId]);
+    const personRes = await this.executeQuery('SELECT id FROM persons WHERE id = $1', [personId], {
+      action: 'getPersonLifePeriods_check',
+      params: { personId },
+    });
 
     if (personRes.rowCount === 0) {
       throw errors.notFound('Личность не найдена');
@@ -1025,7 +1129,10 @@ export class PersonsService extends BaseService {
        ORDER BY p.start_year ASC
     `;
 
-    const result = await this.pool.query(sql, [personId]);
+    const result = await this.executeQuery(sql, [personId], {
+      action: 'getPersonLifePeriods_query',
+      params: { personId },
+    });
 
     return result.rows.map(row => ({
       id: row.id,
@@ -1047,9 +1154,13 @@ export class PersonsService extends BaseService {
     userId: number,
     role: string
   ): Promise<void> {
-    const personRes = await this.pool.query(
+    const personRes = await this.executeQuery(
       'SELECT birth_year, death_year FROM persons WHERE id = $1',
-      [personId]
+      [personId],
+      {
+        action: 'replacePersonLifePeriods_check',
+        params: { personId, userId },
+      }
     );
 
     if (personRes.rowCount === 0) {
