@@ -114,17 +114,18 @@ export const commonSchemas = {
     email: z.string().email('Некорректный email'),
     password: z.string().min(8, 'Пароль должен содержать минимум 8 символов'),
     username: z.string().optional(),
-    fullName: z.string().optional(),
+    login: z.string().optional(),
+    full_name: z.string().optional(),
   }),
 
   login: z.object({
-    email: z.string().email('Некорректный email'),
+    login: z.string().min(1, 'Логин (email или username) обязателен'),
     password: z.string().min(1, 'Пароль обязателен'),
   }),
 
   changePassword: z.object({
-    currentPassword: z.string().min(1, 'Текущий пароль обязателен'),
-    newPassword: z.string().min(8, 'Новый пароль должен содержать минимум 8 символов'),
+    current_password: z.string().min(1, 'Текущий пароль обязателен'),
+    new_password: z.string().min(8, 'Новый пароль должен содержать минимум 8 символов'),
   }),
 
   // Content schemas
