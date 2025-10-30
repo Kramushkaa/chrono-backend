@@ -772,7 +772,7 @@ describe('QuizController', () => {
           total_time_ms: 60000,
           rating_points: 85.5,
           created_at: new Date(),
-          config: {},
+          config: undefined,
         },
       ]);
 
@@ -808,7 +808,7 @@ describe('QuizController', () => {
           total_time_ms: 30000,
           rating_points: 42.5,
           created_at: new Date(),
-          config: {},
+          config: undefined,
         },
       ]);
 

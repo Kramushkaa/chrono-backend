@@ -493,7 +493,7 @@ describe('PersonsService', () => {
       const result = await personsService.getPersonDrafts(1, 10, 0);
 
       expect(result.data).toHaveLength(2);
-      expect(result.data[0].id).toBe('draft-1');
+      expect((result.data[0] as Record<string, unknown>).id).toBe('draft-1');
       expect(result.meta).toBeDefined();
     });
   });

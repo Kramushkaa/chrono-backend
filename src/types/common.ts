@@ -1,13 +1,13 @@
 // Общие типы для всего приложения
 
 /**
- * Метаданные пагинации
+ * Метаданные пагинации (соответствует выводу paginateRows из utils/api)
  */
 export interface PaginationMeta {
-  total: number;
   limit: number;
   offset: number;
   hasMore: boolean;
+  nextOffset: number | null;
 }
 
 /**
