@@ -5,6 +5,26 @@ import { config } from '../config';
 import { BaseService } from './BaseService';
 import { logger } from '../utils/logger';
 
+// Database row interfaces
+interface ListRow {
+  id: number;
+  title: string;
+  user_id: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface ListCountRow {
+  list_id: number;
+  cnt: number;
+}
+
+interface JwtPayload {
+  listId: number;
+  iat?: number;
+  exp?: number;
+}
+
 export interface ListItem {
   id: number;
   list_id: number;
@@ -71,12 +91,12 @@ export class ListsService extends BaseService {
       }
     );
 
-    const ids = rows.rows.map((r: any) => r.id);
+    const ids = rows.rows.map((r: ListRow) => r.id);
     let counts: Record<number, number> = {};
 
     if (ids.length > 0) {
-      const inParams = ids.map((_: any, i: number) => `$${i + 1}`).join(',');
-      const c = await this.executeQuery(
+      const inParams = ids.map((_, i: number) => `$${i + 1}`).join(',');
+      const c = await this.executeQuery<ListCountRow>(
         `SELECT list_id, COUNT(*)::int AS cnt FROM list_items WHERE list_id IN (${inParams}) GROUP BY list_id`,
         ids,
         {
@@ -84,10 +104,10 @@ export class ListsService extends BaseService {
           params: { userId, listIdsCount: ids.length },
         }
       );
-      counts = Object.fromEntries(c.rows.map((r: any) => [r.list_id, r.cnt]));
+      counts = Object.fromEntries(c.rows.map((r: ListCountRow) => [r.list_id, r.cnt]));
     }
 
-    return rows.rows.map((r: any) => ({
+    return rows.rows.map((r: ListRow) => ({
       id: r.id,
       title: r.title,
       items_count: counts[r.id] || 0,
@@ -333,7 +353,7 @@ export class ListsService extends BaseService {
    */
   async getSharedList(code: string): Promise<any> {
     try {
-      const payload: any = jwt.verify(code, this.jwtSecret);
+      const payload = jwt.verify(code, this.jwtSecret) as JwtPayload;
       const listId = Number(payload.listId);
 
       if (!Number.isFinite(listId) || listId <= 0) {
@@ -384,7 +404,7 @@ export class ListsService extends BaseService {
     let listId: number;
 
     try {
-      const payload: any = jwt.verify(code, this.jwtSecret);
+      const payload = jwt.verify(code, this.jwtSecret) as JwtPayload;
       listId = Number(payload.listId);
 
       if (!Number.isFinite(listId) || listId <= 0) {

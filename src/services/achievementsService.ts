@@ -7,6 +7,7 @@ import { TelegramService } from './telegramService';
 import { AchievementRow } from '../types/database';
 import { BaseService } from './BaseService';
 import { logger } from '../utils/logger';
+import { PaginatedResponse, SqlValue } from '../types/common';
 
 export interface AchievementCreateData {
   personId?: string;
@@ -143,7 +144,7 @@ export class AchievementsService extends BaseService {
     filters: AchievementFilters,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -189,7 +190,7 @@ export class AchievementsService extends BaseService {
     userId: number,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -234,7 +235,7 @@ export class AchievementsService extends BaseService {
   async getPendingAchievements(
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -355,7 +356,7 @@ export class AchievementsService extends BaseService {
 
     // Динамически строим UPDATE
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: SqlValue[] = [];
     let idx = 1;
 
     if (updates.year !== undefined) {
@@ -439,7 +440,7 @@ export class AchievementsService extends BaseService {
     userId: number,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,

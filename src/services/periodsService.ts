@@ -7,6 +7,7 @@ import { TelegramService } from './telegramService';
 import { PeriodRow } from '../types/database';
 import { BaseService } from './BaseService';
 import { logger } from '../utils/logger';
+import { PaginatedResponse, SqlValue } from '../types/common';
 
 export interface PeriodCreateData {
   personId: string;
@@ -92,7 +93,7 @@ export class PeriodsService extends BaseService {
         AND int4range(start_year, end_year) && int4range($3, $4)
     `;
 
-    const params: any[] = [personId, periodType, startYear, endYear];
+    const params: SqlValue[] = [personId, periodType, startYear, endYear];
 
     if (excludeId) {
       sql += ` AND id != $5`;
@@ -177,7 +178,7 @@ export class PeriodsService extends BaseService {
     filters: PeriodFilters,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -224,7 +225,7 @@ export class PeriodsService extends BaseService {
     userId: number,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -261,7 +262,7 @@ export class PeriodsService extends BaseService {
   /**
    * Получение pending периодов (для модераторов)
    */
-  async getPendingPeriods(limit?: number, offset?: number): Promise<{ data: any[]; meta: any }> {
+  async getPendingPeriods(limit?: number, offset?: number): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -393,7 +394,7 @@ export class PeriodsService extends BaseService {
 
     // Динамически строим UPDATE
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: SqlValue[] = [];
     let idx = 1;
 
     if (updates.startYear !== undefined) {
@@ -481,7 +482,7 @@ export class PeriodsService extends BaseService {
     userId: number,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,

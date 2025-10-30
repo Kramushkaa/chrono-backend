@@ -7,6 +7,7 @@ import { sanitizePayload, PersonPayload, applyPayloadToPerson } from '../routes/
 import { PersonRow } from '../types/database';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
+import { PaginatedResponse, SqlValue } from '../types/common';
 
 export interface PersonCreateData {
   name: string;
@@ -103,7 +104,7 @@ export class PersonsService extends BaseService {
     filters: PersonFilters,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 100,
       maxLimit: 1000,
@@ -241,7 +242,7 @@ export class PersonsService extends BaseService {
     userId: number,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -273,7 +274,7 @@ export class PersonsService extends BaseService {
   /**
    * Получение pending личностей (для модераторов)
    */
-  async getPendingPersons(limit?: number, offset?: number): Promise<{ data: any[]; meta: any }> {
+  async getPendingPersons(limit?: number, offset?: number): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -446,7 +447,7 @@ export class PersonsService extends BaseService {
     userId: number,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -508,7 +509,7 @@ export class PersonsService extends BaseService {
 
     // Динамическое обновление
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: SqlValue[] = [];
     let idx = 1;
 
     if (updates.name !== undefined) {
@@ -662,7 +663,7 @@ export class PersonsService extends BaseService {
   /**
    * Получение pending правок (для модераторов)
    */
-  async getPendingEdits(limit?: number, offset?: number): Promise<{ data: any[]; meta: any }> {
+  async getPendingEdits(limit?: number, offset?: number): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
@@ -850,7 +851,7 @@ export class PersonsService extends BaseService {
 
       // Обновляем личность
       const fields: string[] = [];
-      const values: any[] = [];
+      const values: SqlValue[] = [];
       let idx = 1;
 
       const mapping: Record<string, string> = {
@@ -1060,7 +1061,7 @@ export class PersonsService extends BaseService {
     userId: number,
     limit?: number,
     offset?: number
-  ): Promise<{ data: any[]; meta: any }> {
+  ): Promise<PaginatedResponse<unknown>> {
     const { limitParam, offsetParam } = parseLimitOffset(limit, offset, {
       defLimit: 200,
       maxLimit: 500,
