@@ -199,6 +199,7 @@ export const quizSchemas = {
     sessionToken: z.string().min(1, 'Токен сессии обязателен'),
     questionId: z.string().min(1, 'ID вопроса обязателен'),
     answer: z.any(), // Answer can be of different types
+    timeSpent: z.number().int().min(0, 'Время ответа не может быть отрицательным'),
   }),
 
   // Finish quiz validation
