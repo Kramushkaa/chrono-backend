@@ -60,7 +60,7 @@ export const config = {
   security: {
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),
     rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '900000'), // 15 минут
-    rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100'),
+    rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '300'),
   },
 
   // Настройки приложения

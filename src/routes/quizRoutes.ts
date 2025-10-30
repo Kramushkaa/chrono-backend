@@ -10,8 +10,8 @@ export function createQuizRoutes(pool: Pool): Router {
   const quizService = new QuizService(pool);
   const quizController = new QuizController(quizService);
 
-  // Rate limiting: 50 requests per 5 minutes (gameplay protection)
-  router.use(rateLimit(5 * 60 * 1000, 50));
+  // Rate limiting: 300 requests per 10 minutes (gameplay protection)
+  router.use(rateLimit(10 * 60 * 1000, 300));
 
   // ============================================================================
   // Regular Quiz Routes

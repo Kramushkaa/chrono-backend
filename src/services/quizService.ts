@@ -710,6 +710,7 @@ export class QuizService extends BaseService {
           ELSE NULL
         END as quiz_title,
         qa.shared_quiz_id,
+        sq.share_code,
         qa.shared_quiz_id IS NOT NULL as is_shared,
         qa.correct_answers,
         qa.total_questions,
@@ -740,11 +741,13 @@ export class QuizService extends BaseService {
   ): Promise<{
     attempt: QuizAttemptDB;
     quizTitle?: string;
+    shareCode?: string;
   } | null> {
     const query = `
       SELECT 
         qa.*,
-        sq.title as quiz_title
+        sq.title as quiz_title,
+        sq.share_code
       FROM quiz_attempts qa
       LEFT JOIN shared_quizzes sq ON qa.shared_quiz_id = sq.id
       WHERE qa.id = $1 AND qa.user_id = $2
@@ -777,6 +780,7 @@ export class QuizService extends BaseService {
     return {
       attempt,
       quizTitle: row.quiz_title,
+      shareCode: row.share_code,
     };
   }
 

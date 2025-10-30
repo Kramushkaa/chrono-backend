@@ -436,6 +436,7 @@ export class QuizController {
         sessionToken: a.session_token,
         quizTitle: a.quiz_title || 'Обычный квиз',
         sharedQuizId: a.shared_quiz_id,
+        shareCode: (a as any).share_code,
         isShared: a.is_shared,
         correctAnswers: a.correct_answers,
         totalQuestions: a.total_questions,
@@ -497,7 +498,7 @@ export class QuizController {
 
       // Prepare detailed answers with full question data (including data field)
       const detailedAnswers =
-        result.attempt.questions?.map((question) => {
+        result.attempt.questions?.map(question => {
           const userAnswer = result.attempt.answers?.find(a => a.questionId === question.id);
           return {
             questionId: question.id,
@@ -519,6 +520,7 @@ export class QuizController {
             attemptId: result.attempt.id,
             quizTitle: result.quizTitle || 'Обычный квиз',
             isShared: !!result.attempt.shared_quiz_id,
+            shareCode: result.shareCode,
             createdAt: result.attempt.created_at,
           },
           results: {
