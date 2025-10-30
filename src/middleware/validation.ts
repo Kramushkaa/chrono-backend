@@ -197,7 +197,7 @@ export const quizSchemas = {
   // Check answer validation
   checkAnswer: z.object({
     sessionToken: z.string().min(1, 'Токен сессии обязателен'),
-    questionId: z.number().int().positive('ID вопроса должен быть положительным числом'),
+    questionId: z.string().min(1, 'ID вопроса обязателен'),
     answer: z.any(), // Answer can be of different types
   }),
 
