@@ -72,34 +72,20 @@ export function createAuthRoutes(authController: AuthController): Router {
   );
 
   // ============================================================================
-  // Admin Routes - User Management (Not Implemented Yet)
-  // ============================================================================
-  // NOTE: These endpoints are placeholders for future admin panel functionality
-  // Will be implemented when UserService and admin UI are developed
-  // All endpoints return 501 Not Implemented status
+  // Admin Routes - User Management
   // ============================================================================
 
   // Получение списка пользователей (только для админов)
-  router.get('/users', authenticateToken, requireRoleMiddleware(['admin']), async (req, res) => {
-    res.status(501).json({
-      success: false,
-      error: 'Not implemented',
-      message: 'Функция получения списка пользователей пока не реализована',
-    });
-  });
+  router.get('/users', authenticateToken, requireRoleMiddleware(['admin']), (req, res, next) =>
+    authController.getAllUsers(req, res, next)
+  );
 
   // Получение пользователя по ID (только для админов)
   router.get(
     '/users/:id',
     authenticateToken,
     requireRoleMiddleware(['admin']),
-    async (req, res) => {
-      res.status(501).json({
-        success: false,
-        error: 'Not implemented',
-        message: 'Функция получения пользователя по ID пока не реализована',
-      });
-    }
+    (req, res, next) => authController.getUserById(req, res, next)
   );
 
   // Обновление пользователя (только для админов)
@@ -107,58 +93,36 @@ export function createAuthRoutes(authController: AuthController): Router {
     '/users/:id',
     authenticateToken,
     requireRoleMiddleware(['admin']),
-    async (req, res) => {
-      res.status(501).json({
-        success: false,
-        error: 'Not implemented',
-        message: 'Функция обновления пользователя пока не реализована',
-      });
-    }
+    (req, res, next) => authController.updateUserById(req, res, next)
   );
 
-  // Удаление пользователя (только для админов)
+  // Деактивация пользователя (только для админов)
   router.delete(
     '/users/:id',
     authenticateToken,
     requireRoleMiddleware(['admin']),
-    async (req, res) => {
-      res.status(501).json({
-        success: false,
-        error: 'Not implemented',
-        message: 'Функция удаления пользователя пока не реализована',
-      });
-    }
+    (req, res, next) => authController.deactivateUser(req, res, next)
   );
 
   // ============================================================================
-  // Admin Routes - Roles & Permissions (Not Implemented Yet)
+  // Admin Routes - Roles & Permissions
   // ============================================================================
 
   // Получение списка ролей (только для админов)
-  router.get('/roles', authenticateToken, requireRoleMiddleware(['admin']), async (req, res) => {
-    res.status(501).json({
-      success: false,
-      error: 'Not implemented',
-      message: 'Функция получения списка ролей пока не реализована',
-    });
-  });
+  router.get('/roles', authenticateToken, requireRoleMiddleware(['admin']), (req, res, next) =>
+    authController.getRoles(req, res, next)
+  );
 
   // Получение списка разрешений (только для админов)
   router.get(
     '/permissions',
     authenticateToken,
     requireRoleMiddleware(['admin']),
-    async (req, res) => {
-      res.status(501).json({
-        success: false,
-        error: 'Not implemented',
-        message: 'Функция получения списка разрешений пока не реализована',
-      });
-    }
+    (req, res, next) => authController.getPermissions(req, res, next)
   );
 
   // ============================================================================
-  // Moderator/Admin Routes - Statistics (Not Implemented Yet)
+  // Moderator/Admin Routes - Statistics
   // ============================================================================
 
   // Получение статистики пользователей (для модераторов и админов)
@@ -166,13 +130,7 @@ export function createAuthRoutes(authController: AuthController): Router {
     '/stats/users',
     authenticateToken,
     requireRoleMiddleware(['moderator', 'admin']),
-    async (req, res) => {
-      res.status(501).json({
-        success: false,
-        error: 'Not implemented',
-        message: 'Функция получения статистики пользователей пока не реализована',
-      });
-    }
+    (req, res, next) => authController.getUserStats(req, res, next)
   );
 
   // ============================================================================

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/authService';
 import { TelegramService } from '../services/telegramService';
 import { EmailService } from '../services/emailService';
+import { UserService } from '../services/userService';
 import { logger } from '../utils/logger';
 import {
   RegisterRequest,
@@ -10,6 +11,8 @@ import {
   ChangePasswordRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
+  UserUpdateRequest,
+  UserQueryParams,
 } from '../types/auth';
 import { errors } from '../utils/errors';
 
@@ -17,15 +20,18 @@ export class AuthController {
   private authService: AuthService;
   private telegramService: TelegramService;
   private emailService: EmailService;
+  private userService: UserService;
 
   constructor(
     authService: AuthService,
     telegramService: TelegramService,
-    emailService: EmailService
+    emailService: EmailService,
+    userService: UserService
   ) {
     this.authService = authService;
     this.telegramService = telegramService;
     this.emailService = emailService;
+    this.userService = userService;
   }
 
   // Регистрация пользователя
@@ -404,6 +410,192 @@ export class AuthController {
       });
     } catch (error) {
       next(errors.unauthorized('Пользователь не аутентифицирован'));
+    }
+  }
+
+  // ========== Admin Methods ==========
+
+  // Получение списка пользователей (только для админов)
+  async getAllUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const params: UserQueryParams = {
+        limit: parseInt(req.query.limit as string) || 20,
+        offset: parseInt(req.query.offset as string) || 0,
+        role: req.query.role as string,
+        is_active:
+          req.query.is_active !== undefined ? req.query.is_active === 'true' : undefined,
+        email_verified:
+          req.query.email_verified !== undefined
+            ? req.query.email_verified === 'true'
+            : undefined,
+        search: req.query.search as string,
+      };
+
+      const result = await this.userService.getAllUsers(params);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          users: result.users,
+          meta: {
+            limit: result.limit,
+            offset: result.offset,
+            hasMore: result.hasMore,
+          },
+        },
+      });
+    } catch (error) {
+      next(
+        errors.server(
+          error instanceof Error ? error.message : 'Ошибка при получении списка пользователей'
+        )
+      );
+    }
+  }
+
+  // Получение пользователя по ID (только для админов)
+  async getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = parseInt(req.params.id);
+
+      if (isNaN(userId)) {
+        return next(errors.badRequest('Некорректный ID пользователя'));
+      }
+
+      const user = await this.userService.getUserById(userId);
+
+      if (!user) {
+        return next(errors.notFound('Пользователь не найден'));
+      }
+
+      res.status(200).json({
+        success: true,
+        data: { user },
+      });
+    } catch (error) {
+      next(
+        errors.server(
+          error instanceof Error ? error.message : 'Ошибка при получении пользователя'
+        )
+      );
+    }
+  }
+
+  // Обновление пользователя (только для админов)
+  async updateUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = parseInt(req.params.id);
+      const updates: UserUpdateRequest = req.body;
+
+      if (isNaN(userId)) {
+        return next(errors.badRequest('Некорректный ID пользователя'));
+      }
+
+      const user = await this.userService.updateUser(userId, updates);
+
+      res.status(200).json({
+        success: true,
+        message: 'Пользователь успешно обновлен',
+        data: { user },
+      });
+    } catch (error) {
+      next(
+        errors.server(
+          error instanceof Error ? error.message : 'Ошибка при обновлении пользователя'
+        )
+      );
+    }
+  }
+
+  // Деактивация пользователя (только для админов)
+  async deactivateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = parseInt(req.params.id);
+
+      if (isNaN(userId)) {
+        return next(errors.badRequest('Некорректный ID пользователя'));
+      }
+
+      // Prevent self-deactivation
+      if (req.user?.sub === userId) {
+        return next(errors.badRequest('Вы не можете деактивировать самого себя'));
+      }
+
+      await this.userService.deactivateUser(userId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Пользователь деактивирован',
+      });
+    } catch (error) {
+      next(
+        errors.server(
+          error instanceof Error ? error.message : 'Ошибка при деактивации пользователя'
+        )
+      );
+    }
+  }
+
+  // Получение статистики пользователей (только для админов)
+  async getUserStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const stats = await this.userService.getUserStats();
+
+      res.status(200).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(
+        errors.server(
+          error instanceof Error ? error.message : 'Ошибка при получении статистики'
+        )
+      );
+    }
+  }
+
+  // Получение списка ролей (статичный список)
+  async getRoles(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const roles = [
+        { value: 'user', label: 'Пользователь', description: 'Обычный пользователь' },
+        {
+          value: 'moderator',
+          label: 'Модератор',
+          description: 'Может модерировать контент',
+        },
+        {
+          value: 'admin',
+          label: 'Администратор',
+          description: 'Полный доступ к системе',
+        },
+      ];
+
+      res.status(200).json({
+        success: true,
+        data: { roles },
+      });
+    } catch (error) {
+      next(errors.server('Ошибка при получении ролей'));
+    }
+  }
+
+  // Получение списка разрешений (статичный список)
+  async getPermissions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const permissions = [
+        { value: 'manage_users', label: 'Управление пользователями' },
+        { value: 'manage_content', label: 'Управление контентом' },
+        { value: 'view_stats', label: 'Просмотр статистики' },
+        { value: 'moderate', label: 'Модерация' },
+      ];
+
+      res.status(200).json({
+        success: true,
+        data: { permissions },
+      });
+    } catch (error) {
+      next(errors.server('Ошибка при получении разрешений'));
     }
   }
 }

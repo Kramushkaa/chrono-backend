@@ -9,6 +9,7 @@ import { AchievementsService } from './services/achievementsService';
 import { PeriodsService } from './services/periodsService';
 import { PersonsService } from './services/personsService';
 import { ListsService } from './services/listsService';
+import { UserService } from './services/userService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler } from './middleware/auth';
@@ -42,7 +43,8 @@ const achievementsService = new AchievementsService(pool, telegramService);
 const periodsService = new PeriodsService(pool, telegramService);
 const personsService = new PersonsService(pool, telegramService);
 const listsService = new ListsService(pool);
-const authController = new AuthController(authService, telegramService, emailService);
+const userService = new UserService(pool);
+const authController = new AuthController(authService, telegramService, emailService, userService);
 
 // Создание Express приложения
 const app = express();

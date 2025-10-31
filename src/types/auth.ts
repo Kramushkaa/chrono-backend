@@ -83,6 +83,22 @@ export interface VerifyEmailRequest {
   token: string;
 }
 
+// Admin типы для запросов
+export interface UserUpdateRequest {
+  role?: 'user' | 'moderator' | 'admin';
+  is_active?: boolean;
+  email_verified?: boolean;
+}
+
+export interface UserQueryParams {
+  limit?: number;
+  offset?: number;
+  role?: string;
+  is_active?: boolean;
+  email_verified?: boolean;
+  search?: string; // search by email or username
+}
+
 // Типы для ответов
 export interface AuthResponse {
   user: User;
@@ -98,8 +114,23 @@ export interface ProfileResponse {
 export interface UsersListResponse {
   users: User[];
   total: number;
-  page: number;
   limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export interface UserStatsResponse {
+  total: number;
+  active: number;
+  inactive: number;
+  verified: number;
+  unverified: number;
+  byRole: {
+    user: number;
+    moderator: number;
+    admin: number;
+  };
+  recentRegistrations: number; // last 7 days
 }
 
 // Типы для JWT
