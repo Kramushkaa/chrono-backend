@@ -422,12 +422,9 @@ export class AuthController {
         limit: parseInt(req.query.limit as string) || 20,
         offset: parseInt(req.query.offset as string) || 0,
         role: req.query.role as string,
-        is_active:
-          req.query.is_active !== undefined ? req.query.is_active === 'true' : undefined,
+        is_active: req.query.is_active !== undefined ? req.query.is_active === 'true' : undefined,
         email_verified:
-          req.query.email_verified !== undefined
-            ? req.query.email_verified === 'true'
-            : undefined,
+          req.query.email_verified !== undefined ? req.query.email_verified === 'true' : undefined,
         search: req.query.search as string,
       };
 
@@ -474,9 +471,7 @@ export class AuthController {
       });
     } catch (error) {
       next(
-        errors.server(
-          error instanceof Error ? error.message : 'Ошибка при получении пользователя'
-        )
+        errors.server(error instanceof Error ? error.message : 'Ошибка при получении пользователя')
       );
     }
   }
@@ -500,9 +495,7 @@ export class AuthController {
       });
     } catch (error) {
       next(
-        errors.server(
-          error instanceof Error ? error.message : 'Ошибка при обновлении пользователя'
-        )
+        errors.server(error instanceof Error ? error.message : 'Ошибка при обновлении пользователя')
       );
     }
   }
@@ -547,9 +540,7 @@ export class AuthController {
       });
     } catch (error) {
       next(
-        errors.server(
-          error instanceof Error ? error.message : 'Ошибка при получении статистики'
-        )
+        errors.server(error instanceof Error ? error.message : 'Ошибка при получении статистики')
       );
     }
   }
