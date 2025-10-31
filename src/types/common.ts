@@ -32,4 +32,3 @@ export type JsonObject = Record<string, unknown>;
  * Тип для ответов квиза (может быть разных типов)
  */
 export type QuizAnswer = string | number | string[] | boolean | null;
-

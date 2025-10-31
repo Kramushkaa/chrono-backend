@@ -40,7 +40,7 @@ class Logger {
 
   private writeLog(level: string, message: string, context?: LogContext): void {
     const formattedLog = this.formatLog(level, message, context);
-    
+
     switch (level) {
       case 'error':
         console.error(formattedLog);

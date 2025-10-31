@@ -6,7 +6,6 @@ import { errors, asyncHandler } from '../../utils/errors';
 import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../../utils/api';
 import { TelegramService } from '../../services/telegramService';
 import { PersonsService } from '../../services/personsService';
-import { applyPayloadToPerson } from './helpers';
 
 export function createAdminPersonRoutes(
   pool: Pool,

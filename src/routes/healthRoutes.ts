@@ -31,7 +31,7 @@ export function createHealthRoutes(pool: Pool): Router {
       const dbStartTime = Date.now();
       await pool.query('SELECT NOW()');
       const dbResponseTime = Date.now() - dbStartTime;
-      
+
       healthCheck.database = {
         status: 'connected',
         responseTime: dbResponseTime,
@@ -50,7 +50,7 @@ export function createHealthRoutes(pool: Pool): Router {
 
       // Check pool health
       const isPoolHealthy = pool.totalCount < pool.options.max * 0.9; // Less than 90% capacity
-      
+
       if (!isPoolHealthy) {
         healthCheck.message = 'Pool near capacity';
         res.status(200).json({

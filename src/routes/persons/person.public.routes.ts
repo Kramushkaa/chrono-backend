@@ -6,16 +6,10 @@ import {
   requireRoleMiddleware,
   requireVerifiedEmail,
 } from '../../middleware/auth';
-import { errors, mapPgError, asyncHandler } from '../../utils/errors';
-import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../../utils/api';
+import { errors, asyncHandler } from '../../utils/errors';
 import { TelegramService } from '../../services/telegramService';
 import { sanitizePayload } from './helpers';
-import {
-  validateQuery,
-  validateParams,
-  validateBody,
-  commonSchemas,
-} from '../../middleware/validation';
+import { validateQuery, validateParams, commonSchemas } from '../../middleware/validation';
 
 import { PersonsService } from '../../services/personsService';
 

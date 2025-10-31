@@ -15,7 +15,9 @@ export class TelegramService {
         this.isEnabled = true;
         logger.info('Telegram notifications service initialized');
       } catch (error) {
-        logger.error('Telegram service initialization failed', { error: error instanceof Error ? error : new Error(String(error)) });
+        logger.error('Telegram service initialization failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
         this.isEnabled = false;
       }
     } else {
@@ -49,7 +51,10 @@ export class TelegramService {
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: new registration', { userEmail });
     } catch (error) {
-      logger.error('Failed to send Telegram notification (registration)', { error: error instanceof Error ? error : new Error(String(error)), userEmail });
+      logger.error('Failed to send Telegram notification (registration)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        userEmail,
+      });
     }
   }
 
@@ -448,7 +453,9 @@ Telegram notifications работают корректно!
       await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Test Telegram message sent successfully');
     } catch (error) {
-      logger.error('Failed to send test Telegram message', { error: error instanceof Error ? error : new Error(String(error)) });
+      logger.error('Failed to send test Telegram message', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
       throw error;
     }
   }

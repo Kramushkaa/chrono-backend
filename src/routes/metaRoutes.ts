@@ -36,7 +36,7 @@ export function createMetaRoutes(pool: Pool): Router {
     asyncHandler(async (_req: Request, res: Response) => {
       const cacheKey = 'categories';
       const cached = cache.get(cacheKey);
-      
+
       if (cached) {
         res.json(cached);
         return;
@@ -51,7 +51,7 @@ export function createMetaRoutes(pool: Pool): Router {
          ORDER BY category`;
       const result = await pool.query(query);
       const categories = result.rows.map(row => row.category);
-      
+
       const response = { success: true, data: categories };
       cache.set(cacheKey, response, 300000); // 5 минут
       res.json(response);
@@ -64,7 +64,7 @@ export function createMetaRoutes(pool: Pool): Router {
     asyncHandler(async (_req: Request, res: Response) => {
       const cacheKey = 'countries';
       const cached = cache.get(cacheKey);
-      
+
       if (cached) {
         res.json(cached);
         return;
@@ -72,7 +72,7 @@ export function createMetaRoutes(pool: Pool): Router {
 
       const result = await pool.query('SELECT name FROM v_countries ORDER BY name');
       const countries = result.rows.map(r => r.name);
-      
+
       const response = { success: true, data: countries };
       cache.set(cacheKey, response, 300000); // 5 минут
       res.json(response);
@@ -85,14 +85,14 @@ export function createMetaRoutes(pool: Pool): Router {
     asyncHandler(async (_req: Request, res: Response) => {
       const cacheKey = 'countries_options';
       const cached = cache.get(cacheKey);
-      
+
       if (cached) {
         res.json(cached);
         return;
       }
 
       const result = await pool.query('SELECT id, name FROM countries ORDER BY name');
-      
+
       const response = { success: true, data: result.rows };
       cache.set(cacheKey, response, 300000); // 5 минут
       res.json(response);
@@ -105,7 +105,7 @@ export function createMetaRoutes(pool: Pool): Router {
     asyncHandler(async (_req: Request, res: Response) => {
       const cacheKey = 'stats';
       const cached = cache.get(cacheKey);
-      
+
       if (cached) {
         res.json(cached);
         return;
@@ -135,7 +135,7 @@ export function createMetaRoutes(pool: Pool): Router {
         categories: categoryStatsResult.rows,
         countries: countryStatsResult.rows,
       };
-      
+
       const response = { success: true, data: stats };
       cache.set(cacheKey, response, 120000); // 2 минуты (статистика обновляется чаще)
       res.json(response);

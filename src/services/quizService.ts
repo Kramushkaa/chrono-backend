@@ -1,7 +1,6 @@
 import { Pool } from 'pg';
 import * as crypto from 'crypto';
 import { BaseService } from './BaseService';
-import { logger } from '../utils/logger';
 import { QuizAnswer } from '../types/common';
 import type {
   QuizQuestion,
@@ -281,7 +280,12 @@ export class QuizService extends BaseService {
       correctAnswers: number;
       totalQuestions: number;
       totalTimeMs: number;
-      answers?: Array<{ questionId: string; answer: QuizAnswer; isCorrect: boolean; timeSpent: number }>;
+      answers?: Array<{
+        questionId: string;
+        answer: QuizAnswer;
+        isCorrect: boolean;
+        timeSpent: number;
+      }>;
     }
   ): Promise<{ id: number; shareCode: string }> {
     const client = await this.pool.connect();
@@ -693,6 +697,7 @@ export class QuizService extends BaseService {
       session_token?: string; // For shared quizzes
       quiz_title?: string; // For shared quizzes
       shared_quiz_id?: number;
+      share_code?: string; // For shared quizzes
       is_shared: boolean;
       correct_answers: number;
       total_questions: number;

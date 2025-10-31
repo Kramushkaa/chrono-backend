@@ -3,12 +3,7 @@ import { Pool } from 'pg';
 import { authenticateToken, rateLimit } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
 import { ListsService } from '../services/listsService';
-import {
-  validateQuery,
-  validateBody,
-  validateParams,
-  commonSchemas,
-} from '../middleware/validation';
+import { validateBody, validateParams, commonSchemas } from '../middleware/validation';
 import { z } from 'zod';
 
 // Валидационные схемы для lists

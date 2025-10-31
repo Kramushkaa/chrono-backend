@@ -54,13 +54,11 @@ export class AuthController {
         await this.emailService.sendVerificationEmail(user.email, verifyToken, userName);
 
         // Отправка уведомления в Telegram об отправке письма подтверждения (неблокирующее)
-        this.telegramService
-          .notifyVerificationEmailSent(user.email, false)
-          .catch(err =>
-            logger.warn('Telegram notification failed (verification sent)', {
-              errorMessage: err instanceof Error ? err.message : String(err),
-            })
-          );
+        this.telegramService.notifyVerificationEmailSent(user.email, false).catch(err =>
+          logger.warn('Telegram notification failed (verification sent)', {
+            errorMessage: err instanceof Error ? err.message : String(err),
+          })
+        );
       } catch (err) {
         logger.warn('Email verification send failed', {
           errorMessage: err instanceof Error ? err.message : String(err),
@@ -321,7 +319,9 @@ export class AuthController {
   // Подтверждение email
   async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const token = (req.body && req.body.token) || (req.query && String(req.query.token || ''));
+      const queryToken = req.query?.token;
+      const token =
+        (req.body && req.body.token) || (typeof queryToken === 'string' ? queryToken : '');
 
       if (!token) {
         return next(errors.badRequest('Токен подтверждения обязателен', 'missing_token'));
@@ -330,13 +330,11 @@ export class AuthController {
       const user = await this.authService.verifyEmail(token);
 
       // Отправка уведомления в Telegram о подтверждении email (неблокирующее)
-      this.telegramService
-        .notifyEmailVerified(user.email, user.username)
-        .catch(err =>
-          logger.warn('Telegram notification failed (email verified)', {
-            errorMessage: err instanceof Error ? err.message : String(err),
-          })
-        );
+      this.telegramService.notifyEmailVerified(user.email, user.username).catch(err =>
+        logger.warn('Telegram notification failed (email verified)', {
+          errorMessage: err instanceof Error ? err.message : String(err),
+        })
+      );
 
       res.status(200).json({
         success: true,
@@ -362,13 +360,11 @@ export class AuthController {
         await this.emailService.sendVerificationEmail(email, token);
 
         // Отправка уведомления в Telegram о повторной отправке письма (неблокирующее)
-        this.telegramService
-          .notifyVerificationEmailSent(email, true)
-          .catch(err =>
-            logger.warn('Telegram notification failed (resend verification)', {
-              errorMessage: err instanceof Error ? err.message : String(err),
-            })
-          );
+        this.telegramService.notifyVerificationEmailSent(email, true).catch(err =>
+          logger.warn('Telegram notification failed (resend verification)', {
+            errorMessage: err instanceof Error ? err.message : String(err),
+          })
+        );
       } catch (err) {
         logger.warn('Resend verification send failed', {
           errorMessage: err instanceof Error ? err.message : String(err),

@@ -8,7 +8,6 @@ import { config as appConfig } from '../config';
 const SALT_ROUNDS = appConfig.security.bcryptRounds;
 const JWT_SECRET = appConfig.jwt.secret;
 const JWT_EXPIRES_IN = appConfig.jwt.expiresIn;
-const REFRESH_TOKEN_EXPIRES_IN = appConfig.jwt.refreshExpiresIn;
 
 // Хеширование паролей
 export const hashPassword = async (password: string): Promise<string> => {

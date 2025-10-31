@@ -1,9 +1,7 @@
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { errors } from '../utils/errors';
-import { config } from '../config';
 import { BaseService } from './BaseService';
-import { logger } from '../utils/logger';
 
 // Database row interfaces
 interface ListRow {

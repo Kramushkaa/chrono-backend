@@ -4,7 +4,6 @@ import { Pool } from 'pg';
 import { authenticateToken } from '../../middleware/auth';
 import { validateParams, commonSchemas } from '../../middleware/validation';
 import { errors, asyncHandler } from '../../utils/errors';
-import { parseLimitOffset, paginateRows, mapApiPersonRow } from '../../utils/api';
 import { TelegramService } from '../../services/telegramService';
 import { sanitizePayload } from './helpers';
 

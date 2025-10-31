@@ -248,7 +248,9 @@ async function startServer() {
         logger.info('Очищено просроченных quiz сессий', { deletedCount: result.deletedCount });
       }
     } catch (error) {
-      logger.error('Ошибка при очистке quiz сессий', { error: error instanceof Error ? error : new Error(String(error)) });
+      logger.error('Ошибка при очистке quiz сессий', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
     }
 
     // Запуск сервера
@@ -271,7 +273,9 @@ async function startServer() {
       logger.info('CORS настроен', { corsInfo });
     });
   } catch (error) {
-    logger.error('Ошибка при запуске сервера', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('Ошибка при запуске сервера', {
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
     process.exit(1);
   }
 }

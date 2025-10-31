@@ -8,7 +8,6 @@ import {
 } from '../types/auth';
 import { UserRow, UserSessionRow } from '../types/database';
 import { BaseService } from './BaseService';
-import { logger } from '../utils/logger';
 import {
   hashPassword,
   comparePassword,

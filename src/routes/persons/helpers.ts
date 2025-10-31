@@ -21,16 +21,15 @@ const allowedPersonFields = new Set([
 ]);
 
 export function sanitizePayload(raw: unknown): Partial<PersonPayload> {
-  const out: Partial<PersonPayload> = {};
+  const out: Record<string, unknown> = {};
   if (!raw || typeof raw !== 'object') return out;
   const rawObj = raw as Record<string, unknown>;
   for (const key of Object.keys(rawObj)) {
     if (allowedPersonFields.has(key)) {
-      const typedKey = key as keyof PersonPayload;
-      out[typedKey] = rawObj[key] as any;
+      out[key] = rawObj[key];
     }
   }
-  return out;
+  return out as Partial<PersonPayload>;
 }
 
 export async function applyPayloadToPerson(

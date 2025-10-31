@@ -24,7 +24,7 @@ export class QuizController {
    */
   saveQuizAttempt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || null;
+      const userId = req.user?.sub || null;
       const data = req.body as SaveQuizAttemptRequest;
 
       // Validation
@@ -80,7 +80,7 @@ export class QuizController {
    */
   createSharedQuiz = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub;
+      const userId = req.user?.sub;
 
       if (!userId) {
         res.status(401).json({
@@ -189,7 +189,7 @@ export class QuizController {
   startSharedQuiz = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { shareCode } = req.params;
-      const userId = (req as any).user?.sub || null;
+      const userId = req.user?.sub || null;
 
       if (!shareCode) {
         res.status(400).json({
@@ -317,7 +317,7 @@ export class QuizController {
    */
   getGlobalLeaderboard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.sub;
 
       const result = await this.quizService.getGlobalLeaderboard(userId);
 
@@ -336,7 +336,7 @@ export class QuizController {
    */
   getUserStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub;
+      const userId = req.user?.sub;
 
       if (!userId) {
         res.status(401).json({
@@ -369,7 +369,7 @@ export class QuizController {
   ): Promise<void> => {
     try {
       const { shareCode } = req.params;
-      const userId = (req as any).user?.sub;
+      const userId = req.user?.sub;
 
       if (!shareCode) {
         res.status(400).json({
@@ -409,7 +409,7 @@ export class QuizController {
    */
   getUserHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub;
+      const userId = req.user?.sub;
 
       if (!userId) {
         res.status(401).json({
@@ -429,7 +429,7 @@ export class QuizController {
         sessionToken: a.session_token,
         quizTitle: a.quiz_title || 'Обычный квиз',
         sharedQuizId: a.shared_quiz_id,
-        shareCode: (a as any).share_code,
+        shareCode: a.share_code,
         isShared: a.is_shared,
         correctAnswers: a.correct_answers,
         totalQuestions: a.total_questions,
@@ -458,7 +458,7 @@ export class QuizController {
   getAttemptDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { attemptId } = req.params;
-      const userId = (req as any).user?.sub;
+      const userId = req.user?.sub;
 
       if (!userId) {
         res.status(401).json({
@@ -537,7 +537,7 @@ export class QuizController {
   getSessionDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { sessionToken } = req.params;
-      const userId = (req as any).user?.sub;
+      const userId = req.user?.sub;
 
       if (!sessionToken) {
         res.status(400).json({
