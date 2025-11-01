@@ -1,8 +1,8 @@
-import TelegramBot from 'node-telegram-bot-api';
+import { Telegraf } from 'telegraf';
 import { logger } from '../utils/logger';
 
 export class TelegramService {
-  private bot: TelegramBot | null = null;
+  private bot: Telegraf | null = null;
   private adminChatId: string;
   private isEnabled: boolean = false;
 
@@ -11,9 +11,9 @@ export class TelegramService {
 
     if (botToken && adminChatId) {
       try {
-        this.bot = new TelegramBot(botToken, { polling: false });
+        this.bot = new Telegraf(botToken);
         this.isEnabled = true;
-        logger.info('Telegram notifications service initialized');
+        logger.info('Telegram notifications service initialized (Telegraf)');
       } catch (error) {
         logger.error('Telegram service initialization failed', {
           error: error instanceof Error ? error : new Error(String(error)),
@@ -48,7 +48,7 @@ export class TelegramService {
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: new registration', { userEmail });
     } catch (error) {
       logger.error('Failed to send Telegram notification (registration)', {
@@ -76,7 +76,7 @@ ${emoji} <b>${action} письма подтверждения</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: verification email', { userEmail, isResend });
     } catch (error) {
       logger.error('Failed to send Telegram notification (verification email)', {
@@ -105,7 +105,7 @@ ${emoji} <b>${action} письма подтверждения</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: email verified', { userEmail, username });
     } catch (error) {
       logger.error('Failed to send Telegram notification (email verified)', {
@@ -141,7 +141,7 @@ ${emoji} <b>Новая личность ${statusText}</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: person created', {
         personName,
         creatorEmail,
@@ -180,7 +180,7 @@ ${emoji} <b>Новая личность ${statusText}</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: person edit proposed', {
         personName,
         proposerEmail,
@@ -221,7 +221,7 @@ ${emoji} <b>Личность ${actionText}</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: person reviewed', {
         personName,
         action,
@@ -271,7 +271,7 @@ ${emoji} <b>Новое достижение ${statusText}</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: achievement created', {
         description,
         year,
@@ -318,7 +318,7 @@ ${emoji} <b>Достижение ${actionText}</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: achievement reviewed', {
         description,
         year,
@@ -364,7 +364,7 @@ ${emoji} <b>Новый период ${statusText}</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: period created', {
         periodType,
         startYear,
@@ -412,7 +412,7 @@ ${emoji} <b>Период ${actionText}</b>
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Telegram notification sent: period reviewed', {
         periodType,
         startYear,
@@ -450,7 +450,7 @@ Telegram notifications работают корректно!
 `.trim();
 
     try {
-      await this.bot.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
       logger.info('Test Telegram message sent successfully');
     } catch (error) {
       logger.error('Failed to send test Telegram message', {
