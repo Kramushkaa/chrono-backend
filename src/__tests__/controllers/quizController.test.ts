@@ -546,7 +546,7 @@ describe('QuizController', () => {
 
   describe('getGlobalLeaderboard', () => {
     it('should get leaderboard with authenticated user', async () => {
-      (mockRequest as any).user = { id: 1 };
+      (mockRequest as any).user = { sub: 1 };
       mockQuizService.getGlobalLeaderboard.mockResolvedValue({
         topPlayers: [
           {

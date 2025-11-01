@@ -240,7 +240,15 @@ export class QuizController {
         return;
       }
 
-      // timeSpent проверяется в схеме валидации
+      // Validate timeSpent
+      if (typeof data.timeSpent !== 'number' || data.timeSpent < 0 || data.timeSpent > 600000) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid time',
+          message: 'Некорректное время ответа',
+        });
+        return;
+      }
 
       const result = await this.quizService.checkAnswer(
         data.sessionToken,
