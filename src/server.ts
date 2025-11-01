@@ -118,7 +118,7 @@ app.use('/api/auth', createAuthRoutes(authController));
 app.use(logRequest);
 
 // Health check routes (без префикса /api для load balancers)
-app.use('/', createHealthRoutes(pool));
+app.use('/', createHealthRoutes(pool, telegramService));
 
 // Маршруты управления Личностями (создание/модерация)
 app.use('/api', createPersonRoutes(pool, telegramService, personsService));

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
+import { TelegramService } from '../services/telegramService';
 
-export function createHealthRoutes(pool: Pool): Router {
+export function createHealthRoutes(pool: Pool, telegramService?: TelegramService): Router {
   const router = Router();
 
   /**
@@ -118,6 +119,38 @@ export function createHealthRoutes(pool: Pool): Router {
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
+  });
+
+  /**
+   * Telegram test endpoint
+   * POST /telegram-test
+   * Sends a test message to verify Telegram integration
+   */
+  router.post('/telegram-test', async (req: Request, res: Response) => {
+    if (!telegramService) {
+      res.status(503).json({
+        success: false,
+        message: 'Telegram service not initialized',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    try {
+      await telegramService.sendTestMessage();
+      res.status(200).json({
+        success: true,
+        message: 'Test message sent successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send test message',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   return router;
