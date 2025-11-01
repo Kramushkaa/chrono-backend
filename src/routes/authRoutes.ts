@@ -81,19 +81,13 @@ export function createAuthRoutes(authController: AuthController): Router {
   );
 
   // Получение пользователя по ID (только для админов)
-  router.get(
-    '/users/:id',
-    authenticateToken,
-    requireRoleMiddleware(['admin']),
-    (req, res, next) => authController.getUserById(req, res, next)
+  router.get('/users/:id', authenticateToken, requireRoleMiddleware(['admin']), (req, res, next) =>
+    authController.getUserById(req, res, next)
   );
 
   // Обновление пользователя (только для админов)
-  router.put(
-    '/users/:id',
-    authenticateToken,
-    requireRoleMiddleware(['admin']),
-    (req, res, next) => authController.updateUserById(req, res, next)
+  router.put('/users/:id', authenticateToken, requireRoleMiddleware(['admin']), (req, res, next) =>
+    authController.updateUserById(req, res, next)
   );
 
   // Деактивация пользователя (только для админов)

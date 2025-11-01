@@ -20,7 +20,7 @@ describe('Meta Routes', () => {
 
   it('should register all routes', () => {
     const router = createMetaRoutes(mockPool);
-    
+
     const routerStack = (router as any).stack;
     expect(routerStack).toBeDefined();
     expect(routerStack.length).toBeGreaterThan(0);
@@ -29,56 +29,45 @@ describe('Meta Routes', () => {
   it('should have health route', () => {
     const router = createMetaRoutes(mockPool);
     const routerStack = (router as any).stack;
-    
-    const healthRoute = routerStack.find((layer: any) => 
-      layer.route?.path === '/health'
-    );
-    
+
+    const healthRoute = routerStack.find((layer: any) => layer.route?.path === '/health');
+
     expect(healthRoute).toBeDefined();
   });
 
   it('should have dto-version route', () => {
     const router = createMetaRoutes(mockPool);
     const routerStack = (router as any).stack;
-    
-    const dtoRoute = routerStack.find((layer: any) => 
-      layer.route?.path === '/dto-version'
-    );
-    
+
+    const dtoRoute = routerStack.find((layer: any) => layer.route?.path === '/dto-version');
+
     expect(dtoRoute).toBeDefined();
   });
 
   it('should have categories route', () => {
     const router = createMetaRoutes(mockPool);
     const routerStack = (router as any).stack;
-    
-    const categoriesRoute = routerStack.find((layer: any) => 
-      layer.route?.path === '/categories'
-    );
-    
+
+    const categoriesRoute = routerStack.find((layer: any) => layer.route?.path === '/categories');
+
     expect(categoriesRoute).toBeDefined();
   });
 
   it('should have countries route', () => {
     const router = createMetaRoutes(mockPool);
     const routerStack = (router as any).stack;
-    
-    const countriesRoute = routerStack.find((layer: any) => 
-      layer.route?.path === '/countries'
-    );
-    
+
+    const countriesRoute = routerStack.find((layer: any) => layer.route?.path === '/countries');
+
     expect(countriesRoute).toBeDefined();
   });
 
   it('should register multiple GET routes', () => {
     const router = createMetaRoutes(mockPool);
     const routerStack = (router as any).stack;
-    
-    const getRoutes = routerStack.filter((layer: any) => 
-      layer.route?.methods?.get
-    );
-    
+
+    const getRoutes = routerStack.filter((layer: any) => layer.route?.methods?.get);
+
     expect(getRoutes.length).toBeGreaterThan(2);
   });
 });
-

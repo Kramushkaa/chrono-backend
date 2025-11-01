@@ -61,14 +61,21 @@ describe('AuthController', () => {
     } as any;
 
     const mockUserService = {
-      getAllUsers: jest.fn().mockResolvedValue({ users: [], total: 0, limit: 20, offset: 0, hasMore: false }),
+      getAllUsers: jest
+        .fn()
+        .mockResolvedValue({ users: [], total: 0, limit: 20, offset: 0, hasMore: false }),
       getUserById: jest.fn().mockResolvedValue(null),
       updateUser: jest.fn().mockResolvedValue({}),
       deactivateUser: jest.fn().mockResolvedValue(undefined),
       getUserStats: jest.fn().mockResolvedValue({}),
     } as any;
 
-    authController = new AuthController(mockAuthService, mockTelegramService, mockEmailService, mockUserService);
+    authController = new AuthController(
+      mockAuthService,
+      mockTelegramService,
+      mockEmailService,
+      mockUserService
+    );
 
     mockRequest = {
       body: {},

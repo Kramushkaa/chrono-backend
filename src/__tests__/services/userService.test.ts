@@ -163,7 +163,7 @@ describe('UserService', () => {
 
     it('should detect hasMore when results exceed limit', async () => {
       const mockUserRow = createMockUserRow();
-      
+
       mockPool.query.mockResolvedValue({
         rows: [mockUserRow, mockUserRow, mockUserRow], // 3 results for limit=2
         command: 'SELECT',
@@ -375,9 +375,7 @@ describe('UserService', () => {
     it('should handle database errors in updateUser', async () => {
       mockPool.query.mockRejectedValue(new Error('Update failed'));
 
-      await expect(
-        userService.updateUser(1, { role: 'moderator' })
-      ).rejects.toThrow();
+      await expect(userService.updateUser(1, { role: 'moderator' })).rejects.toThrow();
     });
   });
 });

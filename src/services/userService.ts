@@ -80,14 +80,10 @@ export class UserService extends BaseService {
    * Получение пользователя по ID
    */
   async getUserById(userId: number): Promise<User | null> {
-    const result = await this.executeQuery<UserRow>(
-      'SELECT * FROM users WHERE id = $1',
-      [userId],
-      {
-        action: 'getUserById',
-        params: { userId },
-      }
-    );
+    const result = await this.executeQuery<UserRow>('SELECT * FROM users WHERE id = $1', [userId], {
+      action: 'getUserById',
+      params: { userId },
+    });
 
     if (result.rows.length === 0) {
       return null;
@@ -197,7 +193,10 @@ export class UserService extends BaseService {
       { action: 'getUserStats_verified' }
     );
     const verifiedMap = Object.fromEntries(
-      verifiedResult.rows.map(r => [r.email_verified ? 'verified' : 'unverified', parseInt(r.count)])
+      verifiedResult.rows.map(r => [
+        r.email_verified ? 'verified' : 'unverified',
+        parseInt(r.count),
+      ])
     );
 
     // By role
@@ -250,4 +249,3 @@ export class UserService extends BaseService {
     };
   }
 }
-

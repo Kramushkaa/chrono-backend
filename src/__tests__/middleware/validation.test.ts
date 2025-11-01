@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { validateQuery, validateBody, validateParams, commonSchemas } from '../../middleware/validation';
+import {
+  validateQuery,
+  validateBody,
+  validateParams,
+  commonSchemas,
+} from '../../middleware/validation';
 
 describe('Validation Middleware', () => {
   let mockRequest: Partial<Request>;
@@ -417,4 +422,3 @@ describe('Validation Middleware', () => {
     });
   });
 });
-

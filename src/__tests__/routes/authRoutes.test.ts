@@ -32,7 +32,7 @@ describe('Auth Routes', () => {
 
   it('should register all routes', () => {
     const router = createAuthRoutes(mockAuthController);
-    
+
     // Check that router has routes registered
     const routerStack = (router as any).stack;
     expect(routerStack).toBeDefined();
@@ -42,7 +42,7 @@ describe('Auth Routes', () => {
   it('should have public routes', () => {
     const router = createAuthRoutes(mockAuthController);
     const routerStack = (router as any).stack;
-    
+
     // Verify that routes are registered (we can't easily test individual routes without integration tests)
     expect(routerStack.length).toBeGreaterThan(5);
   });
@@ -50,7 +50,7 @@ describe('Auth Routes', () => {
   it('should apply rate limiting middleware', () => {
     const router = createAuthRoutes(mockAuthController);
     const routerStack = (router as any).stack;
-    
+
     // Rate limiting middleware should be first
     expect(routerStack[0].handle).toBeDefined();
   });
@@ -58,36 +58,34 @@ describe('Auth Routes', () => {
   it('should configure validation middleware for register route', () => {
     const router = createAuthRoutes(mockAuthController);
     const routerStack = (router as any).stack;
-    
+
     // Find register route
-    const registerRoute = routerStack.find((layer: any) => 
-      layer.route?.path === '/register' && layer.route?.methods?.post
+    const registerRoute = routerStack.find(
+      (layer: any) => layer.route?.path === '/register' && layer.route?.methods?.post
     );
-    
+
     expect(registerRoute).toBeDefined();
   });
 
   it('should configure validation middleware for login route', () => {
     const router = createAuthRoutes(mockAuthController);
     const routerStack = (router as any).stack;
-    
+
     // Find login route
-    const loginRoute = routerStack.find((layer: any) => 
-      layer.route?.path === '/login' && layer.route?.methods?.post
+    const loginRoute = routerStack.find(
+      (layer: any) => layer.route?.path === '/login' && layer.route?.methods?.post
     );
-    
+
     expect(loginRoute).toBeDefined();
   });
 
   it('should protect sensitive routes with authentication', () => {
     const router = createAuthRoutes(mockAuthController);
     const routerStack = (router as any).stack;
-    
+
     // Find logout route (should be protected)
-    const logoutRoute = routerStack.find((layer: any) => 
-      layer.route?.path === '/logout'
-    );
-    
+    const logoutRoute = routerStack.find((layer: any) => layer.route?.path === '/logout');
+
     if (logoutRoute) {
       // Logout should have authentication middleware
       expect(logoutRoute.route.stack.length).toBeGreaterThan(1);
