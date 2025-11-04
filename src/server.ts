@@ -27,7 +27,8 @@ import { cleanupExpiredQuizSessions } from './jobs/cleanup-quiz-sessions';
 import { logger } from './utils/logger';
 
 // Загрузка переменных окружения
-dotenv.config();
+// override: false - не перезаписываем существующие переменные (для Amvera и других PaaS)
+dotenv.config({ override: false });
 
 // Валидация конфигурации перед запуском
 validateConfig();

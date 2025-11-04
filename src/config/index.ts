@@ -2,7 +2,8 @@ import dotenv from 'dotenv';
 import { logger } from '../utils/logger';
 
 // Загружаем переменные окружения
-dotenv.config();
+// override: false - не перезаписываем существующие переменные (для Amvera и других PaaS)
+dotenv.config({ override: false });
 
 export const config = {
   // Настройки сервера
@@ -20,6 +21,7 @@ export const config = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
     ssl: process.env.DB_SSL === 'true',
+    sslRejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', // По умолчанию true для безопасности
     pool: {
       max: parseInt(process.env.DB_POOL_MAX || '20'),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
@@ -127,6 +129,7 @@ export interface DatabaseConfig {
   user: string;
   password: string;
   ssl: boolean;
+  sslRejectUnauthorized: boolean;
   pool: DatabasePoolConfig;
   sslCert?: string;
 }

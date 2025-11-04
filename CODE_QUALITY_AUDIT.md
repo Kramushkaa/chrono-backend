@@ -13,24 +13,36 @@
 ### Frontend - Высокий приоритет:
 
 #### 1. ✅ Исправлено дублирование в useApiData
+
 **Проблема:** Три идентичные проверки `controller.signal.aborted` подряд (строки 179, 190, 197)
 
 **До:**
+
 ```typescript
-if (controller.signal.aborted) { /* ... */ return }
+if (controller.signal.aborted) {
+  /* ... */ return;
+}
 // ... 5 строк ...
-if (controller.signal.aborted) { /* ... */ return }
+if (controller.signal.aborted) {
+  /* ... */ return;
+}
 // ... 5 строк ...
-if (controller.signal.aborted) { /* ... */ return }
+if (controller.signal.aborted) {
+  /* ... */ return;
+}
 ```
 
 **После:**
+
 ```typescript
-if (controller.signal.aborted) { /* ... */ return }
+if (controller.signal.aborted) {
+  /* ... */ return;
+}
 // Убраны 2 лишние проверки
 ```
 
 **Результат:**
+
 - ✅ Убрано ~15 строк дублирующегося кода
 - ✅ Улучшена производительность (меньше проверок)
 - ✅ Все 11 тестов useApiData прошли
@@ -38,9 +50,11 @@ if (controller.signal.aborted) { /* ... */ return }
 ---
 
 #### 2. ✅ Унифицированы statusFilters в useManagePageData
+
 **Проблема:** 3 идентичных состояния для каждого таба
 
 **До:**
+
 ```typescript
 const [statusFilters, setStatusFilters] = useState({ ... });
 const [achStatusFilters, setAchStatusFilters] = useState({ ... });
@@ -48,20 +62,22 @@ const [periodsStatusFilters, setPeriodsStatusFilters] = useState({ ... });
 ```
 
 **После:**
+
 ```typescript
 const [tabStatusFilters, setTabStatusFilters] = useState<Record<Tab, Record<string, boolean>>>({
   persons: { draft: false, pending: false, approved: false, rejected: false },
   achievements: { draft: false, pending: false, approved: false, rejected: false },
-  periods: { draft: false, pending: false, approved: false, rejected: false }
+  periods: { draft: false, pending: false, approved: false, rejected: false },
 });
 
 // Геттеры/сеттеры для обратной совместимости
 const statusFilters = tabStatusFilters.persons;
-const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, persons: filters }));
+const setStatusFilters = filters => setTabStatusFilters(prev => ({ ...prev, persons: filters }));
 // ... аналогично для achievements и periods
 ```
 
 **Результат:**
+
 - ✅ Убрано ~20 строк дублирования
 - ✅ Единый источник истины для статусов
 - ✅ Сохранена полная обратная совместимость
@@ -76,29 +92,34 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 #### 🟡 Средний приоритет:
 
 **1. Дублирование логики пагинации в routes**
+
 - **Файлы:** achievementsRoutes.ts, periodsRoutes.ts, personsRoutes.ts, listsRoutes.ts
 - **Проблема:** Одинаковый код в каждом route:
+
   ```typescript
   const limit = req.query.limit as number | undefined;
   const offset = req.query.offset as number | undefined;
   const countOnly = req.query.count as boolean | undefined;
-  
+
   if (countOnly) {
     const count = await service.getCount();
     res.json({ success: true, data: { count } });
     return;
   }
   ```
+
 - **Решение:** Создать middleware `withPagination(service, method)`
 - **Выгода:** ~200 строк кода, унификация
 
 **2. Дублирование модерационной логики**
+
 - **Файлы:** PersonsService, AchievementsService, PeriodsService
 - **Проблема:** Одинаковые методы approve/reject в каждом сервисе
 - **Решение:** Базовый класс `ModeratableService<T> extends BaseService`
 - **Выгода:** ~150 строк кода, единая логика модерации
 
 **3. Смешанная ответственность в Services**
+
 - **Проблема:** Services содержат и бизнес-логику, и SQL queries
 - **Текущая архитектура:**
   ```
@@ -114,6 +135,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 #### 🟢 Низкий приоритет:
 
 **4. Дублирование интерфейсов фильтров**
+
 - **Проблема:** `PersonFilters`, `AchievementFilters`, `PeriodFilters` - одинаковые поля
 - **Решение:** `BaseFilters` интерфейс + extends
 - **Выгода:** ~30 строк, типобезопасность
@@ -125,6 +147,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 #### 🟡 Средний приоритет:
 
 **1. Большие хуки (Single Responsibility Principle)**
+
 - **useManagePageData:** 289 строк - слишком много
 - **useApiData:** 393 строки - сложная логика
 - **Решение:** Разбить на композицию меньших хуков:
@@ -135,6 +158,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 - **Выгода:** Читаемость, тестируемость, переиспользование
 
 **2. Отсутствие CSS Modules (кроме 1 файла)**
+
 - **Проблема:** Все стили глобальные, риск конфликтов имён
 - **Решение:** Миграция на CSS Modules или styled-components
 - **Выгода:** Изоляция стилей, maintainability
@@ -142,6 +166,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 #### 🟢 Низкий приоритет:
 
 **3. Похожая структура tab компонентов**
+
 - **Файлы:** PersonsTab, AchievementsTab, PeriodsTab
 - **Решение:** Generic `ManageTab<T>` компонент
 - **Выгода:** ~100-150 строк, единообразие
@@ -151,6 +176,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 ## 🟢 Что уже отлично реализовано
 
 ### Backend ✅:
+
 - ✅ **BaseService pattern** - отличное переиспользование
 - ✅ **QueryBuilder** - устраняет SQL дублирование
 - ✅ **Централизованные ошибки** - `errors` utility
@@ -162,6 +188,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 - ✅ **Telegram интеграция** - современная библиотека (Telegraf)
 
 ### Frontend ✅:
+
 - ✅ **Feature-based архитектура** - четкое разделение (auth, manage, quiz, timeline, persons)
 - ✅ **Shared модули** - hooks, components, utils, api
 - ✅ **Custom hooks** - инкапсуляция сложной логики
@@ -177,16 +204,16 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 
 ## 📈 Метрики качества
 
-| Категория | Backend | Frontend | Комментарий |
-|-----------|---------|----------|-------------|
-| **Типизация** | 10/10 | 9/10 | Backend: 100% strict, Frontend: ~98% |
-| **Тесты** | 10/10 | 8/10 | Backend: 624 теста, Frontend: хорошее покрытие |
-| **Дублирование** | 7/10 | 9/10 | Backend: ~5%, Frontend: ~3% (после оптимизаций) |
-| **Архитектура** | 8/10 | 9/10 | Backend: нет Repository layer, Frontend: Feature-based |
-| **Security** | 10/10 | 10/10 | Обе: 0 vulnerabilities |
-| **Документация** | 9/10 | 9/10 | Хорошая документация в обоих проектах |
-| **Производительность** | 9/10 | 9/10 | Обе: оптимизированы |
-| **Maintainability** | 8/10 | 9/10 | Хорошая, есть точки роста |
+| Категория              | Backend | Frontend | Комментарий                                            |
+| ---------------------- | ------- | -------- | ------------------------------------------------------ |
+| **Типизация**          | 10/10   | 9/10     | Backend: 100% strict, Frontend: ~98%                   |
+| **Тесты**              | 10/10   | 8/10     | Backend: 624 теста, Frontend: хорошее покрытие         |
+| **Дублирование**       | 7/10    | 9/10     | Backend: ~5%, Frontend: ~3% (после оптимизаций)        |
+| **Архитектура**        | 8/10    | 9/10     | Backend: нет Repository layer, Frontend: Feature-based |
+| **Security**           | 10/10   | 10/10    | Обе: 0 vulnerabilities                                 |
+| **Документация**       | 9/10    | 9/10     | Хорошая документация в обоих проектах                  |
+| **Производительность** | 9/10    | 9/10     | Обе: оптимизированы                                    |
+| **Maintainability**    | 8/10    | 9/10     | Хорошая, есть точки роста                              |
 
 **Общая оценка:** 🟢 **8.8/10 (Отлично)**
 
@@ -195,18 +222,21 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 ## 🎯 Дорожная карта улучшений
 
 ### ✅ Выполнено (1 ноября 2025):
+
 1. ✅ Исправлено дублирование abort checks (frontend)
 2. ✅ Унифицированы statusFilters (frontend)
 3. ✅ Обновлены зависимости (backend)
 4. ✅ Устранены security vulnerabilities (backend)
 
 ### 📅 Среднесрочно (1-2 месяца):
+
 1. Создать pagination middleware (backend)
 2. Внедрить Repository pattern (backend)
 3. Разбить большие хуки на меньшие (frontend)
 4. Миграция на CSS Modules (frontend)
 
 ### 📅 Долгосрочно (по мере необходимости):
+
 1. Базовый `ModeratableService` (backend)
 2. Generic `ManageTab<T>` компонент (frontend)
 3. Базовые интерфейсы для фильтров (backend)
@@ -216,13 +246,16 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 ## 💡 Рекомендации
 
 ### Немедленно:
+
 - ✅ **Выполнено:** Критичные оптимизации
 
 ### Перед следующим релизом:
+
 - Рассмотреть внедрение Repository pattern
 - Создать pagination middleware
 
 ### При добавлении новых фич:
+
 - Использовать существующие паттерны (BaseService, QueryBuilder)
 - Разбивать большие компоненты/хуки на меньшие
 - Предпочитать композицию наследованию
@@ -232,6 +265,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 ## 🏆 Выводы
 
 **Сильные стороны:**
+
 - Чистая архитектура
 - Отличное покрытие тестами
 - Современный стек
@@ -239,6 +273,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 - Консистентный код style
 
 **Области для улучшения:**
+
 - Некоторое дублирование в backend routes
 - Большие хуки можно разбить
 - Добавить Repository layer
@@ -251,6 +286,7 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 ## 📦 Commits (Code Quality Improvements)
 
 **Backend:**
+
 ```
 2fe0ffb - chore: cleanup files and update patch/minor dependencies
 0ab46b4 - chore: update dotenv to v17.2.3
@@ -260,9 +296,9 @@ const setStatusFilters = (filters) => setTabStatusFilters(prev => ({ ...prev, pe
 ```
 
 **Frontend:**
+
 ```
 2d0aeae - refactor: code quality improvements - high priority fixes
 ```
 
 **Итого:** Улучшено качество кода, устранены уязвимости, убрано дублирование! 🎉
-

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- Build stage ----------
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies
@@ -18,7 +18,7 @@ COPY src ./src
 RUN npm run build
 
 # ---------- Runtime stage ----------
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 

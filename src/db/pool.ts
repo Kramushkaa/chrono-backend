@@ -4,7 +4,7 @@ import { config } from '../config';
 export function createPool(): Pool {
   const sslConfig = config.database.ssl
     ? {
-        rejectUnauthorized: config.server.nodeEnv === 'production',
+        rejectUnauthorized: config.database.sslRejectUnauthorized,
         ...(config.database.sslCert && { ca: config.database.sslCert }),
       }
     : false;
