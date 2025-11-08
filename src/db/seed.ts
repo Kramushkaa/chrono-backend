@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
 dotenv.config();
 
@@ -1285,10 +1286,10 @@ export async function seedDatabase() {
     }
 
     await client.query('COMMIT');
-    console.log('Database seeded successfully');
+    logger.info('Database seeded successfully', { action: 'seed_database' });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error seeding database:', error);
+    logger.error('Error seeding database', { error, action: 'seed_database' });
     throw error;
   } finally {
     client.release();
@@ -1297,7 +1298,7 @@ export async function seedDatabase() {
 
 if (require.main === module) {
   seedDatabase().catch(err => {
-    console.error(err);
+    logger.error('Failed to seed database', { error: err, action: 'seed_database_main' });
     process.exit(1);
   });
 }

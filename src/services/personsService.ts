@@ -36,6 +36,54 @@ export class PersonsService extends BaseService {
   }
 
   /**
+   * Создать или обновить персону напрямую (для админов)
+   * Используется когда нужно обойти модерацию и сразу одобрить
+   */
+  async createOrUpdatePersonDirectly(
+    personData: {
+      id: string;
+      name: string;
+      birthYear: number;
+      deathYear: number;
+      category: string;
+      description: string;
+      imageUrl: string | null;
+      wikiLink: string | null;
+    },
+    userId: number
+  ): Promise<void> {
+    await this.executeQuery(
+      `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'approved',$9,$9)
+       ON CONFLICT (id) DO UPDATE SET
+         name=EXCLUDED.name,
+         birth_year=EXCLUDED.birth_year,
+         death_year=EXCLUDED.death_year,
+         category=EXCLUDED.category,
+         description=EXCLUDED.description,
+         image_url=EXCLUDED.image_url,
+         wiki_link=EXCLUDED.wiki_link,
+         status='approved',
+         updated_by=$9`,
+      [
+        personData.id,
+        personData.name,
+        personData.birthYear,
+        personData.deathYear,
+        personData.category,
+        personData.description,
+        personData.imageUrl,
+        personData.wikiLink,
+        userId,
+      ],
+      {
+        action: 'createOrUpdatePersonDirectly',
+        params: { personId: personData.id, userId },
+      }
+    );
+  }
+
+  /**
    * Создание личности
    */
   async createPerson(
@@ -315,40 +363,15 @@ export class PersonsService extends BaseService {
     reviewerId: number,
     comment?: string
   ): Promise<any> {
-    const checkRes = await this.executeQuery(
-      'SELECT id, status FROM persons WHERE id = $1',
-      [personId],
-      {
-        action: 'reviewPerson_check',
-        params: { personId },
-      }
+    return this.reviewContent<PersonRow>(
+      'persons',
+      'id',
+      personId,
+      action,
+      reviewerId,
+      comment,
+      'Личность'
     );
-
-    if (checkRes.rowCount === 0) {
-      throw errors.notFound('Личность не найдена');
-    }
-
-    const person = checkRes.rows[0];
-
-    if (person.status !== 'pending') {
-      throw errors.badRequest('Можно модерировать только личности в статусе pending');
-    }
-
-    const newStatus = action === 'approve' ? 'approved' : 'rejected';
-
-    const result = await this.executeQuery(
-      `UPDATE persons
-       SET status = $1, reviewed_by = $2, review_comment = $3, updated_at = NOW()
-       WHERE id = $4
-       RETURNING *`,
-      [newStatus, reviewerId, comment ?? null, personId],
-      {
-        action: 'reviewPerson_update',
-        params: { personId, action, reviewerId },
-      }
-    );
-
-    return result.rows[0];
   }
 
   /**
@@ -433,7 +456,11 @@ export class PersonsService extends BaseService {
     }
 
     // Возвращаем обновлённую правку
-    const result = await this.executeQuery('SELECT * FROM person_edits WHERE id = $1', [editId], {
+    const result = await this.executeQuery(
+      `SELECT id, person_id, proposed_changes, status, reviewed_by, review_comment, 
+              created_by, created_at, updated_at 
+       FROM person_edits WHERE id = $1`, 
+      [editId], {
       action: 'reviewEdit_get_result',
       params: { editId },
     });

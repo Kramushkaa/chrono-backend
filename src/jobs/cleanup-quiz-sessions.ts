@@ -8,6 +8,7 @@
  */
 
 import { Pool } from 'pg';
+import { logger } from '../utils/logger';
 
 export interface CleanupResult {
   deletedCount: number;
@@ -31,7 +32,7 @@ export async function cleanupExpiredQuizSessions(pool: Pool): Promise<CleanupRes
     const deletedCount = result.rowCount || 0;
 
     if (deletedCount > 0) {
-      console.log(`🧹 [Cleanup] Удалено просроченных quiz sessions: ${deletedCount}`);
+      logger.info(`Cleanup: Удалено просроченных quiz sessions: ${deletedCount}`, { deletedCount, action: 'cleanup_expired_sessions' });
     }
 
     return {
@@ -39,7 +40,7 @@ export async function cleanupExpiredQuizSessions(pool: Pool): Promise<CleanupRes
       timestamp: new Date(),
     };
   } catch (error) {
-    console.error('❌ [Cleanup] Ошибка при очистке quiz sessions:', error);
+    logger.error('Cleanup: Ошибка при очистке quiz sessions', { error, action: 'cleanup_expired_sessions' });
     throw error;
   }
 }
@@ -65,7 +66,7 @@ export async function cleanupOldFinishedQuizSessions(
     const deletedCount = result.rowCount || 0;
 
     if (deletedCount > 0) {
-      console.log(`🧹 [Cleanup] Удалено старых завершённых quiz sessions: ${deletedCount}`);
+      logger.info(`Cleanup: Удалено старых завершённых quiz sessions: ${deletedCount}`, { deletedCount, daysOld, action: 'cleanup_old_finished_sessions' });
     }
 
     return {
@@ -73,7 +74,7 @@ export async function cleanupOldFinishedQuizSessions(
       timestamp: new Date(),
     };
   } catch (error) {
-    console.error('❌ [Cleanup] Ошибка при очистке старых quiz sessions:', error);
+    logger.error('Cleanup: Ошибка при очистке старых quiz sessions', { error, daysOld, action: 'cleanup_old_finished_sessions' });
     throw error;
   }
 }

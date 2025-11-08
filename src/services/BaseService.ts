@@ -127,4 +127,137 @@ export class BaseService {
       throw error;
     }
   }
+
+  /**
+   * Generic метод для модерации контента (approve/reject)
+   */
+  protected async reviewContent<T extends QueryResultRow>(
+    table: string,
+    idColumn: string,
+    id: string | number,
+    action: 'approve' | 'reject',
+    reviewerId: number,
+    comment?: string,
+    entityName: string = 'запись'
+  ): Promise<T> {
+    // Проверяем существование записи
+    const checkRes = await this.executeQuery(
+      `SELECT id, status FROM ${table} WHERE ${idColumn} = $1`,
+      [id],
+      {
+        action: 'reviewContent_check',
+        params: { table, idColumn, id, action },
+      }
+    );
+
+    if (checkRes.rowCount === 0) {
+      throw errors.notFound(`${entityName} не найдена`);
+    }
+
+    const entity = checkRes.rows[0];
+
+    if (entity.status !== 'pending') {
+      throw errors.badRequest(`Можно модерировать только записи в статусе pending`);
+    }
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+    const result = await this.executeQuery<T>(
+      `UPDATE ${table}
+       SET status = $1, reviewed_by = $2, review_comment = $3, updated_at = NOW()
+       WHERE ${idColumn} = $4
+       RETURNING *`,
+      [newStatus, reviewerId, comment ?? null, id],
+      {
+        action: 'reviewContent_update',
+        params: { table, idColumn, id, action, reviewerId },
+      }
+    );
+
+    return result.rows[0];
+  }
+
+  /**
+   * Generic метод для отправки черновика на модерацию
+   */
+  protected async submitDraftBase<T extends QueryResultRow>(
+    table: string,
+    idColumn: string,
+    id: string | number,
+    userId: number,
+    entityName: string = 'запись'
+  ): Promise<T> {
+    const checkRes = await this.executeQuery(
+      `SELECT created_by, status FROM ${table} WHERE ${idColumn} = $1`,
+      [id],
+      {
+        action: 'submitDraft_check',
+        params: { table, idColumn, id, userId },
+      }
+    );
+
+    if (checkRes.rowCount === 0) {
+      throw errors.notFound(`${entityName} не найдена`);
+    }
+
+    const entity = checkRes.rows[0];
+
+    if (entity.created_by !== userId) {
+      throw errors.forbidden('Вы можете отправлять только свои черновики');
+    }
+
+    if (entity.status !== 'draft') {
+      throw errors.badRequest('Можно отправлять только черновики');
+    }
+
+    const result = await this.executeQuery<T>(
+      `UPDATE ${table} SET status = 'pending', updated_at = NOW() WHERE ${idColumn} = $1 RETURNING *`,
+      [id],
+      {
+        action: 'submitDraft_update',
+        params: { table, idColumn, id, userId },
+      }
+    );
+
+    return result.rows[0];
+  }
+
+  /**
+   * Generic метод для удаления черновика
+   */
+  protected async deleteDraftBase(
+    table: string,
+    idColumn: string,
+    id: string | number,
+    userId: number,
+    entityName: string = 'запись'
+  ): Promise<void> {
+    const checkRes = await this.executeQuery(
+      `SELECT created_by, status FROM ${table} WHERE ${idColumn} = $1`,
+      [id],
+      {
+        action: 'deleteDraft_check',
+        params: { table, idColumn, id, userId },
+      }
+    );
+
+    if (checkRes.rowCount === 0) {
+      throw errors.notFound(`${entityName} не найдена`);
+    }
+
+    const entity = checkRes.rows[0];
+
+    if (entity.created_by !== userId) {
+      throw errors.forbidden('Вы можете удалять только свои записи');
+    }
+
+    if (entity.status !== 'draft') {
+      throw errors.badRequest('Можно удалять только черновики');
+    }
+
+    await this.executeQuery(`DELETE FROM ${table} WHERE ${idColumn} = $1`, [id], {
+      action: 'deleteDraft_delete',
+      params: { table, idColumn, id, userId },
+    });
+  }
 }

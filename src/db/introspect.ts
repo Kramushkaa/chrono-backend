@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../utils/logger';
 
 dotenv.config();
 
@@ -220,7 +221,7 @@ async function introspect(): Promise<void> {
 
     const outPath = path.resolve(__dirname, '../../DB_SCHEMA.md');
     fs.writeFileSync(outPath, lines.join('\n'), 'utf8');
-    console.log(`✅ Схема сохранена в ${outPath}`);
+    logger.info(`Схема сохранена в ${outPath}`, { outPath, action: 'introspect' });
   } finally {
     client.release();
     await pool.end();
@@ -228,6 +229,6 @@ async function introspect(): Promise<void> {
 }
 
 introspect().catch(e => {
-  console.error('❌ Introspection failed:', e);
+  logger.error('Introspection failed', { error: e, action: 'introspect' });
   process.exit(1);
 });

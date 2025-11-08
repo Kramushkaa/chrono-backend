@@ -16,10 +16,32 @@ export type ListModerationActionDTO = {
   slug?: string
 }
 
+export type PersonLifePeriodInputDTO = {
+  countryId: number
+  start: number
+  end: number
+}
+
+export type UpsertPersonDTO = {
+  id: string
+  name: string
+  birthYear: number
+  deathYear: number
+  category: string
+  description: string
+  imageUrl?: string | null
+  wikiLink?: string | null
+  saveAsDraft?: boolean
+  lifePeriods?: PersonLifePeriodInputDTO[]
+}
+
 // Lightweight descriptor to detect drift via runtime check (optional)
 export const dtoDescriptors = {
   UpsertPerson: {
-    id: 'string', name: 'string', birthYear: 'int', deathYear: 'int', category: 'string', description: 'string', imageUrl: 'url|null?', wikiLink: 'url|null?', saveAsDraft: 'boolean?'
+    id: 'string', name: 'string', birthYear: 'int', deathYear: 'int', category: 'string', description: 'string', imageUrl: 'url|null?', wikiLink: 'url|null?', saveAsDraft: 'boolean?', lifePeriods: 'PersonLifePeriodInput[]?'
+  },
+  PersonLifePeriodInput: {
+    countryId: 'int+', start: 'int', end: 'int'
   },
   LifePeriodItem: {
     country_id: 'int+', start_year: 'int', end_year: 'int', period_type: 'string?'
@@ -43,3 +65,5 @@ export const dtoDescriptors = {
     slug: 'string?'
   }
 } as const
+
+export const DTO_VERSION = '2025-11-08-2'

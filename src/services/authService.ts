@@ -381,7 +381,11 @@ export class AuthService extends BaseService {
 
   // Получение пользователя по email
   private async getUserByEmail(email: string): Promise<UserRow | null> {
-    const query = 'SELECT * FROM users WHERE email = $1';
+    const query = `SELECT id, email, username, full_name, password_hash, role, 
+                   email_verified, email_verification_token, email_verification_expires, 
+                   password_reset_token, password_reset_expires, is_active, 
+                   created_at, updated_at 
+                   FROM users WHERE email = $1`;
     const result = await this.executeQuery<UserRow>(query, [email], {
       action: 'getUserByEmail',
       params: { email },
@@ -391,7 +395,11 @@ export class AuthService extends BaseService {
 
   // Получение пользователя по username
   private async getUserByUsername(username: string): Promise<UserRow | null> {
-    const query = 'SELECT * FROM users WHERE username = $1';
+    const query = `SELECT id, email, username, full_name, password_hash, role, 
+                   email_verified, email_verification_token, email_verification_expires, 
+                   password_reset_token, password_reset_expires, is_active, 
+                   created_at, updated_at 
+                   FROM users WHERE username = $1`;
     const result = await this.executeQuery<UserRow>(query, [username], {
       action: 'getUserByUsername',
       params: { username },
@@ -401,7 +409,11 @@ export class AuthService extends BaseService {
 
   // Получение пользователя по ID
   private async getUserById(id: number): Promise<UserRow | null> {
-    const query = 'SELECT * FROM users WHERE id = $1';
+    const query = `SELECT id, email, username, full_name, password_hash, role, 
+                   email_verified, email_verification_token, email_verification_expires, 
+                   password_reset_token, password_reset_expires, is_active, 
+                   created_at, updated_at 
+                   FROM users WHERE id = $1`;
     const result = await this.executeQuery<UserRow>(query, [id], {
       action: 'getUserById',
       params: { id },
@@ -411,7 +423,11 @@ export class AuthService extends BaseService {
 
   // Получение пользователя по токену сброса пароля
   private async getUserByResetToken(token: string): Promise<UserRow | null> {
-    const query = 'SELECT * FROM users WHERE password_reset_token = $1';
+    const query = `SELECT id, email, username, full_name, password_hash, role, 
+                   email_verified, email_verification_token, email_verification_expires, 
+                   password_reset_token, password_reset_expires, is_active, 
+                   created_at, updated_at 
+                   FROM users WHERE password_reset_token = $1`;
     const result = await this.executeQuery<UserRow>(query, [token], {
       action: 'getUserByResetToken',
       params: { token },

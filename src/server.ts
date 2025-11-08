@@ -142,7 +142,7 @@ app.use('/api', createQuizRoutes(pool));
 // Backend info endpoint (оставляем как отдельный информационный маршрут)
 app.get(
   '/api/backend-info',
-  asyncHandler(async (_req: any, res: any) => {
+  asyncHandler(async (_req: express.Request, res: express.Response) => {
     res.json({
       success: true,
       data: {
@@ -172,7 +172,7 @@ app.get(
 // Backend switch endpoint (для переключения между backend'ами)
 app.post(
   '/api/backend-switch',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: express.Request, res: express.Response) => {
     const { backendUrl } = req.body;
 
     if (!backendUrl || typeof backendUrl !== 'string') {

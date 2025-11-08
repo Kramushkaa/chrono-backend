@@ -616,7 +616,7 @@ describe('PersonsService', () => {
       );
 
       await expect(personsService.reviewPerson('test-id', 'approve', 1)).rejects.toThrow(
-        'Можно модерировать только личности в статусе pending'
+        'Можно модерировать только записи в статусе pending'
       );
     });
   });

@@ -285,41 +285,15 @@ export class AchievementsService extends BaseService {
     reviewerId: number,
     comment?: string
   ): Promise<any> {
-    // Проверяем существование
-    const checkRes = await this.executeQuery(
-      'SELECT id, status, created_by FROM achievements WHERE id = $1',
-      [achievementId],
-      {
-        action: 'reviewAchievement_check',
-        params: { achievementId, action, reviewerId },
-      }
+    return this.reviewContent<AchievementRow>(
+      'achievements',
+      'id',
+      achievementId,
+      action,
+      reviewerId,
+      comment,
+      'Достижение'
     );
-
-    if (checkRes.rowCount === 0) {
-      throw errors.notFound('Достижение не найдено');
-    }
-
-    const achievement = checkRes.rows[0];
-
-    if (achievement.status !== 'pending') {
-      throw errors.badRequest('Можно модерировать только достижения в статусе pending');
-    }
-
-    const newStatus = action === 'approve' ? 'approved' : 'rejected';
-
-    const result = await this.executeQuery(
-      `UPDATE achievements
-       SET status = $1, reviewed_by = $2, review_comment = $3, updated_at = NOW()
-       WHERE id = $4
-       RETURNING *`,
-      [newStatus, reviewerId, comment ?? null, achievementId],
-      {
-        action: 'reviewAchievement_update',
-        params: { achievementId, action, reviewerId },
-      }
-    );
-
-    return result.rows[0];
   }
 
   /**
@@ -398,39 +372,13 @@ export class AchievementsService extends BaseService {
    * Отправка черновика на модерацию
    */
   async submitDraft(achievementId: number, userId: number): Promise<any> {
-    const checkRes = await this.executeQuery(
-      'SELECT created_by, status FROM achievements WHERE id = $1',
-      [achievementId],
-      {
-        action: 'submitDraft_check',
-        params: { achievementId, userId },
-      }
+    return this.submitDraftBase<AchievementRow>(
+      'achievements',
+      'id',
+      achievementId,
+      userId,
+      'Достижение'
     );
-
-    if (checkRes.rowCount === 0) {
-      throw errors.notFound('Достижение не найдено');
-    }
-
-    const achievement = checkRes.rows[0];
-
-    if (achievement.created_by !== userId) {
-      throw errors.forbidden('Вы можете отправлять только свои черновики');
-    }
-
-    if (achievement.status !== 'draft') {
-      throw errors.badRequest('Можно отправлять только черновики');
-    }
-
-    const result = await this.executeQuery(
-      `UPDATE achievements SET status = 'pending', updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [achievementId],
-      {
-        action: 'submitDraft_update',
-        params: { achievementId, userId },
-      }
-    );
-
-    return result.rows[0];
   }
 
   /**
@@ -492,33 +440,7 @@ export class AchievementsService extends BaseService {
    * Удаление достижения (только свои черновики)
    */
   async deleteAchievement(achievementId: number, userId: number): Promise<void> {
-    const checkRes = await this.executeQuery(
-      'SELECT created_by, status FROM achievements WHERE id = $1',
-      [achievementId],
-      {
-        action: 'deleteAchievement_check',
-        params: { achievementId, userId },
-      }
-    );
-
-    if (checkRes.rowCount === 0) {
-      throw errors.notFound('Достижение не найдено');
-    }
-
-    const achievement = checkRes.rows[0];
-
-    if (achievement.created_by !== userId) {
-      throw errors.forbidden('Вы можете удалять только свои достижения');
-    }
-
-    if (achievement.status !== 'draft') {
-      throw errors.badRequest('Можно удалять только черновики');
-    }
-
-    await this.executeQuery('DELETE FROM achievements WHERE id = $1', [achievementId], {
-      action: 'deleteAchievement_delete',
-      params: { achievementId, userId },
-    });
+    return this.deleteDraftBase('achievements', 'id', achievementId, userId, 'Достижение');
   }
 
   /**

@@ -553,7 +553,7 @@ describe('PeriodsService', () => {
     it('should throw error when period not found', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(periodsService.deletePeriod(999, 1)).rejects.toThrow('Период не найден');
+      await expect(periodsService.deletePeriod(999, 1)).rejects.toThrow('Период не найдена');
     });
 
     it('should throw error when user does not own period', async () => {
@@ -567,7 +567,7 @@ describe('PeriodsService', () => {
       );
 
       await expect(periodsService.deletePeriod(1, 1)).rejects.toThrow(
-        'Вы можете удалять только свои периоды'
+        'Вы можете удалять только свои записи'
       );
     });
 
@@ -852,7 +852,7 @@ describe('PeriodsService', () => {
       );
 
       await expect(periodsService.reviewPeriod(1, 'approve', 2)).rejects.toThrow(
-        'Можно модерировать только периоды в статусе pending'
+        'Можно модерировать только записи в статусе pending'
       );
     });
   });
@@ -891,7 +891,7 @@ describe('PeriodsService', () => {
     it('should throw error when draft not found', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
-      await expect(periodsService.submitDraft(999, 1)).rejects.toThrow('Период не найден');
+      await expect(periodsService.submitDraft(999, 1)).rejects.toThrow('Период не найдена');
     });
 
     it('should throw error when user does not own draft', async () => {

@@ -1,5 +1,24 @@
 import { z } from 'zod';
 
+const preprocessInt = (value: unknown) => {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return NaN;
+    const num = Number(trimmed);
+    return Number.isInteger(num) ? num : NaN;
+  }
+  return value;
+};
+
+export const PersonLifePeriodInputSchema = z.object({
+  countryId: z.preprocess(preprocessInt, z.number().int().positive()),
+  start: z.preprocess(preprocessInt, z.number().int()),
+  end: z.preprocess(preprocessInt, z.number().int()),
+});
+
 export const UpsertPersonSchema = z.object({
   id: z.string().trim().min(1).max(128),
   name: z.string().trim().min(1).max(200),
@@ -10,6 +29,7 @@ export const UpsertPersonSchema = z.object({
   imageUrl: z.string().trim().url().max(1000).nullable().optional(),
   wikiLink: z.string().trim().url().max(1000).nullable().optional(),
   saveAsDraft: z.boolean().optional().default(false),
+  lifePeriods: z.array(PersonLifePeriodInputSchema).optional(),
 });
 
 export const LifePeriodItemSchema = z.object({
@@ -51,6 +71,7 @@ export const AchievementPersonSchema = z.object({
   saveAsDraft: z.boolean().optional().default(false),
 });
 
+export type PersonLifePeriodInputDTO = z.infer<typeof PersonLifePeriodInputSchema>;
 export type UpsertPersonDTO = z.infer<typeof UpsertPersonSchema>;
 export type LifePeriodItemDTO = z.infer<typeof LifePeriodItemSchema>;
 export type LifePeriodsDTO = z.infer<typeof LifePeriodsSchema>;

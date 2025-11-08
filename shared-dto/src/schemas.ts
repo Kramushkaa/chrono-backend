@@ -1,5 +1,24 @@
 import { z } from 'zod';
 
+const preprocessInt = (value: unknown) => {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return NaN;
+    const num = Number(trimmed);
+    return Number.isInteger(num) ? num : NaN;
+  }
+  return value;
+};
+
+export const PersonLifePeriodInputSchema = z.object({
+  countryId: z.preprocess(preprocessInt, z.number().int().positive()),
+  start: z.preprocess(preprocessInt, z.number().int()),
+  end: z.preprocess(preprocessInt, z.number().int()),
+});
+
 export const UpsertPersonSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
@@ -9,6 +28,7 @@ export const UpsertPersonSchema = z.object({
   description: z.string().default(''),
   imageUrl: z.string().url().nullable().optional(),
   wikiLink: z.string().url().nullable().optional(),
+  lifePeriods: z.array(PersonLifePeriodInputSchema).optional(),
 });
 
 export const LifePeriodItemSchema = z.object({

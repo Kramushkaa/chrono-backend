@@ -370,7 +370,7 @@ export class ListsService extends BaseService {
         [moderatorId]
       );
 
-      if (moderatorResult.rowCount > 0) {
+      if (moderatorResult.rowCount && moderatorResult.rowCount > 0) {
         const moderatorEmail = moderatorResult.rows[0].email;
         const updatedList = updateResult.rows[0];
         // Отправка уведомления в Telegram (неблокирующее)
@@ -871,7 +871,7 @@ export class ListsService extends BaseService {
       { action: 'requestPublication_getOwnerEmail', params: { userId } }
     );
 
-    if (ownerResult.rowCount > 0) {
+    if (ownerResult.rowCount && ownerResult.rowCount > 0) {
       const ownerEmail = ownerResult.rows[0].email;
       // Отправка уведомления в Telegram (неблокирующее)
       this.telegramService

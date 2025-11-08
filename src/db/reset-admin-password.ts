@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
+import { logger } from '../utils/logger';
 
 dotenv.config();
 
@@ -19,13 +20,13 @@ async function resetAdminPassword() {
   const newHash = await bcrypt.hash(password, rounds);
 
   try {
-    console.log('🔑 Сброс пароля администратора...');
+    logger.info('Сброс пароля администратора...', { action: 'reset_admin_password' });
     const res = await pool.query(
       `UPDATE users SET password_hash = $1, is_active = true, updated_at = CURRENT_TIMESTAMP WHERE email = $2 RETURNING id, email`,
       [newHash, 'admin@chrono.ninja']
     );
     if (res.rowCount === 0) {
-      console.log('Администратор не найден, создаю...');
+      logger.info('Администратор не найден, создаю...', { action: 'create_admin' });
       await pool.query(
         `INSERT INTO users (email, password_hash, username, full_name, role, email_verified, is_active)
          VALUES ($1, $2, 'admin', 'Системный администратор', 'admin', true, true)
@@ -33,9 +34,9 @@ async function resetAdminPassword() {
         ['admin@chrono.ninja', newHash]
       );
     }
-    console.log(`✅ Пароль администратора установлен на ${password}`);
+    logger.info(`Пароль администратора установлен на ${password}`, { action: 'reset_admin_password' });
   } catch (e) {
-    console.error('❌ Ошибка при сбросе пароля администратора:', e);
+    logger.error('Ошибка при сбросе пароля администратора', { error: e, action: 'reset_admin_password' });
     process.exit(1);
   } finally {
     await pool.end();

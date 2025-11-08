@@ -6,6 +6,8 @@ import { errors, asyncHandler } from '../../utils/errors';
 import { mapApiPersonRow, parseLimitOffset, paginateRows } from '../../utils/api';
 import { TelegramService } from '../../services/telegramService';
 import { PersonsService } from '../../services/personsService';
+import type { AuthenticatedRequest } from '../../types/auth';
+import { logger } from '../../utils/logger';
 
 export function createAdminPersonRoutes(
   pool: Pool,
@@ -27,39 +29,56 @@ export function createAdminPersonRoutes(
           'validation_error',
           parsed.error.flatten()
         );
+      const authReq = req as unknown as AuthenticatedRequest;
       const { id, name, birthYear, deathYear, category, description, imageUrl, wikiLink } =
         parsed.data;
-      await pool.query(
-        `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by, updated_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'approved',$9,$9)
-         ON CONFLICT (id) DO UPDATE SET
-           name=EXCLUDED.name,
-           birth_year=EXCLUDED.birth_year,
-           death_year=EXCLUDED.death_year,
-           category=EXCLUDED.category,
-           description=EXCLUDED.description,
-           image_url=EXCLUDED.image_url,
-           wiki_link=EXCLUDED.wiki_link,
-           status='approved',
-         updated_by=$9`,
-        [
-          id,
-          name.trim(),
-          Number(birthYear),
-          Number(deathYear),
-          category.trim(),
-          typeof description === 'string' ? description : '',
-          imageUrl ?? null,
-          wikiLink ?? null,
-          (req as any).user!.sub,
-        ]
-      );
 
-      // Отправка уведомления в Telegram о создании личности модератором (неблокирующее)
-      const userEmail = (req as any).user?.email || 'unknown';
-      telegramService
-        .notifyPersonCreated(name.trim(), userEmail, 'approved', id)
-        .catch(err => console.warn('Telegram notification failed (admin person created):', err));
+      const lifePeriods = parsed.data.lifePeriods;
+
+      if (Array.isArray(lifePeriods)) {
+        const user = {
+          sub: authReq.user.sub,
+          role: (authReq.user.role as 'admin' | 'moderator' | 'user') || 'user',
+          email: authReq.user.email ?? 'unknown',
+        };
+
+        await personsService.proposePersonWithLifePeriods(
+          {
+            id,
+            name: name.trim(),
+            birthYear: Number(birthYear),
+            deathYear: Number(deathYear),
+            category: category.trim(),
+            description: typeof description === 'string' ? description : '',
+            imageUrl: imageUrl ?? null,
+            wikiLink: wikiLink ?? null,
+            lifePeriods,
+          },
+          user,
+          false
+        );
+      } else {
+        await personsService.createOrUpdatePersonDirectly(
+          {
+            id,
+            name: name.trim(),
+            birthYear: Number(birthYear),
+            deathYear: Number(deathYear),
+            category: category.trim(),
+            description: typeof description === 'string' ? description : '',
+            imageUrl: imageUrl ?? null,
+            wikiLink: wikiLink ?? null,
+          },
+          authReq.user.sub
+        );
+
+        const userEmail = authReq.user.email ?? 'unknown';
+        telegramService
+          .notifyPersonCreated(name.trim(), userEmail, 'approved', id)
+          .catch(err =>
+            logger.warn('Telegram notification failed (admin person created)', { error: err })
+          );
+      }
 
       res.json({ success: true });
     })
@@ -97,7 +116,12 @@ export function createAdminPersonRoutes(
         res.json({ success: true, data: { count: result.rows[0]?.cnt || 0 } });
         return;
       }
-      const sql = `SELECT * FROM v_pending_moderation${whereClause} ORDER BY created_at DESC, id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      const sql = `SELECT id, name, birth_year, death_year, category, country, description, 
+                          image_url, reign_start, reign_end, wiki_link, status, created_at, 
+                          updated_at, created_by, updated_by 
+                   FROM v_pending_moderation${whereClause} 
+                   ORDER BY created_at DESC, id DESC 
+                   LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limitParam + 1, offsetParam);
       const result = await pool.query(sql, params);
       const persons = result.rows.map(mapApiPersonRow);
@@ -112,6 +136,7 @@ export function createAdminPersonRoutes(
     authenticateToken,
     requireRoleMiddleware(['admin', 'moderator']),
     asyncHandler(async (req: Request, res: Response) => {
+      const authReq = req as unknown as AuthenticatedRequest;
       const { id } = req.params;
       const { action, comment } = req.body || {};
 
@@ -119,13 +144,15 @@ export function createAdminPersonRoutes(
         throw errors.badRequest('action должен быть approve или reject');
       }
 
-      const result = await personsService.reviewPerson(id, action, (req as any).user!.sub, comment);
+      const result = await personsService.reviewPerson(id, action, authReq.user.sub, comment);
 
       // Отправка уведомления в Telegram (неблокирующее)
-      const reviewerEmail = (req as any).user?.email || 'unknown';
+      const reviewerEmail = authReq.user.email ?? 'unknown';
       telegramService
         .notifyPersonReviewed(result.name, action, reviewerEmail, id)
-        .catch(err => console.warn('Telegram notification failed (person reviewed):', err));
+        .catch(err =>
+          logger.warn('Telegram notification failed (person reviewed)', { error: err })
+        );
 
       res.json({ success: true, data: result });
     })

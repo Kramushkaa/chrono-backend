@@ -12,6 +12,7 @@ import { sanitizePayload } from './helpers';
 import { validateQuery, validateParams, commonSchemas } from '../../middleware/validation';
 
 import { PersonsService } from '../../services/personsService';
+import { logger } from '../../utils/logger';
 
 export function createPublicPersonRoutes(
   pool: Pool,
@@ -172,7 +173,7 @@ export function createPublicPersonRoutes(
 
       telegramService
         .notifyPersonEditProposed(personName, userEmail, id)
-        .catch(err => console.warn('Telegram notification failed (person edit proposed):', err));
+        .catch(err => logger.warn('Telegram notification failed (person edit proposed)', { error: err }));
 
       res.status(201).json({
         success: true,

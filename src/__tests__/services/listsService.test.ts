@@ -4,10 +4,14 @@ import { createMockPool, createQueryResult } from '../mocks';
 describe('ListsService', () => {
   let listsService: ListsService;
   let mockPool: any;
+  let mockTelegramService: any;
 
   beforeEach(() => {
     mockPool = createMockPool();
-    listsService = new ListsService(mockPool);
+    mockTelegramService = {
+      notifyListPublished: jest.fn().mockResolvedValue(undefined),
+    };
+    listsService = new ListsService(mockPool, mockTelegramService);
   });
 
   afterEach(() => {

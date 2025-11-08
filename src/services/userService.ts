@@ -51,7 +51,8 @@ export class UserService extends BaseService {
 
     // Запрос с пагинацией (LIMIT + 1 для проверки hasMore)
     const query = `
-      SELECT * FROM users
+      SELECT id, email, username, full_name, role, email_verified, is_active, created_at, updated_at
+      FROM users
       WHERE ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -80,7 +81,9 @@ export class UserService extends BaseService {
    * Получение пользователя по ID
    */
   async getUserById(userId: number): Promise<User | null> {
-    const result = await this.executeQuery<UserRow>('SELECT * FROM users WHERE id = $1', [userId], {
+    const result = await this.executeQuery<UserRow>(
+      'SELECT id, email, username, full_name, role, email_verified, is_active, created_at, updated_at FROM users WHERE id = $1', 
+      [userId], {
       action: 'getUserById',
       params: { userId },
     });

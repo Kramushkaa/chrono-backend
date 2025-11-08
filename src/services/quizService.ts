@@ -460,7 +460,9 @@ export class QuizService extends BaseService {
    */
   async getQuizSession(sessionToken: string): Promise<QuizSessionDB | null> {
     const query = `
-      SELECT * FROM quiz_sessions
+      SELECT id, session_token, user_id, created_at, expires_at, finished_at, 
+             setup_config, share_code, share_enabled
+      FROM quiz_sessions
       WHERE session_token = $1 
         AND expires_at > NOW() 
         AND finished_at IS NULL
@@ -942,7 +944,9 @@ export class QuizService extends BaseService {
             *
           FROM all_players
         )
-        SELECT * FROM ranked_players WHERE user_id = $1
+        SELECT rank, user_id, username, full_name, total_attempts, total_correct_answers, 
+               total_questions, total_rating 
+        FROM ranked_players WHERE user_id = $1
       `;
       const userResult = await this.executeQuery(userQuery, [userId], {
         action: 'getGlobalLeaderboard_userEntry',
@@ -1099,7 +1103,8 @@ export class QuizService extends BaseService {
         LEFT JOIN users u ON qa.user_id = u.id
         WHERE qa.shared_quiz_id = $1
       )
-      SELECT * FROM ranked_attempts
+      SELECT rank, user_id, username, correct_answers, total_time_ms
+      FROM ranked_attempts
       ORDER BY rank
       LIMIT 100
     `;
@@ -1145,7 +1150,8 @@ export class QuizService extends BaseService {
           LEFT JOIN users u ON qa.user_id = u.id
           WHERE qa.shared_quiz_id = $1
         )
-        SELECT * FROM ranked_attempts WHERE user_id = $2
+        SELECT rank, user_id, username, correct_answers, total_time_ms
+        FROM ranked_attempts WHERE user_id = $2
       `;
       const userResult = await this.executeQuery(userQuery, [quiz.id, userId], {
         action: 'getSharedQuizLeaderboard_getUserEntry',

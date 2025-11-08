@@ -15,9 +15,11 @@ export type SqlOperator =
   | 'IS NULL'
   | 'IS NOT NULL';
 
+type FilterValue = string | number | boolean | null | (string | number | boolean)[];
+
 interface FilterCondition {
   field: string;
-  value: any;
+  value: FilterValue;
   operator: SqlOperator;
 }
 
@@ -31,7 +33,7 @@ export class QueryBuilder {
    * @param value - Значение для фильтрации
    * @param operator - SQL оператор (по умолчанию '=')
    */
-  addFilter(field: string, value: any, operator: SqlOperator = '='): this {
+  addFilter(field: string, value: FilterValue | undefined, operator: SqlOperator = '='): this {
     if (value === undefined || value === null || value === '') {
       return this;
     }
@@ -90,8 +92,8 @@ export class QueryBuilder {
    * @param baseWhere - Базовое WHERE условие (например, "1=1" или "status = 'approved'")
    * @returns Объект с sql (WHERE часть) и params (значения для $1, $2, etc.)
    */
-  build(baseWhere: string = '1=1'): { whereClause: string; params: any[] } {
-    const params: any[] = [];
+  build(baseWhere: string = '1=1'): { whereClause: string; params: (string | number | boolean)[] } {
+    const params: (string | number | boolean)[] = [];
     let whereClause = baseWhere;
 
     for (const condition of this.conditions) {
@@ -143,9 +145,9 @@ export class QueryBuilder {
  */
 export function buildFilteredQuery(
   baseQuery: string,
-  filters: Record<string, any>,
+  filters: Record<string, FilterValue | undefined>,
   searchFields?: { fields: string[]; term: string }
-): { sql: string; params: any[] } {
+): { sql: string; params: (string | number | boolean)[] } {
   const builder = new QueryBuilder();
 
   // Добавляем поисковые поля

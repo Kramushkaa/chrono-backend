@@ -356,7 +356,7 @@ describe('AchievementsService', () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
       await expect(achievementsService.deleteAchievement(999, 1)).rejects.toThrow(
-        'Достижение не найдено'
+        'Достижение не найдена'
       );
     });
 
@@ -371,7 +371,7 @@ describe('AchievementsService', () => {
       );
 
       await expect(achievementsService.deleteAchievement(1, 1)).rejects.toThrow(
-        'Вы можете удалять только свои достижения'
+        'Вы можете удалять только свои записи'
       );
     });
 
@@ -645,7 +645,7 @@ describe('AchievementsService', () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
       await expect(achievementsService.reviewAchievement(999, 'approve', 2)).rejects.toThrow(
-        'Достижение не найдено'
+        'Достижение не найдена'
       );
     });
 
@@ -661,7 +661,7 @@ describe('AchievementsService', () => {
       );
 
       await expect(achievementsService.reviewAchievement(1, 'approve', 2)).rejects.toThrow(
-        'Можно модерировать только достижения в статусе pending'
+        'Можно модерировать только записи в статусе pending'
       );
     });
   });
@@ -701,7 +701,7 @@ describe('AchievementsService', () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([]));
 
       await expect(achievementsService.submitDraft(999, 1)).rejects.toThrow(
-        'Достижение не найдено'
+        'Достижение не найдена'
       );
     });
 

@@ -308,40 +308,15 @@ export class PeriodsService extends BaseService {
     reviewerId: number,
     comment?: string
   ): Promise<any> {
-    const checkRes = await this.executeQuery(
-      'SELECT id, status FROM periods WHERE id = $1',
-      [periodId],
-      {
-        action: 'reviewPeriod_check',
-        params: { periodId, action, reviewerId },
-      }
+    return this.reviewContent<PeriodRow>(
+      'periods',
+      'id',
+      periodId,
+      action,
+      reviewerId,
+      comment,
+      'Период'
     );
-
-    if (checkRes.rowCount === 0) {
-      throw errors.notFound('Период не найден');
-    }
-
-    const period = checkRes.rows[0];
-
-    if (period.status !== 'pending') {
-      throw errors.badRequest('Можно модерировать только периоды в статусе pending');
-    }
-
-    const newStatus = action === 'approve' ? 'approved' : 'rejected';
-
-    const result = await this.executeQuery(
-      `UPDATE periods
-       SET status = $1, reviewed_by = $2, review_comment = $3, updated_at = NOW()
-       WHERE id = $4
-       RETURNING *`,
-      [newStatus, reviewerId, comment ?? null, periodId],
-      {
-        action: 'reviewPeriod_update',
-        params: { periodId, action, reviewerId },
-      }
-    );
-
-    return result.rows[0];
   }
 
   /**
@@ -440,39 +415,7 @@ export class PeriodsService extends BaseService {
    * Отправка черновика на модерацию
    */
   async submitDraft(periodId: number, userId: number): Promise<any> {
-    const checkRes = await this.executeQuery(
-      'SELECT created_by, status FROM periods WHERE id = $1',
-      [periodId],
-      {
-        action: 'submitDraft_check',
-        params: { periodId, userId },
-      }
-    );
-
-    if (checkRes.rowCount === 0) {
-      throw errors.notFound('Период не найден');
-    }
-
-    const period = checkRes.rows[0];
-
-    if (period.created_by !== userId) {
-      throw errors.forbidden('Вы можете отправлять только свои черновики');
-    }
-
-    if (period.status !== 'draft') {
-      throw errors.badRequest('Можно отправлять только черновики');
-    }
-
-    const result = await this.executeQuery(
-      `UPDATE periods SET status = 'pending', updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [periodId],
-      {
-        action: 'submitDraft_update',
-        params: { periodId, userId },
-      }
-    );
-
-    return result.rows[0];
+    return this.submitDraftBase<PeriodRow>('periods', 'id', periodId, userId, 'Период');
   }
 
   /**
@@ -538,33 +481,7 @@ export class PeriodsService extends BaseService {
    * Удаление периода (только свои черновики)
    */
   async deletePeriod(periodId: number, userId: number): Promise<void> {
-    const checkRes = await this.executeQuery(
-      'SELECT created_by, status FROM periods WHERE id = $1',
-      [periodId],
-      {
-        action: 'deletePeriod_check',
-        params: { periodId, userId },
-      }
-    );
-
-    if (checkRes.rowCount === 0) {
-      throw errors.notFound('Период не найден');
-    }
-
-    const period = checkRes.rows[0];
-
-    if (period.created_by !== userId) {
-      throw errors.forbidden('Вы можете удалять только свои периоды');
-    }
-
-    if (period.status !== 'draft') {
-      throw errors.badRequest('Можно удалять только черновики');
-    }
-
-    await this.executeQuery('DELETE FROM periods WHERE id = $1', [periodId], {
-      action: 'deletePeriod_delete',
-      params: { periodId, userId },
-    });
+    return this.deleteDraftBase('periods', 'id', periodId, userId, 'Период');
   }
 
   /**

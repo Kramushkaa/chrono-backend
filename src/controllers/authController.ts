@@ -94,13 +94,12 @@ export class AuthController {
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       logger.info('Login attempt', {
-        login: (req.body && (req.body.login || req.body.email)) || 'no-body',
+        login: req.body?.login || 'no-body',
         bodyType: typeof req.body,
       });
-      // Support legacy { email, password } and new { login, password }
       const loginData: LoginRequest = {
-        login: (req.body && (req.body.login || req.body.email)) || '',
-        password: (req.body && req.body.password) || '',
+        login: req.body?.login || '',
+        password: req.body?.password || '',
       };
       const result = await this.authService.loginUser(loginData);
 
