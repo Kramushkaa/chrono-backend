@@ -433,6 +433,92 @@ ${emoji} <b>Период ${actionText}</b>
   }
 
   /**
+   * Отправка уведомления о запросе публикации списка
+   */
+  async notifyListPublicationRequested(
+    listTitle: string,
+    ownerEmail: string,
+    listId: number,
+    itemsCount: number
+  ): Promise<void> {
+    if (!this.isEnabled || !this.bot) return;
+
+    const message = `
+⏳ <b>Список отправлен на модерацию</b>
+
+📋 Название: ${listTitle}
+📧 Владелец: ${ownerEmail}
+📊 Элементов: ${itemsCount}
+🆔 ID: ${listId}
+
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+`.trim();
+
+    try {
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      logger.info('Telegram notification sent: list publication requested', {
+        listTitle,
+        ownerEmail,
+        listId,
+        itemsCount,
+      });
+    } catch (error) {
+      logger.error('Failed to send Telegram notification (list publication requested)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        listTitle,
+        ownerEmail,
+        listId,
+      });
+    }
+  }
+
+  /**
+   * Отправка уведомления о решении модератора по списку
+   */
+  async notifyListReviewed(
+    listTitle: string,
+    action: 'approve' | 'reject',
+    moderatorEmail: string,
+    listId: number,
+    slug?: string
+  ): Promise<void> {
+    if (!this.isEnabled || !this.bot) return;
+
+    const emoji = action === 'approve' ? '✅' : '❌';
+    const actionText = action === 'approve' ? 'опубликован' : 'отклонён';
+    const slugLine = slug && action === 'approve' ? `\n🔗 Slug: ${slug}` : '';
+
+    const message = `
+${emoji} <b>Список ${actionText}</b>
+
+📋 Название: ${listTitle}
+👨‍⚖️ Модератор: ${moderatorEmail}
+🆔 ID: ${listId}${slugLine}
+
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+`.trim();
+
+    try {
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      logger.info('Telegram notification sent: list reviewed', {
+        listTitle,
+        action,
+        moderatorEmail,
+        listId,
+        slug,
+      });
+    } catch (error) {
+      logger.error('Failed to send Telegram notification (list reviewed)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        listTitle,
+        action,
+        moderatorEmail,
+        listId,
+      });
+    }
+  }
+
+  /**
    * Отправка тестового сообщения
    */
   async sendTestMessage(): Promise<void> {

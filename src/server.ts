@@ -43,7 +43,7 @@ const emailService = new EmailService();
 const achievementsService = new AchievementsService(pool, telegramService);
 const periodsService = new PeriodsService(pool, telegramService);
 const personsService = new PersonsService(pool, telegramService);
-const listsService = new ListsService(pool);
+const listsService = new ListsService(pool, telegramService);
 const userService = new UserService(pool);
 const authController = new AuthController(authService, telegramService, emailService, userService);
 
