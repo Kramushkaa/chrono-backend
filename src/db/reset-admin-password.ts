@@ -36,7 +36,8 @@ async function resetAdminPassword() {
     }
     logger.info(`Пароль администратора установлен на ${password}`, { action: 'reset_admin_password' });
   } catch (e) {
-    logger.error('Ошибка при сбросе пароля администратора', { error: e, action: 'reset_admin_password' });
+    const err = e instanceof Error ? e : new Error(String(e));
+    logger.error('Ошибка при сбросе пароля администратора', { error: err, action: 'reset_admin_password' });
     process.exit(1);
   } finally {
     await pool.end();

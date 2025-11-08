@@ -100,22 +100,22 @@ export class QueryBuilder {
       // Специальная обработка для поисковых условий (уже содержат OR)
       if (condition.field.includes(' OR ')) {
         whereClause += ` AND ${condition.field}`;
-        params.push(condition.value);
+        params.push(condition.value as string | number | boolean);
         this.paramIndex++;
       } else if (condition.operator === 'IN') {
         const values = Array.isArray(condition.value) ? condition.value : [condition.value];
         const placeholders = values.map(() => `$${this.paramIndex++}`).join(', ');
         whereClause += ` AND ${condition.field} IN (${placeholders})`;
-        params.push(...values);
+        params.push(...(values as Array<string | number | boolean>));
       } else if (condition.operator === 'IS NULL' || condition.operator === 'IS NOT NULL') {
         whereClause += ` AND ${condition.field} ${condition.operator}`;
       } else if (condition.operator === 'LIKE' || condition.operator === 'ILIKE') {
         whereClause += ` AND ${condition.field} ${condition.operator} $${this.paramIndex}`;
-        params.push(condition.value);
+        params.push(condition.value as string | number | boolean);
         this.paramIndex++;
       } else {
         whereClause += ` AND ${condition.field} ${condition.operator} $${this.paramIndex}`;
-        params.push(condition.value);
+        params.push(condition.value as string | number | boolean);
         this.paramIndex++;
       }
     }

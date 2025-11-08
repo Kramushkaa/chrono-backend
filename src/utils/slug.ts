@@ -67,10 +67,12 @@ const translitMap: Record<string, string> = {
   я: 'ya',
 };
 
+const MAX_SLUG_LENGTH = 64;
+
 /**
  * Convert arbitrary text (including Cyrillic) to a URL-friendly slug.
  */
-export function slugify(raw: string, maxLength = 80): string {
+export function slugify(raw: string, maxLength = MAX_SLUG_LENGTH): string {
   const transliterated = Array.from(raw || '')
     .map(ch => translitMap[ch] ?? ch)
     .join('');
@@ -83,7 +85,19 @@ export function slugify(raw: string, maxLength = 80): string {
     .replace(/-+/g, '-')
     .toLowerCase();
 
-  const trimmed = sanitized.slice(0, maxLength).replace(/-+$/g, '');
+  const trimmed = sanitized
+    .slice(0, maxLength)
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 
   return trimmed || '';
+}
+
+/**
+ * Canonical helper used across the codebase to generate slugs from names.
+ * Uses MAX_SLUG_LENGTH=64 unless explicitly overridden.
+ */
+export function slugifyIdFromName(name: string, maxLength = MAX_SLUG_LENGTH): string {
+  const slug = slugify(name, Math.min(maxLength, MAX_SLUG_LENGTH));
+  return slug.replace(/^-+/, '');
 }

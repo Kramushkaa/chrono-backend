@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { logger } from '../utils/logger';
+import { APP_VERSION } from '../version';
 
 // Загружаем переменные окружения
 // override: false - не перезаписываем существующие переменные (для Amvera и других PaaS)
@@ -68,7 +69,7 @@ export const config = {
   // Настройки приложения
   app: {
     name: 'Хроно ниндзя API',
-    version: '1.0.0',
+    version: APP_VERSION,
     description: 'Backend API для проекта Хроно ниндзя',
   },
 };

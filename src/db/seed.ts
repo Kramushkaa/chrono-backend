@@ -1289,7 +1289,8 @@ export async function seedDatabase() {
     logger.info('Database seeded successfully', { action: 'seed_database' });
   } catch (error) {
     await client.query('ROLLBACK');
-    logger.error('Error seeding database', { error, action: 'seed_database' });
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Error seeding database', { error: err, action: 'seed_database' });
     throw error;
   } finally {
     client.release();
@@ -1298,7 +1299,8 @@ export async function seedDatabase() {
 
 if (require.main === module) {
   seedDatabase().catch(err => {
-    logger.error('Failed to seed database', { error: err, action: 'seed_database_main' });
+    const e = err instanceof Error ? err : new Error(String(err));
+    logger.error('Failed to seed database', { error: e, action: 'seed_database_main' });
     process.exit(1);
   });
 }

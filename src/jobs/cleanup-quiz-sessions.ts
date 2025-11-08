@@ -40,7 +40,8 @@ export async function cleanupExpiredQuizSessions(pool: Pool): Promise<CleanupRes
       timestamp: new Date(),
     };
   } catch (error) {
-    logger.error('Cleanup: Ошибка при очистке quiz sessions', { error, action: 'cleanup_expired_sessions' });
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Cleanup: Ошибка при очистке quiz sessions', { error: err, action: 'cleanup_expired_sessions' });
     throw error;
   }
 }
@@ -74,7 +75,8 @@ export async function cleanupOldFinishedQuizSessions(
       timestamp: new Date(),
     };
   } catch (error) {
-    logger.error('Cleanup: Ошибка при очистке старых quiz sessions', { error, daysOld, action: 'cleanup_old_finished_sessions' });
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Cleanup: Ошибка при очистке старых quiz sessions', { error: err, daysOld, action: 'cleanup_old_finished_sessions' });
     throw error;
   }
 }

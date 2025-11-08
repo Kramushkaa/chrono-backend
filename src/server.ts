@@ -23,6 +23,7 @@ import { createMetaRoutes } from './routes/metaRoutes';
 import { createQuizRoutes } from './routes/quizRoutes';
 import { createHealthRoutes } from './routes/healthRoutes';
 import { config, validateConfig } from './config';
+import { APP_VERSION } from './version';
 import { cleanupExpiredQuizSessions } from './jobs/cleanup-quiz-sessions';
 import { logger } from './utils/logger';
 
@@ -147,7 +148,7 @@ app.get(
       success: true,
       data: {
         name: 'Хронониндзя API',
-        version: '1.0.0',
+        version: APP_VERSION,
         environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString(),
         endpoints: {
@@ -176,11 +177,12 @@ app.post(
     const { backendUrl } = req.body;
 
     if (!backendUrl || typeof backendUrl !== 'string') {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Invalid backend URL',
         message: "Необходимо указать URL backend'а",
       });
+      return;
     }
 
     try {
@@ -209,7 +211,7 @@ app.post(
 app.get('/', (req, res) => {
   res.json({
     message: 'Хронониндзя API',
-    version: '1.0.0',
+    appVersion: APP_VERSION,
     endpoints: {
       persons: '/api/persons',
       categories: '/api/categories',
