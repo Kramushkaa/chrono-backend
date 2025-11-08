@@ -60,3 +60,4 @@ export const dtoDescriptors = {
     slug: 'string?',
   },
 } as const;
+

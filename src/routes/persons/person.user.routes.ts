@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PersonEditPayloadSchema } from '../../dto';
+import { PersonEditPayloadSchema } from '@chrononinja/dto';
 import { Pool } from 'pg';
 import { authenticateToken } from '../../middleware/auth';
 import { validateParams, commonSchemas } from '../../middleware/validation';

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { asyncHandler } from '../utils/errors';
-import { DTO_VERSION as DTO_VERSION_BE } from '../dtoDescriptors';
+import { DTO_VERSION as DTO_VERSION_BE } from '@chrononinja/dto';
 import { cache } from '../utils/cache';
 
 export function createMetaRoutes(pool: Pool): Router {

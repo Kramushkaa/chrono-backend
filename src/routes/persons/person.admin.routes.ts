@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { UpsertPersonSchema } from '../../dto';
+import { UpsertPersonSchema } from '@chrononinja/dto';
 import { Pool } from 'pg';
 import { authenticateToken, requireRoleMiddleware } from '../../middleware/auth';
 import { errors, asyncHandler } from '../../utils/errors';

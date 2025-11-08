@@ -10,6 +10,7 @@ import { asyncHandler, errors } from '../utils/errors';
 import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { AchievementsService } from '../services/achievementsService';
+import { AchievementPersonSchema } from '@chrononinja/dto';
 import {
   validateQuery,
   validateParams,
@@ -135,7 +136,6 @@ export function createAchievementsRoutes(
     requireVerifiedEmail,
     asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
-      const { AchievementPersonSchema } = await import('../dto');
       const parsed = AchievementPersonSchema.safeParse(req.body || {});
       if (!parsed.success)
         throw errors.badRequest(

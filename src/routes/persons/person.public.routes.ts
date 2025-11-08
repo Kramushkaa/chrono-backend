@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { UpsertPersonSchema, PersonEditPayloadSchema, LifePeriodsSchema } from '../../dto';
+import { UpsertPersonSchema, PersonEditPayloadSchema, LifePeriodsSchema } from '@chrononinja/dto';
 import { Pool } from 'pg';
 import {
   authenticateToken,
