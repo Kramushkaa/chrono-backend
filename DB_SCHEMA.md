@@ -99,12 +99,22 @@
 | title | text | NO |  |
 | created_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
 | updated_at | timestamp without time zone | YES | CURRENT_TIMESTAMP |
+| moderation_status | text | NO | 'draft'::text |
+| public_description | text | NO | ''::text |
+| moderation_requested_at | timestamp without time zone | YES |  |
+| published_at | timestamp without time zone | YES |  |
+| moderated_by | integer | YES |  |
+| moderated_at | timestamp without time zone | YES |  |
+| moderation_comment | text | YES |  |
+| public_slug | text | YES |  |
 
 - **Первичный ключ**: id
 - **Внешние ключи**:
+- lists_moderated_by_fkey: (moderated_by) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
 - lists_owner_user_id_fkey: (owner_user_id) → users(id) ON DELETE CASCADE ON UPDATE NO ACTION
 - **Индексы**:
   - lists_pkey: CREATE UNIQUE INDEX lists_pkey ON public.lists USING btree (id)
+  - lists_public_slug_unique: CREATE UNIQUE INDEX lists_public_slug_unique ON public.lists USING btree (public_slug) WHERE (public_slug IS NOT NULL)
 
 ### periods
 
@@ -224,6 +234,59 @@
   - idx_persons_updated_at: CREATE INDEX idx_persons_updated_at ON public.persons USING btree (updated_at)
   - persons_pkey: CREATE UNIQUE INDEX persons_pkey ON public.persons USING btree (id)
 
+### quiz_attempts
+
+| Колонка | Тип | NULL | По умолчанию |
+|---|---|:--:|---|
+| id | integer | NO | nextval('quiz_attempts_id_seq'::regclass) |
+| user_id | integer | YES |  |
+| shared_quiz_id | integer | YES |  |
+| correct_answers | integer | NO |  |
+| total_questions | integer | NO |  |
+| total_time_ms | integer | NO |  |
+| rating_points | numeric | NO | 0 |
+| config | jsonb | YES |  |
+| created_at | timestamp without time zone | NO | CURRENT_TIMESTAMP |
+| answers | jsonb | YES |  |
+| questions | jsonb | YES |  |
+
+- **Первичный ключ**: id
+- **Внешние ключи**:
+- quiz_attempts_shared_quiz_id_fkey: (shared_quiz_id) → shared_quizzes(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- quiz_attempts_user_id_fkey: (user_id) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
+- **Индексы**:
+  - idx_quiz_attempts_created_at: CREATE INDEX idx_quiz_attempts_created_at ON public.quiz_attempts USING btree (created_at DESC)
+  - idx_quiz_attempts_rating_points: CREATE INDEX idx_quiz_attempts_rating_points ON public.quiz_attempts USING btree (rating_points DESC)
+  - idx_quiz_attempts_shared_quiz_id: CREATE INDEX idx_quiz_attempts_shared_quiz_id ON public.quiz_attempts USING btree (shared_quiz_id)
+  - idx_quiz_attempts_user_created: CREATE INDEX idx_quiz_attempts_user_created ON public.quiz_attempts USING btree (user_id, created_at DESC) WHERE (user_id IS NOT NULL)
+  - idx_quiz_attempts_user_id: CREATE INDEX idx_quiz_attempts_user_id ON public.quiz_attempts USING btree (user_id)
+  - quiz_attempts_pkey: CREATE UNIQUE INDEX quiz_attempts_pkey ON public.quiz_attempts USING btree (id)
+
+### quiz_sessions
+
+| Колонка | Тип | NULL | По умолчанию |
+|---|---|:--:|---|
+| id | integer | NO | nextval('quiz_sessions_id_seq'::regclass) |
+| shared_quiz_id | integer | NO |  |
+| user_id | integer | YES |  |
+| session_token | character varying | NO |  |
+| answers | jsonb | NO | '[]'::jsonb |
+| started_at | timestamp without time zone | NO | CURRENT_TIMESTAMP |
+| expires_at | timestamp without time zone | NO |  |
+| finished_at | timestamp without time zone | YES |  |
+
+- **Первичный ключ**: id
+- **Внешние ключи**:
+- quiz_sessions_shared_quiz_id_fkey: (shared_quiz_id) → shared_quizzes(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- quiz_sessions_user_id_fkey: (user_id) → users(id) ON DELETE SET NULL ON UPDATE NO ACTION
+- **Индексы**:
+  - idx_quiz_sessions_active: CREATE INDEX idx_quiz_sessions_active ON public.quiz_sessions USING btree (expires_at) WHERE (finished_at IS NULL)
+  - idx_quiz_sessions_expires: CREATE INDEX idx_quiz_sessions_expires ON public.quiz_sessions USING btree (expires_at)
+  - idx_quiz_sessions_finished: CREATE INDEX idx_quiz_sessions_finished ON public.quiz_sessions USING btree (finished_at) WHERE (finished_at IS NOT NULL)
+  - idx_quiz_sessions_token: CREATE INDEX idx_quiz_sessions_token ON public.quiz_sessions USING btree (session_token)
+  - quiz_sessions_pkey: CREATE UNIQUE INDEX quiz_sessions_pkey ON public.quiz_sessions USING btree (id)
+  - quiz_sessions_session_token_key: CREATE UNIQUE INDEX quiz_sessions_session_token_key ON public.quiz_sessions USING btree (session_token)
+
 ### role_permissions
 
 | Колонка | Тип | NULL | По умолчанию |
@@ -252,6 +315,47 @@
 - **Индексы**:
   - roles_name_key: CREATE UNIQUE INDEX roles_name_key ON public.roles USING btree (name)
   - roles_pkey: CREATE UNIQUE INDEX roles_pkey ON public.roles USING btree (id)
+
+### shared_quiz_questions
+
+| Колонка | Тип | NULL | По умолчанию |
+|---|---|:--:|---|
+| id | integer | NO | nextval('shared_quiz_questions_id_seq'::regclass) |
+| shared_quiz_id | integer | NO |  |
+| question_index | integer | NO |  |
+| question_data | jsonb | NO |  |
+| created_at | timestamp without time zone | NO | CURRENT_TIMESTAMP |
+
+- **Первичный ключ**: id
+- **Внешние ключи**:
+- shared_quiz_questions_shared_quiz_id_fkey: (shared_quiz_id) → shared_quizzes(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- **Индексы**:
+  - idx_shared_quiz_questions_quiz_id: CREATE INDEX idx_shared_quiz_questions_quiz_id ON public.shared_quiz_questions USING btree (shared_quiz_id)
+  - shared_quiz_questions_pkey: CREATE UNIQUE INDEX shared_quiz_questions_pkey ON public.shared_quiz_questions USING btree (id)
+  - shared_quiz_questions_shared_quiz_id_question_index_key: CREATE UNIQUE INDEX shared_quiz_questions_shared_quiz_id_question_index_key ON public.shared_quiz_questions USING btree (shared_quiz_id, question_index)
+
+### shared_quizzes
+
+| Колонка | Тип | NULL | По умолчанию |
+|---|---|:--:|---|
+| id | integer | NO | nextval('shared_quizzes_id_seq'::regclass) |
+| creator_user_id | integer | NO |  |
+| title | text | NO |  |
+| description | text | YES |  |
+| share_code | character varying | NO |  |
+| config | jsonb | NO |  |
+| created_at | timestamp without time zone | NO | CURRENT_TIMESTAMP |
+| expires_at | timestamp without time zone | YES |  |
+
+- **Первичный ключ**: id
+- **Внешние ключи**:
+- shared_quizzes_creator_user_id_fkey: (creator_user_id) → users(id) ON DELETE CASCADE ON UPDATE NO ACTION
+- **Индексы**:
+  - idx_shared_quizzes_created_at: CREATE INDEX idx_shared_quizzes_created_at ON public.shared_quizzes USING btree (created_at DESC)
+  - idx_shared_quizzes_creator: CREATE INDEX idx_shared_quizzes_creator ON public.shared_quizzes USING btree (creator_user_id)
+  - idx_shared_quizzes_share_code: CREATE INDEX idx_shared_quizzes_share_code ON public.shared_quizzes USING btree (share_code)
+  - shared_quizzes_pkey: CREATE UNIQUE INDEX shared_quizzes_pkey ON public.shared_quizzes USING btree (id)
+  - shared_quizzes_share_code_key: CREATE UNIQUE INDEX shared_quizzes_share_code_key ON public.shared_quizzes USING btree (share_code)
 
 ### user_sessions
 
@@ -331,7 +435,8 @@ SELECT p.id,
     a.achievement_years,
     rp.ruler_periods,
     p.wiki_link,
-    COALESCE(a.achievements_wiki_all, ARRAY[]::text[]) AS achievements_wiki
+    COALESCE(a.achievements_wiki_all, ARRAY[]::text[]) AS achievements_wiki,
+    p.status
    FROM ((((persons p
      LEFT JOIN v_person_achievements_all a ON (((a.person_id)::text = (p.id)::text)))
      LEFT JOIN v_person_ruler_span rs ON (((rs.person_id)::text = (p.id)::text)))
@@ -374,26 +479,26 @@ SELECT pr.id,
 
 ### v_approved_persons
 ```sql
-SELECT v.id,
-    v.name,
-    v.birth_year,
-    v.death_year,
-    v.reign_start,
-    v.reign_end,
-    v.category,
-    v.country,
-    v.country_names,
-    v.country_ids,
-    v.description,
-    v.image_url,
-    v.achievements,
-    v.achievement_years,
-    v.ruler_periods,
-    v.wiki_link,
-    v.achievements_wiki
-   FROM (v_api_persons v
-     JOIN persons p ON (((p.id)::text = (v.id)::text)))
-  WHERE (p.status = 'approved'::text);
+SELECT id,
+    name,
+    birth_year,
+    death_year,
+    reign_start,
+    reign_end,
+    category,
+    country,
+    country_names,
+    country_ids,
+    description,
+    image_url,
+    achievements,
+    achievement_years,
+    ruler_periods,
+    wiki_link,
+    achievements_wiki,
+    status
+   FROM v_api_persons
+  WHERE (status = 'approved'::text);
 ```
 
 ### v_countries
@@ -418,43 +523,31 @@ SELECT c.id,
 
 ### v_pending_moderation
 ```sql
-WITH targets AS (
-         SELECT p.id,
-            'persons'::text AS content_type,
-            p.status,
-            p.created_at,
-            p.updated_at
-           FROM persons p
-          WHERE (p.status = 'pending'::text)
-        UNION ALL
-         SELECT pr.person_id AS id,
-            'periods'::text AS content_type,
-            pr.status,
-            pr.created_at,
-            pr.updated_at
-           FROM periods pr
-          WHERE ((pr.status = 'pending'::text) AND (pr.person_id IS NOT NULL))
-        UNION ALL
-         SELECT pe.person_id AS id,
-            'person_edits'::text AS content_type,
-            pe.status,
-            pe.created_at,
-            pe.created_at AS updated_at
-           FROM person_edits pe
-          WHERE (pe.status = 'pending'::text)
-        )
- SELECT t.id,
-    t.content_type,
-    t.status,
-    t.created_at,
-    t.updated_at,
+SELECT v.id,
     v.name,
-    v.category,
     v.birth_year,
-    v.death_year
-   FROM (targets t
-     LEFT JOIN v_api_persons v ON (((v.id)::text = (t.id)::text)))
-  ORDER BY t.created_at DESC, t.id DESC;
+    v.death_year,
+    v.reign_start,
+    v.reign_end,
+    v.category,
+    v.country,
+    v.country_names,
+    v.country_ids,
+    v.description,
+    v.image_url,
+    v.achievements,
+    v.achievement_years,
+    v.ruler_periods,
+    v.wiki_link,
+    v.achievements_wiki,
+    v.status,
+    p.created_at,
+    p.updated_at,
+    p.created_by,
+    p.updated_by
+   FROM (v_api_persons v
+     JOIN persons p ON (((p.id)::text = (v.id)::text)))
+  WHERE (p.status = 'pending'::text);
 ```
 
 ### v_periods_with_names

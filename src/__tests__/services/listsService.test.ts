@@ -18,12 +18,24 @@ describe('ListsService', () => {
     it('should create a list with valid title', async () => {
       const title = 'Test List';
       const userId = 1;
+      const now = new Date();
 
       mockPool.query.mockResolvedValueOnce(
         createQueryResult([
           {
             id: 1,
+            owner_user_id: userId,
             title,
+            created_at: now,
+            updated_at: now,
+            moderation_status: 'draft',
+            public_description: '',
+            moderation_requested_at: null,
+            published_at: null,
+            moderated_by: null,
+            moderated_at: null,
+            moderation_comment: null,
+            public_slug: null,
           },
         ])
       );
@@ -33,7 +45,7 @@ describe('ListsService', () => {
       expect(result.id).toBe(1);
       expect(result.title).toBe(title);
       expect(mockPool.query).toHaveBeenCalledWith(
-        'INSERT INTO lists (owner_user_id, title) VALUES ($1, $2) RETURNING id, title',
+        expect.stringContaining('INSERT INTO lists (owner_user_id, title)'),
         [userId, title]
       );
     });
@@ -52,7 +64,26 @@ describe('ListsService', () => {
 
     it('should trim title before validation', async () => {
       const title = '  Test List  ';
-      mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 1, title: 'Test List' }]));
+      const now = new Date();
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([
+          {
+            id: 1,
+            owner_user_id: 1,
+            title: 'Test List',
+            created_at: now,
+            updated_at: now,
+            moderation_status: 'draft',
+            public_description: '',
+            moderation_requested_at: null,
+            published_at: null,
+            moderated_by: null,
+            moderated_at: null,
+            moderation_comment: null,
+            public_slug: null,
+          },
+        ])
+      );
 
       await listsService.createList(title, 1);
 
@@ -69,6 +100,14 @@ describe('ListsService', () => {
           title: 'List 1',
           created_at: new Date(),
           updated_at: new Date(),
+          moderation_status: 'draft',
+          public_description: '',
+          moderation_requested_at: null,
+          published_at: null,
+          moderated_by: null,
+          moderated_at: null,
+          moderation_comment: null,
+          public_slug: null,
         },
         {
           id: 2,
@@ -76,12 +115,20 @@ describe('ListsService', () => {
           title: 'List 2',
           created_at: new Date(),
           updated_at: new Date(),
+          moderation_status: 'draft',
+          public_description: '',
+          moderation_requested_at: null,
+          published_at: null,
+          moderated_by: null,
+          moderated_at: null,
+          moderation_comment: null,
+          public_slug: null,
         },
       ];
 
       const countRows = [
-        { list_id: 1, cnt: 5 },
-        { list_id: 2, cnt: 3 },
+        { list_id: 1, total: 5, persons: 3, achievements: 1, periods: 1 },
+        { list_id: 2, total: 3, persons: 2, achievements: 1, periods: 0 },
       ];
 
       mockPool.query
@@ -92,7 +139,11 @@ describe('ListsService', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].items_count).toBe(5);
+      expect(result[0].persons_count).toBe(3);
+      expect(result[0].achievements_count).toBe(1);
+      expect(result[0].periods_count).toBe(1);
       expect(result[1].items_count).toBe(3);
+      expect(result[1].persons_count).toBe(2);
     });
 
     it('should handle empty lists', async () => {
@@ -101,6 +152,164 @@ describe('ListsService', () => {
       const result = await listsService.getUserLists(1);
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('requestPublication', () => {
+    it('should mark list as pending and update description', async () => {
+      const now = new Date();
+      mockPool.query
+        .mockResolvedValueOnce(
+          createQueryResult([{ owner_user_id: 1, moderation_status: 'draft' as const }])
+        )
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 1,
+              owner_user_id: 1,
+              title: 'List 1',
+              created_at: now,
+              updated_at: now,
+              moderation_status: 'pending' as const,
+              public_description: 'desc',
+              moderation_requested_at: now,
+              published_at: null,
+              moderated_by: null,
+              moderated_at: null,
+              moderation_comment: null,
+              public_slug: null,
+            },
+          ])
+        )
+        .mockResolvedValueOnce(
+          createQueryResult([{ total: 3, persons: 2, achievements: 1, periods: 0 }])
+        );
+
+      const result = await listsService.requestPublication(1, 1, 'desc');
+
+      expect(result.moderation_status).toBe('pending');
+      expect(result.public_description).toBe('desc');
+      expect(mockPool.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE lists'), [
+        1,
+        1,
+        'desc',
+      ]);
+    });
+
+    it('should throw if list already published', async () => {
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([{ owner_user_id: 1, moderation_status: 'published' as const }])
+      );
+
+      await expect(listsService.requestPublication(1, 1, 'desc')).rejects.toThrow(
+        'Список уже опубликован'
+      );
+    });
+  });
+
+  describe('reviewList', () => {
+    it('should publish list with generated slug', async () => {
+      const now = new Date();
+      const mockClient = {
+        query: jest
+          .fn()
+          .mockResolvedValueOnce(createQueryResult([])) // BEGIN
+          .mockResolvedValueOnce(
+            createQueryResult([
+              {
+                id: 1,
+                owner_user_id: 1,
+                title: 'List Title',
+                moderation_status: 'pending' as const,
+                public_slug: null,
+              },
+            ])
+          )
+          .mockResolvedValueOnce(createQueryResult([])) // ensureUniqueSlug check
+          .mockResolvedValueOnce(
+            createQueryResult([
+              {
+                id: 1,
+                owner_user_id: 1,
+                title: 'List Title',
+                created_at: now,
+                updated_at: now,
+                moderation_status: 'published' as const,
+                public_description: 'desc',
+                moderation_requested_at: now,
+                published_at: now,
+                moderated_by: 2,
+                moderated_at: now,
+                moderation_comment: null,
+                public_slug: 'list-title',
+              },
+            ])
+          )
+          .mockResolvedValueOnce(
+            createQueryResult([{ total: 2, persons: 1, achievements: 1, periods: 0 }])
+          )
+          .mockResolvedValueOnce(createQueryResult([])), // COMMIT
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient as any);
+
+      const result = await listsService.reviewList(1, 2, 'approve', { comment: 'ok' });
+
+      expect(result.moderation_status).toBe('published');
+      expect(result.public_slug).toBe('list-title');
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('should reject list with comment', async () => {
+      const mockClient = {
+        query: jest
+          .fn()
+          .mockResolvedValueOnce(createQueryResult([])) // BEGIN
+          .mockResolvedValueOnce(
+            createQueryResult([
+              {
+                id: 1,
+                owner_user_id: 1,
+                title: 'List Title',
+                moderation_status: 'pending' as const,
+                public_slug: null,
+              },
+            ])
+          )
+          .mockResolvedValueOnce(
+            createQueryResult([
+              {
+                id: 1,
+                owner_user_id: 1,
+                title: 'List Title',
+                created_at: new Date(),
+                updated_at: new Date(),
+                moderation_status: 'rejected' as const,
+                public_description: 'desc',
+                moderation_requested_at: new Date(),
+                published_at: null,
+                moderated_by: 2,
+                moderated_at: new Date(),
+                moderation_comment: 'needs fixes',
+                public_slug: null,
+              },
+            ])
+          )
+          .mockResolvedValueOnce(
+            createQueryResult([{ total: 2, persons: 1, achievements: 1, periods: 0 }])
+          )
+          .mockResolvedValueOnce(createQueryResult([])), // COMMIT
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient as any);
+
+      const result = await listsService.reviewList(1, 2, 'reject', { comment: 'needs fixes' });
+
+      expect(result.moderation_status).toBe('rejected');
+      expect(result.moderation_comment).toBe('needs fixes');
     });
   });
 

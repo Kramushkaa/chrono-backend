@@ -1,4 +1,4 @@
-export const DTO_VERSION = '2025-10-13-1';
+export const DTO_VERSION = '2025-11-08-1';
 
 // Very simple, hand-maintained descriptors to detect drift across apps
 export const dtoDescriptors = {
@@ -44,5 +44,13 @@ export const dtoDescriptors = {
     wikipedia_url: 'url|null?',
     image_url: 'url|null?',
     saveAsDraft: 'boolean?',
+  },
+  ListPublicationRequest: {
+    description: 'string?',
+  },
+  ListModerationAction: {
+    action: "enum('approve'|'reject')",
+    comment: 'string?',
+    slug: 'string?',
   },
 } as const;

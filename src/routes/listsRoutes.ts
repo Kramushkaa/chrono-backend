@@ -1,9 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
-import { authenticateToken, rateLimit } from '../middleware/auth';
+import { authenticateToken, rateLimit, requireRoleMiddleware } from '../middleware/auth';
 import { asyncHandler, errors } from '../utils/errors';
-import { ListsService } from '../services/listsService';
-import { validateBody, validateParams, commonSchemas } from '../middleware/validation';
+import { ListsService, ListModerationStatus } from '../services/listsService';
+import {
+  validateBody,
+  validateParams,
+  commonSchemas,
+  validateQuery,
+} from '../middleware/validation';
+import { parseLimitOffset } from '../utils/api';
 import { z } from 'zod';
 
 // Валидационные схемы для lists
@@ -32,13 +38,47 @@ const listsSchemas = {
     achievement_id: z.number().int().positive().optional(),
     period_id: z.number().int().positive().optional(),
   }),
+
+  publishRequest: z.object({
+    description: z.string().trim().max(2000, 'Описание слишком длинное').optional(),
+  }),
+
+  moderationQuery: z.object({
+    status: z
+      .string()
+      .trim()
+      .optional()
+      .transform(val => (val ? (val as ListModerationStatus) : undefined))
+      .refine(
+        val =>
+          !val || val === 'pending' || val === 'published' || val === 'rejected' || val === 'draft',
+        { message: 'Недопустимый статус' }
+      ),
+  }),
+
+  reviewList: z.object({
+    action: z.enum(['approve', 'reject']),
+    comment: z.string().trim().max(2000, 'Комментарий слишком длинный').optional(),
+    slug: z
+      .string()
+      .trim()
+      .max(80, 'Slug слишком длинный')
+      .regex(/^[a-z0-9-]+$/i, 'Slug может содержать только буквы, цифры и дефисы')
+      .optional(),
+  }),
 };
+
+const moderationListQuerySchema = commonSchemas.pagination.extend({
+  status: listsSchemas.moderationQuery.shape.status,
+});
+
+const publicListQuerySchema = commonSchemas.pagination;
 
 export function createListsRoutes(pool: Pool, listsService: ListsService): Router {
   const router = Router();
 
-  // Rate limiting: 30 requests per minute (content mutations)
-  router.use(rateLimit(1 * 60 * 1000, 30));
+  // Rate limiting: 300 requests per minute (content mutations)
+  router.use(rateLimit(1 * 60 * 1000, 300));
 
   // Create a share token for a list (owner only)
   router.post(
@@ -143,6 +183,22 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
     })
   );
 
+  // Request list publication (owner only)
+  router.post(
+    '/lists/:listId/publish-request',
+    authenticateToken,
+    validateParams(listsSchemas.listId),
+    validateBody(listsSchemas.publishRequest),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { listId } = req.params as unknown as { listId: number };
+      const { description } = req.body as { description?: string };
+      const userId = req.user!.sub;
+
+      const data = await listsService.requestPublication(Number(listId), userId, description);
+      res.json({ success: true, data });
+    })
+  );
+
   router.delete(
     '/lists/:listId/items/:itemId',
     authenticateToken,
@@ -170,6 +226,64 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
     })
   );
 
+  // Admin moderation queue for lists
+  router.get(
+    '/admin/lists/moderation',
+    authenticateToken,
+    requireRoleMiddleware(['admin', 'moderator']),
+    validateQuery(moderationListQuerySchema),
+    asyncHandler(async (req: Request, res: Response) => {
+      const status = (req.query.status as ListModerationStatus | undefined) || 'pending';
+      const { limitParam, offsetParam } = parseLimitOffset(
+        req.query.limit as number | undefined,
+        req.query.offset as number | undefined,
+        { defLimit: 50, maxLimit: 200 }
+      );
+
+      const { total, data } = await listsService.getModerationQueue(
+        status,
+        limitParam,
+        offsetParam
+      );
+
+      res.json({
+        success: true,
+        data,
+        meta: {
+          total,
+          limit: limitParam,
+          offset: offsetParam,
+          hasMore: offsetParam + limitParam < total,
+        },
+      });
+    })
+  );
+
+  // Admin review list (approve / reject)
+  router.post(
+    '/admin/lists/:listId/review',
+    authenticateToken,
+    requireRoleMiddleware(['admin', 'moderator']),
+    validateParams(listsSchemas.listId),
+    validateBody(listsSchemas.reviewList),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { listId } = req.params as unknown as { listId: number };
+      const { action, comment, slug } = req.body as {
+        action: 'approve' | 'reject';
+        comment?: string;
+        slug?: string;
+      };
+      const moderatorId = req.user!.sub;
+
+      const data = await listsService.reviewList(Number(listId), moderatorId, action, {
+        comment,
+        slug,
+      });
+
+      res.json({ success: true, data });
+    })
+  );
+
   // Copy list from a public share code into current user's account
   router.post(
     '/lists/copy-from-share',
@@ -182,6 +296,42 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
       const result = await listsService.copyListFromShare(code, userId, newTitle);
 
       res.status(201).json({ success: true, data: result });
+    })
+  );
+
+  // Public lists index
+  router.get(
+    '/public/lists',
+    validateQuery(publicListQuerySchema),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limitParam, offsetParam } = parseLimitOffset(
+        req.query.limit as number | undefined,
+        req.query.offset as number | undefined,
+        { defLimit: 20, maxLimit: 100 }
+      );
+
+      const { total, data } = await listsService.getPublicLists(limitParam, offsetParam);
+
+      res.json({
+        success: true,
+        data,
+        meta: {
+          total,
+          limit: limitParam,
+          offset: offsetParam,
+          hasMore: offsetParam + limitParam < total,
+        },
+      });
+    })
+  );
+
+  // Public list detail by slug
+  router.get(
+    '/public/lists/:slug',
+    asyncHandler(async (req: Request, res: Response) => {
+      const { slug } = req.params as { slug: string };
+      const data = await listsService.getPublicList(slug);
+      res.json({ success: true, data });
     })
   );
 

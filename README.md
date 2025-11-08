@@ -117,6 +117,11 @@ TGT_DB_SSL=false
 - `GET /api/persons/categories/list` - Получить список категорий
 - `GET /api/persons/countries/list` - Получить список стран
 - `GET /api/persons/stats/overview` - Получить статистику
+- `POST /api/lists/:listId/publish-request` - Отправить список на модерацию (владелец)
+- `GET /api/admin/lists/moderation` - Очередь списков для модераторов/администраторов
+- `POST /api/admin/lists/:listId/review` - Утвердить или отклонить список с комментарием
+- `GET /api/public/lists` - Получить опубликованные списки
+- `GET /api/public/lists/:slug` - Получить публичный список по slug или ID
 
 ### Параметры запросов
 
