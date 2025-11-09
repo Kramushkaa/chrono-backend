@@ -204,7 +204,7 @@ describe('AuthController', () => {
 
     it('should support legacy email login', async () => {
       mockRequest.body = {
-        email: 'test@example.com',
+        login: 'test@example.com',
         password: 'Password123!',
       };
       mockAuthService.loginUser.mockResolvedValue(loginResult);
