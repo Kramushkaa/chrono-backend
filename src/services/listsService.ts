@@ -1128,7 +1128,7 @@ export class ListsService extends BaseService {
     );
 
     if (own.rowCount === 0) {
-      throw errors.forbidden('Нет прав на изменение списка');
+      throw errors.forbidden('Нет прав на удаление элемента из списка');
     }
 
     await this.executeQuery(
@@ -1208,45 +1208,48 @@ export class ListsService extends BaseService {
    * Получение списка по share-коду
    */
   async getSharedList(code: string): Promise<any> {
+    let listId: number;
+    
     try {
       const payload = jwt.verify(code, this.jwtSecret) as JwtPayload;
-      const listId = Number(payload.listId);
+      listId = Number(payload.listId);
 
       if (!Number.isFinite(listId) || listId <= 0) {
         throw new Error('bad list');
       }
-
-      const listRow = await this.executeQuery(
-        'SELECT id, owner_user_id, title FROM lists WHERE id = $1',
-        [listId],
-        {
-          action: 'getSharedList_getList',
-          params: { listId, code },
-        }
-      );
-
-      if (listRow.rowCount === 0) {
-        throw errors.notFound('Список не найден');
-      }
-
-      const items = await this.executeQuery(
-        'SELECT id, list_id, item_type, person_id, achievement_id, period_id, position FROM list_items WHERE list_id = $1 ORDER BY position ASC, id ASC',
-        [listId],
-        {
-          action: 'getSharedList_getItems',
-          params: { listId, code },
-        }
-      );
-
-      return {
-        list_id: listId,
-        owner_user_id: listRow.rows[0].owner_user_id,
-        title: listRow.rows[0].title,
-        items: items.rows,
-      };
     } catch (e) {
-      throw errors.badRequest('invalid_share_code');
+      throw errors.badRequest('Некорректный код');
     }
+
+    const listRow = await this.executeQuery(
+      'SELECT id, owner_user_id, title FROM lists WHERE id = $1',
+      [listId],
+      {
+        action: 'getSharedList_getList',
+        params: { listId, code },
+      }
+    );
+
+    if (listRow.rowCount === 0) {
+      throw errors.notFound('Список не найден');
+    }
+
+    const items = await this.executeQuery(
+      'SELECT id, list_id, item_type, person_id, achievement_id, period_id, position FROM list_items WHERE list_id = $1 ORDER BY position ASC, id ASC',
+      [listId],
+      {
+        action: 'getSharedList_getItems',
+        params: { listId, code },
+      }
+    );
+
+    return {
+      id: listRow.rows[0].id,
+      list_id: listId,
+      owner_user_id: listRow.rows[0].owner_user_id,
+      title: listRow.rows[0].title,
+      items: items.rows,
+    };
   }
 
   /**
