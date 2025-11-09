@@ -21,6 +21,7 @@ import {
   isTokenExpired,
   hashToken,
 } from '../utils/auth';
+import { logger } from '../utils/logger';
 
 export class AuthService extends BaseService {
   constructor(pool: Pool) {
@@ -113,6 +114,16 @@ export class AuthService extends BaseService {
     // Проверка пароля
     const isValidPassword = await comparePassword(data.password, user.password_hash);
     if (!isValidPassword) {
+      // Security event logging for failed login attempt
+      logger.securityEvent(
+        'failed_login_attempt',
+        {
+          email: user.email,
+          login: loginIdentifier,
+          userId: user.id,
+        },
+        'medium'
+      );
       throw new Error('Неверный email или пароль');
     }
 

@@ -153,6 +153,11 @@ export class PeriodsService extends BaseService {
       }
     );
 
+    // Invalidate metadata cache if approved
+    if (status === 'approved') {
+      this.invalidateMetadataCache();
+    }
+
     // Telegram уведомление (если не черновик)
     if (status !== 'draft') {
       const userEmail = user.email || 'unknown';

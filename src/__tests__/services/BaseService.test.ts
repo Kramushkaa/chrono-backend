@@ -257,9 +257,7 @@ describe('BaseService', () => {
         .mockResolvedValueOnce(createQueryResult([{ id: 1, status: 'pending' }], 1))
         // Mock update query
         .mockResolvedValueOnce(
-          createQueryResult([
-            { id: 1, status: 'approved', reviewed_by: 100, review_comment: null },
-          ])
+          createQueryResult([{ id: 1, status: 'approved', reviewed_by: 100, review_comment: null }])
         );
 
       const result = await service.testReviewContent(
@@ -314,27 +312,34 @@ describe('BaseService', () => {
 
       expect(result.status).toBe('rejected');
       expect(result.review_comment).toBe('Test comment');
-      expect(mockPool.query).toHaveBeenNthCalledWith(
+      expect(mockPool.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE periods'), [
+        'rejected',
+        100,
+        'Test comment',
         2,
-        expect.stringContaining('UPDATE periods'),
-        ['rejected', 100, 'Test comment', 2]
-      );
+      ]);
     });
 
     it('should throw error when record not found', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([], 0));
 
       await expect(
-        service.testReviewContent('achievements', 'id', 999, 'approve', 100, undefined, 'Достижение')
+        service.testReviewContent(
+          'achievements',
+          'id',
+          999,
+          'approve',
+          100,
+          undefined,
+          'Достижение'
+        )
       ).rejects.toThrow(/Достижение не найдена/);
 
       expect(mockPool.query).toHaveBeenCalledTimes(1);
     });
 
     it('should throw error when status is not pending', async () => {
-      mockPool.query.mockResolvedValueOnce(
-        createQueryResult([{ id: 1, status: 'approved' }], 1)
-      );
+      mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 1, status: 'approved' }], 1));
 
       await expect(
         service.testReviewContent('achievements', 'id', 1, 'approve', 100)
@@ -379,7 +384,14 @@ describe('BaseService', () => {
           createQueryResult([{ id: 1, status: 'approved', reviewed_by: 100, review_comment: null }])
         );
 
-      const result = await service.testReviewContent('achievements', 'id', 1, 'approve', 100, undefined);
+      const result = await service.testReviewContent(
+        'achievements',
+        'id',
+        1,
+        'approve',
+        100,
+        undefined
+      );
 
       expect(result.review_comment).toBe(null);
     });
@@ -420,9 +432,9 @@ describe('BaseService', () => {
         createQueryResult([{ id: 1, created_by: 200, status: 'draft' }], 1)
       );
 
-      await expect(
-        service.testSubmitDraft('achievements', 'id', 1, 100)
-      ).rejects.toThrow(/Вы можете отправлять только свои черновики/);
+      await expect(service.testSubmitDraft('achievements', 'id', 1, 100)).rejects.toThrow(
+        /Вы можете отправлять только свои черновики/
+      );
     });
 
     it('should throw error when status is not draft', async () => {
@@ -430,9 +442,9 @@ describe('BaseService', () => {
         createQueryResult([{ id: 1, created_by: 100, status: 'pending' }], 1)
       );
 
-      await expect(
-        service.testSubmitDraft('achievements', 'id', 1, 100)
-      ).rejects.toThrow(/Можно отправлять только черновики/);
+      await expect(service.testSubmitDraft('achievements', 'id', 1, 100)).rejects.toThrow(
+        /Можно отправлять только черновики/
+      );
     });
   });
 
@@ -445,19 +457,17 @@ describe('BaseService', () => {
       await service.testDeleteDraft('achievements', 'id', 1, 100, 'Достижение');
 
       expect(mockPool.query).toHaveBeenCalledTimes(2);
-      expect(mockPool.query).toHaveBeenNthCalledWith(
-        2,
-        'DELETE FROM achievements WHERE id = $1',
-        [1]
-      );
+      expect(mockPool.query).toHaveBeenNthCalledWith(2, 'DELETE FROM achievements WHERE id = $1', [
+        1,
+      ]);
     });
 
     it('should throw error when draft not found', async () => {
       mockPool.query.mockResolvedValueOnce(createQueryResult([], 0));
 
-      await expect(
-        service.testDeleteDraft('periods', 'id', 999, 100, 'Период')
-      ).rejects.toThrow(/Период не найдена/);
+      await expect(service.testDeleteDraft('periods', 'id', 999, 100, 'Период')).rejects.toThrow(
+        /Период не найдена/
+      );
     });
 
     it('should throw error when user is not owner', async () => {
@@ -465,9 +475,9 @@ describe('BaseService', () => {
         createQueryResult([{ id: 1, created_by: 200, status: 'draft' }], 1)
       );
 
-      await expect(
-        service.testDeleteDraft('periods', 'id', 1, 100)
-      ).rejects.toThrow(/Вы можете удалять только свои записи/);
+      await expect(service.testDeleteDraft('periods', 'id', 1, 100)).rejects.toThrow(
+        /Вы можете удалять только свои записи/
+      );
     });
 
     it('should throw error when status is not draft', async () => {
@@ -475,9 +485,9 @@ describe('BaseService', () => {
         createQueryResult([{ id: 1, created_by: 100, status: 'approved' }], 1)
       );
 
-      await expect(
-        service.testDeleteDraft('periods', 'id', 1, 100)
-      ).rejects.toThrow(/Можно удалять только черновики/);
+      await expect(service.testDeleteDraft('periods', 'id', 1, 100)).rejects.toThrow(
+        /Можно удалять только черновики/
+      );
     });
   });
 

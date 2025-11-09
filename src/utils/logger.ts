@@ -124,6 +124,44 @@ class Logger {
       ...context,
     });
   }
+
+  /**
+   * Логирование событий безопасности с поддержкой Telegram уведомлений
+   * Severity levels: low, medium, high, critical
+   * High и critical отправляются в Telegram (если настроен)
+   */
+  securityEvent(
+    event: string,
+    details: Record<string, unknown>,
+    severity: 'low' | 'medium' | 'high' | 'critical',
+    telegramService?: {
+      sendSecurityAlert: (
+        event: string,
+        details: Record<string, unknown>,
+        severity: string
+      ) => Promise<void>;
+    }
+  ): void {
+    const logLevel = severity === 'critical' || severity === 'high' ? 'error' : 'warn';
+
+    this.writeLog(logLevel, `Security event: ${event} [${severity}]`, {
+      event,
+      severity,
+      ...details,
+      action: 'security_event',
+    });
+
+    // Отправка в Telegram для высокого и критичного уровня
+    if ((severity === 'high' || severity === 'critical') && telegramService) {
+      telegramService.sendSecurityAlert(event, details, severity).catch(error => {
+        this.error('Failed to send security alert to Telegram', {
+          error: error instanceof Error ? error : new Error(String(error)),
+          event,
+          severity,
+        });
+      });
+    }
+  }
 }
 
 // Создаем глобальный экземпляр logger

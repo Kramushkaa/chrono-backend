@@ -480,7 +480,6 @@ export class ListsService extends BaseService {
     let attempt = 1;
     const runner = client ? client.query.bind(client) : this.pool.query.bind(this.pool);
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const result = await runner(
         `SELECT 1 FROM lists WHERE public_slug = $1 AND id <> $2 LIMIT 1`,
@@ -875,12 +874,7 @@ export class ListsService extends BaseService {
       const ownerEmail = ownerResult.rows[0].email;
       // Отправка уведомления в Telegram (неблокирующее)
       this.telegramService
-        .notifyListPublicationRequested(
-          updated.rows[0].title,
-          ownerEmail,
-          listId,
-          counts.total
-        )
+        .notifyListPublicationRequested(updated.rows[0].title, ownerEmail, listId, counts.total)
         .catch(err =>
           logger.warn('Telegram notification failed (list publication requested)', { error: err })
         );

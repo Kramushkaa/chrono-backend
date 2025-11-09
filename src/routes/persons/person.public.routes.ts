@@ -173,7 +173,9 @@ export function createPublicPersonRoutes(
 
       telegramService
         .notifyPersonEditProposed(personName, userEmail, id)
-        .catch(err => logger.warn('Telegram notification failed (person edit proposed)', { error: err }));
+        .catch(err =>
+          logger.warn('Telegram notification failed (person edit proposed)', { error: err })
+        );
 
       res.status(201).json({
         success: true,

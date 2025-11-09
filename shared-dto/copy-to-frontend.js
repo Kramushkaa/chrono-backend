@@ -43,6 +43,23 @@ FILES_TO_COPY.forEach(file => {
   if (fs.existsSync(sourcePath)) {
     let content = fs.readFileSync(sourcePath, 'utf8');
     
+    // Для index.ts убираем экспорт schemas (зависит от zod, не нужен во фронтенде)
+    if (file === 'index.d.ts') {
+      content = content.replace(/export \* from ['"]\.\/schemas['"];?\s*\n?/g, '');
+    }
+    
+    // Для types.ts убираем импорты zod и schemas, и заменяем z.infer на any (типы уже определены в dtoDescriptors)
+    if (file === 'types.d.ts') {
+      content = content.replace(/import type \{ z \} from ['"]zod['"];?\s*\n?/g, '');
+      content = content.replace(/import type \{[^}]+\} from ['"]\.\/schemas['"];?\s*\n?/g, '');
+      content = content.replace(/z\.infer<typeof \w+>/g, 'any');
+    }
+    
+    // Убираем 'declare' из констант, чтобы Rollup мог их правильно реэкспортировать
+    // Для DTO_VERSION делаем обычный const, для остальных (типов) — делаем type
+    content = content.replace(/export declare const (DTO_VERSION[^;]+;)/g, 'export const $1');
+    content = content.replace(/export declare const (\w+):/g, 'export type $1 =');
+    
     // Добавляем комментарий о том, что файл автоматически сгенерирован
     const header = `// AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 // This file is automatically copied from backend/shared-dto

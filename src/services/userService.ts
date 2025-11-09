@@ -82,11 +82,13 @@ export class UserService extends BaseService {
    */
   async getUserById(userId: number): Promise<User | null> {
     const result = await this.executeQuery<UserRow>(
-      'SELECT id, email, username, full_name, role, email_verified, is_active, created_at, updated_at FROM users WHERE id = $1', 
-      [userId], {
-      action: 'getUserById',
-      params: { userId },
-    });
+      'SELECT id, email, username, full_name, role, email_verified, is_active, created_at, updated_at FROM users WHERE id = $1',
+      [userId],
+      {
+        action: 'getUserById',
+        params: { userId },
+      }
+    );
 
     if (result.rows.length === 0) {
       return null;

@@ -125,6 +125,11 @@ export class PersonsService extends BaseService {
       }
     );
 
+    // Invalidate metadata cache if approved
+    if (status === 'approved') {
+      this.invalidateMetadataCache();
+    }
+
     // Telegram уведомление (если не черновик)
     if (status !== 'draft') {
       const userEmail = user.email || 'unknown';
@@ -459,11 +464,13 @@ export class PersonsService extends BaseService {
     const result = await this.executeQuery(
       `SELECT id, person_id, proposed_changes, status, reviewed_by, review_comment, 
               created_by, created_at, updated_at 
-       FROM person_edits WHERE id = $1`, 
-      [editId], {
-      action: 'reviewEdit_get_result',
-      params: { editId },
-    });
+       FROM person_edits WHERE id = $1`,
+      [editId],
+      {
+        action: 'reviewEdit_get_result',
+        params: { editId },
+      }
+    );
     return result.rows[0];
   }
 

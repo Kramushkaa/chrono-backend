@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { TelegramService } from '../services/telegramService';
+import { cache } from '../utils/cache';
 
 export function createHealthRoutes(pool: Pool, telegramService?: TelegramService): Router {
   const router = Router();
@@ -12,6 +13,8 @@ export function createHealthRoutes(pool: Pool, telegramService?: TelegramService
    */
   router.get('/health', async (req: Request, res: Response) => {
     const startTime = Date.now();
+    const cacheStats = cache.getStats();
+
     const healthCheck = {
       uptime: process.uptime(),
       message: 'OK',
@@ -24,6 +27,10 @@ export function createHealthRoutes(pool: Pool, telegramService?: TelegramService
         totalConnections: pool.totalCount,
         idleConnections: pool.idleCount,
         waitingClients: pool.waitingCount,
+      },
+      cache: {
+        size: cacheStats.size,
+        keys: cacheStats.keys,
       },
     };
 

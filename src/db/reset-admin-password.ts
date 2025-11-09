@@ -34,10 +34,15 @@ async function resetAdminPassword() {
         ['admin@chrono.ninja', newHash]
       );
     }
-    logger.info(`Пароль администратора установлен на ${password}`, { action: 'reset_admin_password' });
+    logger.info(`Пароль администратора установлен на ${password}`, {
+      action: 'reset_admin_password',
+    });
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
-    logger.error('Ошибка при сбросе пароля администратора', { error: err, action: 'reset_admin_password' });
+    logger.error('Ошибка при сбросе пароля администратора', {
+      error: err,
+      action: 'reset_admin_password',
+    });
     process.exit(1);
   } finally {
     await pool.end();

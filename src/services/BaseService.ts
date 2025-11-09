@@ -1,6 +1,7 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { logger } from '../utils/logger';
 import { errors, ApiError } from '../utils/errors';
+import { cache } from '../utils/cache';
 
 export interface ErrorContext {
   userId?: number;
@@ -19,6 +20,13 @@ export class BaseService {
 
   /**
    * Выполнить запрос с логированием и обработкой ошибок
+   *
+   * SECURITY WARNING: Always use parameterized queries with placeholders ($1, $2, etc.)
+   * NEVER interpolate user input directly into SQL strings using template literals or concatenation.
+   * This protects against SQL injection attacks.
+   *
+   * ✅ Good: pool.query('SELECT * FROM users WHERE id = $1', [userId])
+   * ❌ Bad:  pool.query(`SELECT * FROM users WHERE id = ${userId}`)
    */
   protected async executeQuery<T extends QueryResultRow = any>(
     query: string,
@@ -259,5 +267,17 @@ export class BaseService {
       action: 'deleteDraft_delete',
       params: { table, idColumn, id, userId },
     });
+  }
+
+  /**
+   * Инвалидировать кэш метаданных после мутаций
+   * Вызывается после создания/обновления/удаления persons, achievements, periods
+   */
+  protected invalidateMetadataCache(): void {
+    cache.clear('categories');
+    cache.clear('countries');
+    cache.clear('countries_options');
+    cache.clear('stats');
+    logger.debug('Metadata cache invalidated after mutation');
   }
 }

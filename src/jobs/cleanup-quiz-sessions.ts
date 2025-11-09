@@ -32,7 +32,10 @@ export async function cleanupExpiredQuizSessions(pool: Pool): Promise<CleanupRes
     const deletedCount = result.rowCount || 0;
 
     if (deletedCount > 0) {
-      logger.info(`Cleanup: Удалено просроченных quiz sessions: ${deletedCount}`, { deletedCount, action: 'cleanup_expired_sessions' });
+      logger.info(`Cleanup: Удалено просроченных quiz sessions: ${deletedCount}`, {
+        deletedCount,
+        action: 'cleanup_expired_sessions',
+      });
     }
 
     return {
@@ -41,7 +44,10 @@ export async function cleanupExpiredQuizSessions(pool: Pool): Promise<CleanupRes
     };
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    logger.error('Cleanup: Ошибка при очистке quiz sessions', { error: err, action: 'cleanup_expired_sessions' });
+    logger.error('Cleanup: Ошибка при очистке quiz sessions', {
+      error: err,
+      action: 'cleanup_expired_sessions',
+    });
     throw error;
   }
 }
@@ -67,7 +73,11 @@ export async function cleanupOldFinishedQuizSessions(
     const deletedCount = result.rowCount || 0;
 
     if (deletedCount > 0) {
-      logger.info(`Cleanup: Удалено старых завершённых quiz sessions: ${deletedCount}`, { deletedCount, daysOld, action: 'cleanup_old_finished_sessions' });
+      logger.info(`Cleanup: Удалено старых завершённых quiz sessions: ${deletedCount}`, {
+        deletedCount,
+        daysOld,
+        action: 'cleanup_old_finished_sessions',
+      });
     }
 
     return {
@@ -76,7 +86,11 @@ export async function cleanupOldFinishedQuizSessions(
     };
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    logger.error('Cleanup: Ошибка при очистке старых quiz sessions', { error: err, daysOld, action: 'cleanup_old_finished_sessions' });
+    logger.error('Cleanup: Ошибка при очистке старых quiz sessions', {
+      error: err,
+      daysOld,
+      action: 'cleanup_old_finished_sessions',
+    });
     throw error;
   }
 }

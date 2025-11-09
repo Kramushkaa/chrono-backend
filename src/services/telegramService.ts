@@ -519,6 +519,129 @@ ${emoji} <b>Список ${actionText}</b>
   }
 
   /**
+   * Отправка security alert
+   */
+  async sendSecurityAlert(
+    event: string,
+    details: Record<string, unknown>,
+    severity: 'low' | 'medium' | 'high' | 'critical'
+  ): Promise<void> {
+    if (!this.isEnabled || !this.bot) return;
+
+    const emojiMap = {
+      low: '🔵',
+      medium: '🟡',
+      high: '🟠',
+      critical: '🔴',
+    };
+
+    const emoji = emojiMap[severity];
+    const detailsText = Object.entries(details)
+      .map(([key, value]) => `  • ${key}: ${String(value)}`)
+      .join('\n');
+
+    const message = `
+${emoji} <b>Security Alert [${severity.toUpperCase()}]</b>
+
+📢 Event: ${event}
+
+${detailsText}
+
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+`.trim();
+
+    try {
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      logger.info('Telegram security alert sent', { event, severity });
+    } catch (error) {
+      logger.error('Failed to send Telegram security alert', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        event,
+        severity,
+      });
+    }
+  }
+
+  /**
+   * Отправка error alert
+   */
+  async sendErrorAlert(error: Error, context: Record<string, unknown>): Promise<void> {
+    if (!this.isEnabled || !this.bot) return;
+
+    const contextText = Object.entries(context)
+      .map(([key, value]) => `  • ${key}: ${String(value)}`)
+      .join('\n');
+
+    const errorMessage = error.message.substring(0, 200);
+    const stackPreview = error.stack?.split('\n').slice(0, 3).join('\n') || 'No stack trace';
+
+    const message = `
+🔴 <b>Error Alert</b>
+
+❌ Error: ${errorMessage}
+
+Context:
+${contextText}
+
+Stack:
+<code>${stackPreview.substring(0, 200)}</code>
+
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+`.trim();
+
+    try {
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      logger.info('Telegram error alert sent', { errorMessage: error.message });
+    } catch (sendError) {
+      logger.error('Failed to send Telegram error alert', {
+        error: sendError instanceof Error ? sendError : new Error(String(sendError)),
+        originalError: error.message,
+      });
+    }
+  }
+
+  /**
+   * Отправка performance alert
+   */
+  async sendPerformanceAlert(
+    metric: string,
+    value: number,
+    threshold: number,
+    context?: Record<string, unknown>
+  ): Promise<void> {
+    if (!this.isEnabled || !this.bot) return;
+
+    const contextText = context
+      ? '\n\nContext:\n' +
+        Object.entries(context)
+          .map(([key, val]) => `  • ${key}: ${String(val)}`)
+          .join('\n')
+      : '';
+
+    const message = `
+⚡ <b>Performance Alert</b>
+
+📊 Metric: ${metric}
+📈 Value: ${value}
+⚠️ Threshold: ${threshold}${contextText}
+
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+`.trim();
+
+    try {
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      logger.info('Telegram performance alert sent', { metric, value, threshold });
+    } catch (error) {
+      logger.error('Failed to send Telegram performance alert', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        metric,
+        value,
+        threshold,
+      });
+    }
+  }
+
+  /**
    * Отправка тестового сообщения
    */
   async sendTestMessage(): Promise<void> {

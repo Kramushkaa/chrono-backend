@@ -85,10 +85,7 @@ export function slugify(raw: string, maxLength = MAX_SLUG_LENGTH): string {
     .replace(/-+/g, '-')
     .toLowerCase();
 
-  const trimmed = sanitized
-    .slice(0, maxLength)
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
+  const trimmed = sanitized.slice(0, maxLength).replace(/^-+/, '').replace(/-+$/, '');
 
   return trimmed || '';
 }

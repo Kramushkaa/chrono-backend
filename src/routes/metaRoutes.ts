@@ -3,11 +3,12 @@ import { Pool } from 'pg';
 import { asyncHandler } from '../utils/errors';
 import { DTO_VERSION as DTO_VERSION_BE } from '@chrononinja/dto';
 import { cache } from '../utils/cache';
+import { rateLimit } from '../middleware/auth';
 
 export function createMetaRoutes(pool: Pool): Router {
   const router = Router();
 
-  // Health
+  // Health endpoint - no rate limiting for load balancer checks
   router.get(
     '/health',
     asyncHandler(async (_req: Request, res: Response) => {
@@ -22,13 +23,17 @@ export function createMetaRoutes(pool: Pool): Router {
     })
   );
 
-  // DTO version
+  // DTO version - no rate limiting
   router.get(
     '/dto-version',
     asyncHandler(async (_req: Request, res: Response) => {
       res.json({ success: true, data: { version: DTO_VERSION_BE } });
     })
   );
+
+  // Rate limiting for metadata endpoints: 1000 requests per 15 minutes
+  // This protects against abuse while being liberal for public data
+  router.use(rateLimit(15 * 60 * 1000, 1000));
 
   // Categories (only from approved persons for public filters)
   router.get(

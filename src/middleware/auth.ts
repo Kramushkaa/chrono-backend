@@ -56,7 +56,18 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     req.user = decoded;
     next();
   } catch (error) {
-    logger.authError('Token verification failed', undefined, getClientIp(req));
+    const ip = getClientIp(req);
+    logger.authError('Token verification failed', undefined, ip);
+    // Security event logging for invalid token attempts
+    logger.securityEvent(
+      'invalid_token_attempt',
+      {
+        ip,
+        endpoint: req.path,
+        method: req.method,
+      },
+      'low'
+    );
     next(errors.unauthorized('Недействительный токен доступа', 'invalid_token'));
   }
 };
@@ -260,6 +271,18 @@ export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number
     if (!current || current.resetTime < windowStart) {
       requests.set(ip, { count: 1, resetTime: now });
     } else if (current.count >= maxRequests) {
+      // Security event logging for rate limit exceeded
+      logger.securityEvent(
+        'rate_limit_exceeded',
+        {
+          ip,
+          endpoint: req.path,
+          method: req.method,
+          count: current.count,
+          limit: maxRequests,
+        },
+        'medium'
+      );
       next(errors.tooMany('Слишком много запросов. Попробуйте позже.'));
       return;
     } else {

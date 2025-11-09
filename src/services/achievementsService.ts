@@ -124,6 +124,11 @@ export class AchievementsService extends BaseService {
       );
     }
 
+    // Invalidate metadata cache if approved
+    if (status === 'approved') {
+      this.invalidateMetadataCache();
+    }
+
     // Telegram уведомление (если не черновик)
     if (status !== 'draft' && personName) {
       const userEmail = user.email || 'unknown';

@@ -22,7 +22,7 @@ module.exports = [
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        ecmaVersion: 2020,
+        ecmaVersion: 2024,
         sourceType: 'module',
         project: './tsconfig.json',
       },
@@ -78,6 +78,8 @@ module.exports = [
       '@typescript-eslint/no-namespace': 'off', // Allow namespaces in type definitions
       'prefer-const': 'warn',
       'no-var': 'error',
+      // SQL injection protection: warn about template literals in strings
+      'no-template-curly-in-string': 'error',
     },
   },
 ];
