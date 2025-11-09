@@ -1,6 +1,10 @@
 import { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
+
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 /**
  * Утилиты для работы с тестовой базой данных
@@ -8,14 +12,25 @@ import * as path from 'path';
 
 // Создание connection pool для тестовой БД
 function createTestPool(): Pool {
+  const sslMode = (process.env.DB_SSL || '').toLowerCase();
+  let ssl: boolean | { rejectUnauthorized: boolean } | undefined;
+
+  if (sslMode === 'true' || sslMode === 'require') {
+    const rejectUnauthorized =
+      (process.env.DB_SSL_REJECT_UNAUTHORIZED || 'true').toLowerCase() !== 'false';
+    ssl = { rejectUnauthorized };
+  } else if (sslMode === 'disable' || sslMode === 'false') {
+    ssl = false;
+  }
+
   return new Pool({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
     database: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
-    // Важно! Используем search_path для тестовой схемы
     options: `-c search_path=test,public`,
+    ssl,
   });
 }
 
@@ -29,23 +44,8 @@ export async function clearTestData(): Promise<void> {
   try {
     await client.query('BEGIN');
 
-    // Очищаем таблицы в правильном порядке (с учётом foreign keys)
-    const tables = [
-      'quiz_attempt_answers',
-      'quiz_attempts',
-      'quiz_shared_sessions',
-      'quiz_shared_questions',
-      'quiz_shared',
-      'list_items',
-      'lists',
-      'life_periods',
-      'achievements',
-      'persons',
-      'refresh_tokens',
-      'password_reset_tokens',
-      'email_verification_tokens',
-      'users',
-    ];
+    const result = await client.query("SELECT tablename FROM pg_tables WHERE schemaname = 'test'");
+    const tables = result.rows.map((row: { tablename: string }) => row.tablename);
 
     for (const table of tables) {
       await client.query(`TRUNCATE TABLE test.${table} RESTART IDENTITY CASCADE`);
@@ -90,9 +90,16 @@ export async function seedTestData(): Promise<void> {
 
     // Читаем и выполняем SQL
     const seedSQL = fs.readFileSync(seedFilePath, 'utf-8');
-    await client.query(seedSQL);
+    let seededViaFile = false;
+    try {
+      await client.query(seedSQL);
+      seededViaFile = true;
+    } catch (seedError: any) {
+      console.warn('⚠️  Не удалось выполнить seed-data.sql, используем минимальный набор пользователей:', seedError.message || seedError);
+      await createTestUsers(client);
+    }
 
-    console.log('✅ Seed данные загружены');
+    console.log(seededViaFile ? '✅ Seed данные загружены' : '✅ Базовые пользователи созданы');
   } catch (error) {
     console.error('❌ Ошибка при загрузке seed данных:', error);
     throw error;
@@ -106,9 +113,7 @@ export async function seedTestData(): Promise<void> {
  * Создание базовых тестовых пользователей
  */
 async function createTestUsers(client: any): Promise<void> {
-  // Хэш для пароля "Test123!" (bcrypt)
-  // В реальности нужно использовать bcryptjs.hashSync()
-  const passwordHash = '$2a$10$5PXxKxF.cPXnGN7d1x5pQ.DGj5kWh8wVvKx5JJK8MJ5kFh1x5pQ.D';
+  const passwordHash = await bcrypt.hash('Test123!', 10);
 
   const users = [
     {
@@ -163,4 +168,3 @@ export async function getTableCount(tableName: string): Promise<number> {
   const rows = await executeSQL(`SELECT COUNT(*) FROM test.${tableName}`);
   return parseInt(rows[0].count);
 }
-

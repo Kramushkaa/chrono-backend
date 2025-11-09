@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 import { TestUser, TestPerson, TestAchievement, TestPeriod, TestList } from '../types';
 
 /**
@@ -16,7 +19,7 @@ let listCounter = 0;
 export function createTestUser(overrides?: Partial<TestUser>): TestUser {
   userCounter++;
   const timestamp = Date.now();
-  
+
   return {
     username: `testuser${userCounter}_${timestamp}`,
     email: `testuser${userCounter}_${timestamp}@test.com`,
@@ -46,15 +49,15 @@ export function createTestModerator(overrides?: Partial<TestUser>): TestUser {
 export function createTestPerson(overrides?: Partial<TestPerson>): TestPerson {
   personCounter++;
   const timestamp = Date.now();
-  
+
   const categories = ['scientists', 'politicians', 'writers', 'artists', 'entrepreneurs'];
   const countries = ['Россия', 'США', 'Германия', 'Великобритания', 'Франция'];
   const occupations = ['Учёный', 'Политик', 'Писатель', 'Художник', 'Предприниматель'];
-  
+
   const category = categories[personCounter % categories.length];
   const country = countries[personCounter % countries.length];
   const occupation = occupations[personCounter % occupations.length];
-  
+
   return {
     id: `test-person-${personCounter}-${timestamp}`,
     name: `Тестовая Личность ${personCounter}`,
@@ -74,7 +77,7 @@ export function createTestPerson(overrides?: Partial<TestPerson>): TestPerson {
  */
 export function createTestAchievement(overrides?: Partial<TestAchievement>): TestAchievement {
   achievementCounter++;
-  
+
   return {
     year: 1900 + (achievementCounter % 120),
     title: `Тестовое достижение ${achievementCounter}`,
@@ -88,9 +91,9 @@ export function createTestAchievement(overrides?: Partial<TestAchievement>): Tes
  */
 export function createTestPeriod(overrides?: Partial<TestPeriod>): TestPeriod {
   periodCounter++;
-  
-  const startYear = 1900 + (periodCounter * 5);
-  
+
+  const startYear = 1900 + periodCounter * 5;
+
   return {
     start_year: startYear,
     end_year: startYear + 5,
@@ -107,7 +110,7 @@ export function createTestPeriod(overrides?: Partial<TestPeriod>): TestPeriod {
 export function createTestList(overrides?: Partial<TestList>): TestList {
   listCounter++;
   const timestamp = Date.now();
-  
+
   return {
     title: `Тестовый список ${listCounter} ${timestamp}`,
     moderation_status: 'draft',
@@ -124,17 +127,15 @@ export function createPersonWithRelations(overrides?: {
   periodsCount?: number;
 }) {
   const person = createTestPerson(overrides?.person);
-  
-  const achievements = Array.from(
-    { length: overrides?.achievementsCount || 2 },
-    () => createTestAchievement({ person_id: person.id })
+
+  const achievements = Array.from({ length: overrides?.achievementsCount || 2 }, () =>
+    createTestAchievement({ person_id: person.id })
   );
-  
-  const periods = Array.from(
-    { length: overrides?.periodsCount || 2 },
-    () => createTestPeriod({ person_id: person.id })
+
+  const periods = Array.from({ length: overrides?.periodsCount || 2 }, () =>
+    createTestPeriod({ person_id: person.id })
   );
-  
+
   return { person, achievements, periods };
 }
 
@@ -148,4 +149,3 @@ export function resetCounters(): void {
   periodCounter = 0;
   listCounter = 0;
 }
-

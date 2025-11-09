@@ -1,5 +1,5 @@
 import { test as base, Page } from '@playwright/test';
-import { setupAuthenticatedUser } from '../helpers/auth-helper';
+import { setupAuthenticatedUser, DEFAULT_TEST_USER } from '../helpers/auth-helper';
 import { createTestUser, createTestAdmin, createTestModerator } from '../utils/test-data-factory';
 import { TestUser } from '../types';
 
@@ -31,7 +31,7 @@ export const test = base.extend<AuthFixtures>({
    * Fixture для обычного авторизованного пользователя
    */
   authenticatedPage: async ({ page }, use) => {
-    const user = createTestUser();
+    const user = DEFAULT_TEST_USER;
     const apiUrl = process.env.BACKEND_URL || 'http://localhost:3001';
     
     const result = await setupAuthenticatedUser(page, user, apiUrl);
@@ -127,4 +127,5 @@ export const test = base.extend<AuthFixtures>({
 });
 
 export { expect } from '@playwright/test';
+
 

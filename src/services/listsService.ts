@@ -1219,37 +1219,37 @@ export class ListsService extends BaseService {
       }
     } catch (e) {
       throw errors.badRequest('Некорректный код');
-    }
-
-    const listRow = await this.executeQuery(
-      'SELECT id, owner_user_id, title FROM lists WHERE id = $1',
-      [listId],
-      {
-        action: 'getSharedList_getList',
-        params: { listId, code },
       }
-    );
 
-    if (listRow.rowCount === 0) {
-      throw errors.notFound('Список не найден');
-    }
+      const listRow = await this.executeQuery(
+        'SELECT id, owner_user_id, title FROM lists WHERE id = $1',
+        [listId],
+        {
+          action: 'getSharedList_getList',
+          params: { listId, code },
+        }
+      );
 
-    const items = await this.executeQuery(
-      'SELECT id, list_id, item_type, person_id, achievement_id, period_id, position FROM list_items WHERE list_id = $1 ORDER BY position ASC, id ASC',
-      [listId],
-      {
-        action: 'getSharedList_getItems',
-        params: { listId, code },
+      if (listRow.rowCount === 0) {
+        throw errors.notFound('Список не найден');
       }
-    );
 
-    return {
+      const items = await this.executeQuery(
+        'SELECT id, list_id, item_type, person_id, achievement_id, period_id, position FROM list_items WHERE list_id = $1 ORDER BY position ASC, id ASC',
+        [listId],
+        {
+          action: 'getSharedList_getItems',
+          params: { listId, code },
+        }
+      );
+
+      return {
       id: listRow.rows[0].id,
-      list_id: listId,
-      owner_user_id: listRow.rows[0].owner_user_id,
-      title: listRow.rows[0].title,
-      items: items.rows,
-    };
+        list_id: listId,
+        owner_user_id: listRow.rows[0].owner_user_id,
+        title: listRow.rows[0].title,
+        items: items.rows,
+      };
   }
 
   /**

@@ -195,7 +195,7 @@ test.describe('Visual Regression @visual', () => {
     await loginPage.goto();
     
     // Вводим неправильные данные
-    await loginPage.login({ email: 'wrong@test.com', password: 'wrong' });
+    await loginPage.login('wrong@test.com', 'wrong');
     await page.waitForTimeout(500);
 
     await createBaselineSnapshot(page, {
@@ -363,4 +363,5 @@ test.describe('Visual Regression @visual', () => {
     });
   });
 });
+
 

@@ -573,3 +573,4 @@ jobs:
 
 Для внедрения скопируйте workflow файл в `.github/workflows/e2e.yml` и настройте secrets.
 
+

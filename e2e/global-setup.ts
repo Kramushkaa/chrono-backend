@@ -1,7 +1,9 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 import { chromium, FullConfig } from '@playwright/test';
 import { resetDatabase, seedTestData } from './utils/db-reset';
 import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Global setup для E2E тестов

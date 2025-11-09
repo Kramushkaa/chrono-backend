@@ -63,3 +63,4 @@ ON CONFLICT DO NOTHING;
 -- const hash = bcrypt.hashSync('Test123!', 10);
 -- console.log(hash);
 
+

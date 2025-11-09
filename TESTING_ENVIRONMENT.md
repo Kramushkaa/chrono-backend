@@ -286,3 +286,4 @@ GROUP BY schemaname;
 3. Проверьте логи сервера на наличие SQL ошибок
 4. Проверьте документацию PostgreSQL по схемам: https://www.postgresql.org/docs/current/ddl-schemas.html
 
+

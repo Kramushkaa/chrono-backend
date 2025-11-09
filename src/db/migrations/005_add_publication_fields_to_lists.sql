@@ -21,3 +21,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS lists_public_slug_unique
   WHERE public_slug IS NOT NULL;
 
 
+

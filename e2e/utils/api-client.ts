@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 import { getAuthHeaders } from '../helpers/auth-helper';
 import { TestPerson, TestAchievement, TestPeriod, TestList, TestListItem } from '../types';
 

@@ -6,6 +6,11 @@ import { UserCredentials, AuthTokens, TestUser } from '../types';
  */
 
 const DEFAULT_API_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+export const DEFAULT_TEST_USER: TestUser = {
+  username: 'testuser',
+  email: 'testuser@test.com',
+  password: 'Test123!'
+};
 
 /**
  * Регистрация нового пользователя через API
@@ -91,11 +96,18 @@ export function getAuthHeaders(accessToken: string): Record<string, string> {
  * Внедрение токенов авторизации в браузер (localStorage)
  * Это позволяет обойти UI логин и сразу начать с авторизованного состояния
  */
-export async function injectAuthState(page: Page, tokens: AuthTokens): Promise<void> {
-  await page.addInitScript((tokens) => {
-    localStorage.setItem('accessToken', tokens.accessToken);
-    localStorage.setItem('refreshToken', tokens.refreshToken);
-  }, tokens);
+export async function injectAuthState(page: Page, tokens: AuthTokens, user?: any): Promise<void> {
+  await page.addInitScript((payload) => {
+    const authState = {
+      user: payload.user ?? null,
+      accessToken: payload.tokens.accessToken,
+      refreshToken: payload.tokens.refreshToken,
+    };
+    localStorage.setItem('auth', JSON.stringify(authState));
+    localStorage.setItem('auth_version', 'v2-vite');
+    localStorage.setItem('accessToken', payload.tokens.accessToken);
+    localStorage.setItem('refreshToken', payload.tokens.refreshToken);
+  }, { tokens, user });
 }
 
 /**
@@ -106,6 +118,8 @@ export async function clearAuthState(page: Page): Promise<void> {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('auth');
+    localStorage.removeItem('auth_version');
   });
 }
 
@@ -118,27 +132,37 @@ export async function setupAuthenticatedUser(
   user: TestUser,
   apiUrl: string = DEFAULT_API_URL
 ): Promise<{ success: boolean; user?: any; error?: string }> {
+  const targetUser = user ?? DEFAULT_TEST_USER;
+
+  // Пытаемся залогиниться сразу, если пользователь уже существует
+  const initialLoginAttempt = await loginUser(targetUser, apiUrl);
+  if (initialLoginAttempt.success && initialLoginAttempt.tokens) {
+    await injectAuthState(page, initialLoginAttempt.tokens, initialLoginAttempt.user);
+    return { success: true, user: initialLoginAttempt.user };
+  }
+
   // 1. Регистрируем пользователя
-  const registerResult = await registerUser(user, apiUrl);
+  const registerResult = await registerUser(targetUser, apiUrl);
   
   if (!registerResult.success) {
-    // Если пользователь уже существует, пробуем просто залогиниться
-    if (registerResult.error?.includes('already exists') || registerResult.error?.includes('уже существует')) {
-      // Продолжаем с логином
-    } else {
+    const errorMessage = registerResult.error || '';
+    const isAlreadyExists = errorMessage.includes('already exists') || errorMessage.includes('уже существует');
+    const isRateLimited = errorMessage.includes('Too many requests') || errorMessage.includes('Слишком много запросов');
+
+    if (!isAlreadyExists && !isRateLimited) {
       return registerResult;
     }
   }
 
   // 2. Логинимся
-  const loginResult = await loginUser(user, apiUrl);
+  const loginResult = await loginUser(targetUser, apiUrl);
   
   if (!loginResult.success || !loginResult.tokens) {
     return { success: false, error: loginResult.error || 'Login failed' };
   }
 
   // 3. Внедряем токены в браузер
-  await injectAuthState(page, loginResult.tokens);
+  await injectAuthState(page, loginResult.tokens, loginResult.user);
 
   return { success: true, user: loginResult.user };
 }
@@ -223,4 +247,5 @@ export async function logoutUser(
     return { success: false, error: (error as Error).message };
   }
 }
+
 
