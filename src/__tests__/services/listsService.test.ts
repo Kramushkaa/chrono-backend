@@ -502,4 +502,231 @@ describe('ListsService', () => {
       );
     });
   });
+
+  describe('getPublicLists', () => {
+    it('should return published lists with item counts', async () => {
+      const listRows = [
+        {
+          id: 1,
+          title: 'Public List 1',
+          public_description: 'Desc 1',
+          public_slug: 'list-1',
+          published_at: new Date(),
+          owner_user_id: 1,
+          owner_full_name: 'John Doe',
+          owner_username: 'john',
+          created_at: new Date(),
+          updated_at: new Date(),
+          moderation_status: 'published',
+          moderation_requested_at: null,
+          moderated_by: 1,
+          moderated_at: new Date(),
+          moderation_comment: null,
+          owner_email: null,
+        },
+      ];
+
+      const countRows = [{ list_id: 1, total: 5, persons: 3, achievements: 2, periods: 0 }];
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ cnt: 10 }])) // total count
+        .mockResolvedValueOnce(createQueryResult(listRows)) // lists
+        .mockResolvedValueOnce(createQueryResult(countRows)); // item counts
+
+      const result = await listsService.getPublicLists(10, 0);
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(10);
+      expect(result.data[0].items_count).toBe(5);
+      expect(result.data[0].persons_count).toBe(3);
+    });
+
+    it('should return empty array when no published lists', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ cnt: 0 }]))
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([]));
+
+      const result = await listsService.getPublicLists(10, 0);
+
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+  });
+
+  describe('getPublicList', () => {
+    it('should return published list by slug', async () => {
+      const listRow = {
+        id: 1,
+        title: 'Public List',
+        public_description: 'Description',
+        public_slug: 'list-1',
+        published_at: new Date(),
+        owner_user_id: 1,
+        owner_full_name: 'John',
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([listRow])) // list
+        .mockResolvedValueOnce(createQueryResult([])); // items
+
+      const result = await listsService.getPublicList('list-1');
+
+      expect(result.id).toBe(1);
+      expect(result.title).toBe('Public List');
+      expect(result.items).toBeDefined();
+    });
+
+    it('should return published list by numeric ID', async () => {
+      const listRow = {
+        id: 1,
+        title: 'Public List',
+        public_description: 'Description',
+        public_slug: 'list-1',
+        published_at: new Date(),
+        owner_user_id: 1,
+        owner_full_name: 'John',
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([listRow]))
+        .mockResolvedValueOnce(createQueryResult([]));
+
+      const result = await listsService.getPublicList('1');
+
+      expect(result.id).toBe(1);
+    });
+
+    it('should throw error if list not found', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([]));
+
+      await expect(listsService.getPublicList('non-existent')).rejects.toThrow(
+        'Публичный список не найден'
+      );
+    });
+  });
+
+  describe('deleteListItem', () => {
+    it('should delete item from list', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ id: 1 }])) // ownership check
+        .mockResolvedValueOnce(createQueryResult([])); // delete
+
+      await listsService.deleteListItem(1, 10, 1);
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        'DELETE FROM list_items WHERE id = $1 AND list_id = $2',
+        [10, 1]
+      );
+    });
+
+    it('should throw error if user is not owner', async () => {
+      mockPool.query.mockResolvedValueOnce(createQueryResult([])); // No ownership
+
+      await expect(listsService.deleteListItem(1, 10, 2)).rejects.toThrow(
+        'Нет прав на удаление элемента из списка'
+      );
+    });
+  });
+
+  describe('getSharedList', () => {
+    it('should return list data for valid share code', async () => {
+      // Create share code
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([{ owner_user_id: 1, title: 'Shared List' }])
+      );
+
+      const code = await listsService.shareList(1, 1);
+
+      mockPool.query.mockClear();
+
+      // Get shared list
+      mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 1, title: 'Shared List' }]));
+
+      const result = await listsService.getSharedList(code);
+
+      expect(result.id).toBe(1);
+      expect(result.title).toBe('Shared List');
+    });
+
+    it('should throw error for invalid share code', async () => {
+      await expect(listsService.getSharedList('invalid')).rejects.toThrow('Некорректный код');
+    });
+
+    it('should throw error if shared list not found', async () => {
+      // Create valid code for non-existent list
+      mockPool.query.mockResolvedValueOnce(
+        createQueryResult([{ owner_user_id: 1, title: 'Test' }])
+      );
+
+      const code = await listsService.shareList(1, 1);
+
+      mockPool.query.mockClear();
+
+      mockPool.query.mockResolvedValueOnce(createQueryResult([])); // list not found
+
+      await expect(listsService.getSharedList(code)).rejects.toThrow('Список не найден');
+    });
+  });
+
+  describe('getModerationQueue', () => {
+    it('should return pending lists with pagination', async () => {
+      const listRows = [
+        {
+          id: 1,
+          title: 'Pending List',
+          public_description: 'Desc',
+          moderation_status: 'pending',
+          owner_user_id: 1,
+          owner_email: 'user@test.com',
+          owner_full_name: 'User',
+          owner_username: 'user1',
+          moderation_requested_at: new Date(),
+          created_at: new Date(),
+          updated_at: new Date(),
+          published_at: null,
+          moderated_by: null,
+          moderated_at: null,
+          moderation_comment: null,
+          public_slug: null,
+        },
+      ];
+
+      const countRows = [{ list_id: 1, total: 3, persons: 2, achievements: 1, periods: 0 }];
+
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ cnt: 5 }])) // total count
+        .mockResolvedValueOnce(createQueryResult(listRows)) // lists
+        .mockResolvedValueOnce(createQueryResult(countRows)); // counts
+
+      const result = await listsService.getModerationQueue('pending', 10, 0);
+
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(5);
+      expect(result.data[0].items_count).toBe(3);
+    });
+
+    it('should return empty array when no pending lists', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ cnt: 0 }]))
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([]));
+
+      const result = await listsService.getModerationQueue('pending', 10, 0);
+
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+
+    it('should return all lists when status is null', async () => {
+      mockPool.query
+        .mockResolvedValueOnce(createQueryResult([{ cnt: 2 }]))
+        .mockResolvedValueOnce(createQueryResult([]))
+        .mockResolvedValueOnce(createQueryResult([]));
+
+      const result = await listsService.getModerationQueue(null, 10, 0);
+
+      expect(result.total).toBe(2);
+    });
+  });
 });

@@ -21,6 +21,7 @@ export const config = {
     name: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
+    schema: process.env.DB_SCHEMA || 'public',
     ssl: process.env.DB_SSL === 'true',
     sslRejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', // По умолчанию true для безопасности
     pool: {
@@ -129,6 +130,7 @@ export interface DatabaseConfig {
   name: string;
   user: string;
   password: string;
+  schema: string;
   ssl: boolean;
   sslRejectUnauthorized: boolean;
   pool: DatabasePoolConfig;

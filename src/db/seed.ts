@@ -4,6 +4,8 @@ import { logger } from '../utils/logger';
 
 dotenv.config();
 
+const schema = process.env.DB_SCHEMA || 'public';
+
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
@@ -11,7 +13,10 @@ const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'password',
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : (undefined as any),
+  options: `-c search_path=${schema},public`,
 });
+
+logger.info(`🌱 Seeding database with schema: ${schema}`);
 
 interface Person {
   id: string;
@@ -1254,17 +1259,14 @@ export async function seedDatabase() {
     for (const person of sampleData) {
       // Вставка Личности без legacy полей достижений
       await client.query(
-        `INSERT INTO persons (id, name, birth_year, death_year, reign_start, reign_end, category, country, description, image_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           person.id,
           person.name,
           person.birthYear,
           person.deathYear,
-          person.reignStart || null,
-          person.reignEnd || null,
           person.category,
-          person.country,
           person.description,
           person.imageUrl || null,
         ]

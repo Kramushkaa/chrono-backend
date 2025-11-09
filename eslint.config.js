@@ -14,9 +14,11 @@ module.exports = [
       '*.config.js',
       '*.min.js',
       'src/types/*.d.ts', // Type definition files
+      'e2e-report/**',
+      'test-results/**',
     ],
   },
-  // Main config for TypeScript files
+  // Main config for TypeScript files (src/)
   {
     files: ['src/**/*.ts'],
     languageOptions: {
@@ -80,6 +82,63 @@ module.exports = [
       'no-var': 'error',
       // SQL injection protection: warn about template literals in strings
       'no-template-curly-in-string': 'error',
+    },
+  },
+  // E2E tests config
+  {
+    files: ['e2e/**/*.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 2024,
+        sourceType: 'module',
+        project: './tsconfig.json',
+      },
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+        exports: 'writable',
+        Buffer: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+      prettier: prettierPlugin,
+    },
+    rules: {
+      ...tsPlugin.configs['recommended'].rules,
+      ...prettierConfig.rules,
+      'prettier/prettier': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      // E2E tests specific
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      'no-console': 'off', // Console allowed in tests for debugging
+      'prefer-const': 'warn',
+      'no-var': 'error',
     },
   },
 ];

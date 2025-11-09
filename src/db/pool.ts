@@ -19,6 +19,7 @@ export function createPool(): Pool {
     idleTimeoutMillis: config.database.pool.idleTimeoutMillis,
     connectionTimeoutMillis: config.database.pool.connectionTimeoutMillis,
     ssl: sslConfig,
+    options: `-c search_path=${config.database.schema},public`,
   };
 
   return new Pool(poolConfig);
