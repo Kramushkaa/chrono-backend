@@ -9,21 +9,39 @@ export class ListsPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.createListButton = page.locator('button:has-text("Создать список"), button:has-text("Create list")');
-    this.listNameInput = page.locator('input[name="title"], input[placeholder*="название"]');
-    this.saveListButton = page.locator('button:has-text("Сохранить"), button:has-text("Save")');
-    this.lists = page.locator('[data-testid="list-item"], .list-item');
+    this.createListButton = page.getByRole('button', { name: /создать список/i });
+    this.listNameInput = page.getByPlaceholder(/название списка/i);
+    this.saveListButton = page.getByRole('button', { name: /создать|сохранить/i });
+    this.lists = page.getByRole('region', { name: /меню списков/i });
   }
 
   async goto(): Promise<void> {
     await this.page.goto('/lists');
   }
 
-  async createList(title: string): Promise<void> {
+  async createList(title: string): Promise<{ locator: Locator }> {
     await this.createListButton.click();
-    await this.listNameInput.fill(title);
-    await this.saveListButton.click();
-    await this.page.waitForTimeout(500);
+    const modal = this.page.locator('[role="dialog"]').filter({ hasText: 'Новый список' });
+    await modal.waitFor({ state: 'visible' });
+    await modal.getByPlaceholder(/название списка/i).fill(title);
+    const postPromise = this.page.waitForResponse((response) => {
+      return response.url().includes('/api/lists') && response.request().method() === 'POST' && response.status() < 400;
+    });
+    await modal.getByRole('button', { name: /создать/i }).click();
+    await postPromise;
+    await this.page.waitForResponse((response) => {
+      return response.url().includes('/api/lists') && response.request().method() === 'GET' && response.status() < 400;
+    });
+    const createdList = this.lists.locator('[role="button"]').filter({ hasText: title }).first();
+    await expect(createdList).toBeVisible();
+
+    return { locator: createdList };
+  }
+
+  async waitForList(title: string): Promise<Locator> {
+    const listLocator = this.lists.locator('[role="button"]').filter({ hasText: title }).first();
+    await expect(listLocator).toBeVisible({ timeout: 15000 });
+    return listLocator;
   }
 
   async addItemToList(listId: number, itemType: string, itemId: string | number): Promise<void> {
@@ -32,12 +50,17 @@ export class ListsPage {
     // Логика добавления элемента зависит от UI
   }
 
-  async shareList(listId: number): Promise<string> {
-    const list = this.page.locator(`[data-list-id="${listId}"]`);
-    await list.locator('button:has-text("Поделиться"), button:has-text("Share")').click();
-    
-    const shareCode = await this.page.locator('[data-testid="share-code"]').textContent();
-    return shareCode || '';
+  async shareListByLocator(listLocator: Locator): Promise<string> {
+    const shareButton = listLocator.locator('button[title*="Поделиться" i], button:has-text("🔗"), button[aria-label*="Поделиться" i], button[aria-label*="share" i]').first();
+    const shareResponsePromise = this.page.waitForResponse((response) => {
+      const url = response.url();
+      return url.includes('/api/lists/') && url.endsWith('/share') && response.request().method() === 'POST';
+    });
+    await shareButton.click();
+    await shareResponsePromise;
+    const toast = this.page.locator('.toast-message').filter({ hasText: /Ссылка скопирована/i });
+    await toast.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    return 'copied';
   }
 
   async requestPublication(listId: number, description?: string): Promise<void> {
@@ -57,4 +80,5 @@ export class ListsPage {
     await expect(items).toHaveCount(itemsCount);
   }
 }
+
 

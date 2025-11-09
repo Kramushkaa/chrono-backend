@@ -15,6 +15,27 @@ export class PublicListsPage {
     await this.page.goto('/lists/public');
   }
 
+  async waitForLoaded(): Promise<void> {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await this.page.waitForLoadState('networkidle');
+      const mainText = (await this.page.locator('main').innerText().catch(() => '')) || '';
+      if (!/Слишком много запросов/i.test(mainText)) {
+        return;
+      }
+
+      const retryButton = this.page.getByRole('button', { name: /Попробовать снова/i });
+      if (await retryButton.isVisible()) {
+        await retryButton.click();
+        await this.page.waitForTimeout(500);
+        continue;
+      }
+
+      await this.page.waitForTimeout(1000);
+    }
+
+    throw new Error('Public lists did not load due to rate limiting');
+  }
+
   async expectPublicList(slug: string): Promise<void> {
     await this.page.goto(`/lists/public/${slug}`);
     await expect(this.page.locator('h1, h2')).toBeVisible();
@@ -26,4 +47,5 @@ export class PublicListsPage {
     await this.page.waitForTimeout(500);
   }
 }
+
 
