@@ -1,66 +1,56 @@
 -- Seed данные для E2E тестов Хронониндзя
--- Используем тестовую схему (test)
+-- Используем схему test (search_path=test,public)
 
--- Тестовые пользователи
--- Пароль для всех: Test123!
--- Хэш сгенерирован через bcryptjs.hashSync('Test123!', 10)
-INSERT INTO test.users (username, email, password_hash, role, is_active, email_verified, created_at)
-VALUES 
-  ('testuser', 'testuser@test.com', '$2a$10$YourHashHere', 'user', true, true, NOW()),
-  ('testmoderator', 'testmoderator@test.com', '$2a$10$YourHashHere', 'moderator', true, true, NOW()),
-  ('testadmin', 'testadmin@test.com', '$2a$10$YourHashHere', 'admin', true, true, NOW())
+-- Пользователи (пароль для всех: Test123!)
+INSERT INTO test.users (email, password_hash, username, full_name, role, is_active, email_verified)
+VALUES
+  ('testuser@test.com', '$2b$10$U7L.QhbqTY9nQopJ1nxateVUS3HHMCGnZVAS910lfQ98uOBMjn6gq', 'testuser', 'Тестовый пользователь', 'user', true, true),
+  ('testmoderator@test.com', '$2b$10$U7L.QhbqTY9nQopJ1nxateVUS3HHMCGnZVAS910lfQ98uOBMjn6gq', 'testmoderator', 'Тестовый модератор', 'moderator', true, true),
+  ('testadmin@test.com', '$2b$10$U7L.QhbqTY9nQopJ1nxateVUS3HHMCGnZVAS910lfQ98uOBMjn6gq', 'testadmin', 'Тестовый администратор', 'admin', true, true)
 ON CONFLICT (email) DO NOTHING;
 
--- Тестовые личности (разные категории и страны)
-INSERT INTO test.persons (id, name, birth_year, death_year, category, country, occupation, bio, wiki_link, image_url, moderation_status, created_at)
-VALUES 
-  ('test-person-1', 'Альберт Эйнштейн', 1879, 1955, 'scientists', 'Германия', 'Физик-теоретик', 'Автор теории относительности', 'https://ru.wikipedia.org/wiki/Эйнштейн,_Альберт', NULL, 'published', NOW()),
-  ('test-person-2', 'Мария Кюри', 1867, 1934, 'scientists', 'Польша', 'Физик, химик', 'Первая женщина-лауреат Нобелевской премии', 'https://ru.wikipedia.org/wiki/Склодовская-Кюри,_Мария', NULL, 'published', NOW()),
-  ('test-person-3', 'Уинстон Черчилль', 1874, 1965, 'politicians', 'Великобритания', 'Политик, премьер-министр', 'Премьер-министр Великобритании во время Второй мировой войны', 'https://ru.wikipedia.org/wiki/Черчилль,_Уинстон', NULL, 'published', NOW()),
-  ('test-person-4', 'Лев Толстой', 1828, 1910, 'writers', 'Россия', 'Писатель, философ', 'Автор романов "Война и мир" и "Анна Каренина"', 'https://ru.wikipedia.org/wiki/Толстой,_Лев_Николаевич', NULL, 'published', NOW()),
-  ('test-person-5', 'Фрида Кало', 1907, 1954, 'artists', 'Мексика', 'Художник', 'Мексиканская художница, автопортреты', 'https://ru.wikipedia.org/wiki/Кало,_Фрида', NULL, 'published', NOW()),
-  ('test-person-6', 'Стив Джобс', 1955, 2011, 'entrepreneurs', 'США', 'Предприниматель', 'Сооснователь Apple Inc.', 'https://ru.wikipedia.org/wiki/Джобс,_Стив', NULL, 'published', NOW()),
-  ('test-person-7', 'Никола Тесла', 1856, 1943, 'scientists', 'Сербия', 'Изобретатель, инженер', 'Изобретатель в области электротехники', 'https://ru.wikipedia.org/wiki/Тесла,_Никола', NULL, 'published', NOW()),
-  ('test-person-8', 'Клеопатра', -69, -30, 'politicians', 'Египет', 'Фараон', 'Последняя царица Египта', 'https://ru.wikipedia.org/wiki/Клеопатра', NULL, 'published', NOW()),
-  ('test-person-9', 'Чарльз Дарвин', 1809, 1882, 'scientists', 'Великобритания', 'Натуралист', 'Автор теории эволюции', 'https://ru.wikipedia.org/wiki/Дарвин,_Чарльз', NULL, 'published', NOW()),
-  ('test-person-10', 'Махатма Ганди', 1869, 1948, 'politicians', 'Индия', 'Политик, философ', 'Лидер индийского движения за независимость', 'https://ru.wikipedia.org/wiki/Махатма_Ганди', NULL, 'published', NOW()),
-  -- Draft личность для тестов модерации
-  ('test-person-draft', 'Тестовая Личность', 1900, 2000, 'scientists', 'Россия', 'Тестер', 'Тестовое описание', NULL, NULL, 'draft', NOW())
+-- Справочник стран
+INSERT INTO test.countries (id, name)
+VALUES
+  (1, 'Россия'),
+  (2, 'США'),
+  (3, 'Германия'),
+  (4, 'Великобритания'),
+  (5, 'Франция'),
+  (6, 'Польша'),
+  (7, 'Мексика'),
+  (8, 'Сербия'),
+  (9, 'Египет'),
+  (10, 'Индия')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+-- Личности
+INSERT INTO test.persons (id, name, birth_year, death_year, category, description, wiki_link, image_url, status, created_by)
+VALUES
+  ('test-person-1', 'Альберт Эйнштейн', 1879, 1955, 'scientists', 'Теоретический физик, автор теории относительности.', 'https://ru.wikipedia.org/wiki/Эйнштейн,_Альберт', NULL, 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-2', 'Мария Кюри', 1867, 1934, 'scientists', 'Физик и химик, дважды лауреат Нобелевской премии.', 'https://ru.wikipedia.org/wiki/Склодовская-Кюри,_Мария', NULL, 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-3', 'Уинстон Черчилль', 1874, 1965, 'politicians', 'Премьер-министр Великобритании в годы Второй мировой войны.', 'https://ru.wikipedia.org/wiki/Черчилль,_Уинстон', NULL, 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-4', 'Лев Толстой', 1828, 1910, 'writers', 'Русский писатель, автор «Войны и мира» и «Анны Карениной».', 'https://ru.wikipedia.org/wiki/Толстой,_Лев_Николаевич', NULL, 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-draft', 'Тестовая личность', 1900, 1990, 'scientists', 'Черновик личности для сценариев модерации.', NULL, NULL, 'draft', (SELECT id FROM test.users WHERE email = 'testuser@test.com'))
 ON CONFLICT (id) DO NOTHING;
 
--- Тестовые достижения
-INSERT INTO test.achievements (person_id, year, title, description, created_at)
-VALUES 
-  ('test-person-1', 1905, 'Специальная теория относительности', 'Публикация работы о специальной теории относительности', NOW()),
-  ('test-person-1', 1915, 'Общая теория относительности', 'Завершение общей теории относительности', NOW()),
-  ('test-person-1', 1921, 'Нобелевская премия по физике', 'Награда за объяснение фотоэлектрического эффекта', NOW()),
-  ('test-person-2', 1903, 'Нобелевская премия по физике', 'Совместно с мужем за исследование радиации', NOW()),
-  ('test-person-2', 1911, 'Нобелевская премия по химии', 'За открытие радия и полония', NOW()),
-  ('test-person-3', 1953, 'Нобелевская премия по литературе', 'За мастерство исторического и биографического описания', NOW()),
-  ('test-person-4', 1869, 'Война и мир', 'Публикация романа "Война и мир"', NOW()),
-  ('test-person-4', 1877, 'Анна Каренина', 'Публикация романа "Анна Каренина"', NOW()),
-  ('test-person-6', 1976, 'Основание Apple', 'Сооснование компании Apple Computer', NOW()),
-  ('test-person-6', 2007, 'Презентация iPhone', 'Представление первого iPhone', NOW())
+-- Достижения
+INSERT INTO test.achievements (person_id, year, description, wikipedia_url, status, created_by)
+VALUES
+  ('test-person-1', 1905, 'Публикация специальной теории относительности.', 'https://ru.wikipedia.org/wiki/Специальная_теория_относительности', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-1', 1915, 'Завершение общей теории относительности.', 'https://ru.wikipedia.org/wiki/Общая_теория_относительности', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-2', 1903, 'Нобелевская премия по физике.', 'https://ru.wikipedia.org/wiki/Нобелевская_премия_по_физике', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-4', 1869, 'Публикация романа «Война и мир».', 'https://ru.wikipedia.org/wiki/Война_и_мир', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com'))
 ON CONFLICT DO NOTHING;
 
--- Тестовые периоды жизни
-INSERT INTO test.life_periods (person_id, start_year, end_year, title, description, location, created_at)
-VALUES 
-  ('test-person-1', 1879, 1894, 'Детство', 'Ранние годы в Германии', 'Ульм, Германия', NOW()),
-  ('test-person-1', 1896, 1900, 'Обучение в Цюрихе', 'Учёба в Политехникуме', 'Цюрих, Швейцария', NOW()),
-  ('test-person-1', 1902, 1909, 'Работа в патентном бюро', 'Служащий патентного бюро', 'Берн, Швейцария', NOW()),
-  ('test-person-1', 1914, 1933, 'Профессор в Берлине', 'Работа в университете', 'Берлин, Германия', NOW()),
-  ('test-person-2', 1891, 1894, 'Обучение в Сорбонне', 'Изучение физики и математики', 'Париж, Франция', NOW()),
-  ('test-person-2', 1895, 1906, 'Научные исследования', 'Работа над радиоактивностью', 'Париж, Франция', NOW()),
-  ('test-person-4', 1828, 1844, 'Детство', 'Ранние годы в Ясной Поляне', 'Ясная Поляна, Россия', NOW()),
-  ('test-person-4', 1851, 1853, 'Служба на Кавказе', 'Военная служба', 'Кавказ, Россия', NOW()),
-  ('test-person-4', 1862, 1910, 'Писательская деятельность', 'Период создания главных произведений', 'Ясная Поляна, Россия', NOW())
+-- Периоды жизни по странам
+INSERT INTO test.periods (person_id, start_year, end_year, period_type, country_id, comment, status, created_by)
+VALUES
+  ('test-person-1', 1879, 1895, 'life', (SELECT id FROM test.countries WHERE name = 'Германия'), 'Детство и учеба в Германии.', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-1', 1933, 1955, 'life', (SELECT id FROM test.countries WHERE name = 'США'), 'Работа и жизнь в США.', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-2', 1891, 1934, 'life', (SELECT id FROM test.countries WHERE name = 'Франция'), 'Научная деятельность в Париже.', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-3', 1940, 1945, 'life', (SELECT id FROM test.countries WHERE name = 'Великобритания'), 'Руководство Великобританией во время войны.', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com')),
+  ('test-person-4', 1870, 1910, 'life', (SELECT id FROM test.countries WHERE name = 'Россия'), 'Творчество и жизнь в Ясной Поляне.', 'approved', (SELECT id FROM test.users WHERE email = 'testadmin@test.com'))
 ON CONFLICT DO NOTHING;
-
--- Примечание: В реальном использовании нужно заменить '$2a$10$YourHashHere' на реальный хэш
--- Можно сгенерировать через Node.js:
--- const bcrypt = require('bcryptjs');
--- const hash = bcrypt.hashSync('Test123!', 10);
--- console.log(hash);
 
 

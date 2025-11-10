@@ -32,19 +32,19 @@ const stubPersonSearchResponse = {
 };
 
 test.describe('Управление контентом', () => {
-  test.beforeEach(async ({ authenticatedPage }) => {
+  test.beforeEach(async ({ moderatorPage }) => {
     const loginResult = await loginUser(DEFAULT_TEST_USER);
     if (!loginResult.success || !loginResult.tokens) {
       throw new Error('Не удалось получить токен для подготовительного запроса');
     }
 
     const personPayload = {
-      id: `e2e-person-${Date.now()}`,
-      name: `E2E Личность ${Date.now()}`,
+      id: `manage-db-base-${Date.now()}`,
+      name: `Manage DB Base ${Date.now()}`,
       birthYear: 1900,
       deathYear: 1950,
       category: 'scientists',
-      description: 'E2E описание',
+      description: 'Seed person для manage-db',
       imageUrl: null,
       wikiLink: null,
       lifePeriods: [],
@@ -60,50 +60,37 @@ test.describe('Управление контентом', () => {
       body: JSON.stringify(personPayload),
     });
 
-    const personOption = { value: personPayload.id, label: personPayload.name };
+    await moderatorPage.addInitScript(() => {
+      const personOptions = (window as any).__E2E_PERSON_OPTIONS__ ?? [];
+      const defaultOption = (window as any).__E2E_DEFAULT_PERSON__ ?? null;
 
-    await authenticatedPage.addInitScript(({ option }) => {
-      (window as any).__E2E_PERSON_OPTIONS__ = [option];
-      (window as any).__E2E_DEFAULT_PERSON__ = option.value;
-    }, { option: personOption });
+      if (!personOptions.some((item: any) => item.value === personPayload.id)) {
+        personOptions.push({ value: personPayload.id, label: personPayload.name });
+      }
 
-    await authenticatedPage.route('**/api/categories', async (route) => {
+      (window as any).__E2E_PERSON_OPTIONS__ = personOptions;
+      (window as any).__E2E_DEFAULT_PERSON__ = defaultOption ?? personPayload.id;
+    });
+
+    await moderatorPage.route('**/api/categories', async route => {
+      await fulfillJson(route, stubCategoriesResponse);
+    });
+
+    await moderatorPage.route('**/api/countries**', async route => {
       if (route.request().method() !== 'GET') {
         await route.continue();
         return;
       }
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(stubCategoriesResponse),
-      });
-    });
-
-    await authenticatedPage.route('**/api/countries', async (route) => {
-      if (route.request().method() !== 'GET') {
-        await route.continue();
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/api/countries/options')) {
+        await fulfillJson(route, stubCountryOptionsResponse);
         return;
       }
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(stubCountriesResponse),
-      });
+
+      await fulfillJson(route, stubCountriesResponse);
     });
 
-    await authenticatedPage.route('**/api/countries/options', async (route) => {
-      if (route.request().method() !== 'GET') {
-        await route.continue();
-        return;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(stubCountryOptionsResponse),
-      });
-    });
-
-    await authenticatedPage.route('**/api/persons**', async (route) => {
+    await moderatorPage.route('**/api/persons**', async (route) => {
       if (route.request().method() !== 'GET') {
         await route.continue();
         return;
@@ -128,27 +115,27 @@ test.describe('Управление контентом', () => {
     });
   });
 
-  test('создание новой личности @regression @manage', async ({ authenticatedPage }) => {
-    const managePage = new ManagePage(authenticatedPage);
+  test('создание новой личности @regression @manage', async ({ moderatorPage }) => {
+    const managePage = new ManagePage(moderatorPage);
     const person = createTestPerson();
-    
+
     await managePage.goto();
     await managePage.createPerson(person);
     await managePage.expectPersonCreated();
   });
 
-  test('создание достижения @regression @manage', async ({ authenticatedPage }) => {
-    const managePage = new ManagePage(authenticatedPage);
+  test('создание достижения @regression @manage', async ({ moderatorPage }) => {
+    const managePage = new ManagePage(moderatorPage);
     const achievement = createTestAchievement();
-    
+
     await managePage.goto();
     await managePage.createAchievement(achievement);
   });
 
-  test('создание периода жизни @regression @manage', async ({ authenticatedPage }) => {
-    const managePage = new ManagePage(authenticatedPage);
+  test('создание периода жизни @regression @manage', async ({ moderatorPage }) => {
+    const managePage = new ManagePage(moderatorPage);
     const period = createTestPeriod();
-    
+
     await managePage.goto();
     await managePage.createPeriod(period);
   });

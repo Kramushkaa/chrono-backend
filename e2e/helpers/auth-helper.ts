@@ -1,4 +1,6 @@
 import { Page } from '@playwright/test';
+import bcrypt from 'bcryptjs';
+import { createTestPool } from '../utils/db-reset';
 import { UserCredentials, AuthTokens, TestUser } from '../types';
 
 /**
@@ -11,6 +13,50 @@ export const DEFAULT_TEST_USER: TestUser = {
   email: 'testuser@test.com',
   password: 'Test123!'
 };
+
+const PASSWORD_HASH_CACHE = new Map<string, string>();
+
+async function ensureTestUserInDb(user: TestUser): Promise<void> {
+  const pool = createTestPool();
+  const client = await pool.connect();
+
+  try {
+    const password = user.password ?? DEFAULT_TEST_USER.password;
+    let passwordHash = PASSWORD_HASH_CACHE.get(password);
+    if (!passwordHash) {
+      passwordHash = await bcrypt.hash(password, 10);
+      PASSWORD_HASH_CACHE.set(password, passwordHash);
+    }
+
+    await client.query(
+      `INSERT INTO test.users (email, password_hash, username, full_name, role, is_active, email_verified, created_at, updated_at,
+                               email_verification_token, email_verification_expires, password_reset_token, password_reset_expires)
+       VALUES ($1, $2, $3, $4, $5, true, true, NOW(), NOW(), NULL, NULL, NULL, NULL)
+       ON CONFLICT (email) DO UPDATE
+       SET password_hash = EXCLUDED.password_hash,
+           username = EXCLUDED.username,
+           full_name = EXCLUDED.full_name,
+           role = EXCLUDED.role,
+           is_active = true,
+           email_verified = true,
+           updated_at = NOW(),
+           email_verification_token = NULL,
+           email_verification_expires = NULL,
+           password_reset_token = NULL,
+           password_reset_expires = NULL`,
+      [
+        user.email,
+        passwordHash,
+        user.username ?? user.email,
+        user.username ?? user.email,
+        user.role ?? 'user',
+      ]
+    );
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
 
 /**
  * Регистрация нового пользователя через API
@@ -134,34 +180,14 @@ export async function setupAuthenticatedUser(
 ): Promise<{ success: boolean; user?: any; error?: string }> {
   const targetUser = user ?? DEFAULT_TEST_USER;
 
-  // Пытаемся залогиниться сразу, если пользователь уже существует
-  const initialLoginAttempt = await loginUser(targetUser, apiUrl);
-  if (initialLoginAttempt.success && initialLoginAttempt.tokens) {
-    await injectAuthState(page, initialLoginAttempt.tokens, initialLoginAttempt.user);
-    return { success: true, user: initialLoginAttempt.user };
-  }
+  await ensureTestUserInDb(targetUser);
 
-  // 1. Регистрируем пользователя
-  const registerResult = await registerUser(targetUser, apiUrl);
-  
-  if (!registerResult.success) {
-    const errorMessage = registerResult.error || '';
-    const isAlreadyExists = errorMessage.includes('already exists') || errorMessage.includes('уже существует');
-    const isRateLimited = errorMessage.includes('Too many requests') || errorMessage.includes('Слишком много запросов');
-
-    if (!isAlreadyExists && !isRateLimited) {
-      return registerResult;
-    }
-  }
-
-  // 2. Логинимся
   const loginResult = await loginUser(targetUser, apiUrl);
   
   if (!loginResult.success || !loginResult.tokens) {
     return { success: false, error: loginResult.error || 'Login failed' };
   }
 
-  // 3. Внедряем токены в браузер
   await injectAuthState(page, loginResult.tokens, loginResult.user);
 
   return { success: true, user: loginResult.user };
