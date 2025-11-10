@@ -567,8 +567,14 @@ describe('QuizController', () => {
           gamesPlayed: 5,
           averageScore: 75,
           bestScore: 95,
+          isCurrentUser: true,
         },
         totalPlayers: 100,
+        page: {
+          limit: 30,
+          offset: 0,
+          hasMore: false,
+        },
       });
 
       await quizController.getGlobalLeaderboard(
@@ -577,7 +583,7 @@ describe('QuizController', () => {
         mockNext
       );
 
-      expect(mockQuizService.getGlobalLeaderboard).toHaveBeenCalledWith(1);
+      expect(mockQuizService.getGlobalLeaderboard).toHaveBeenCalledWith(30, 0, 1);
       expect(mockResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
@@ -605,6 +611,11 @@ describe('QuizController', () => {
         ],
         userEntry: undefined,
         totalPlayers: 100,
+        page: {
+          limit: 30,
+          offset: 0,
+          hasMore: false,
+        },
       });
 
       await quizController.getGlobalLeaderboard(
@@ -613,7 +624,7 @@ describe('QuizController', () => {
         mockNext
       );
 
-      expect(mockQuizService.getGlobalLeaderboard).toHaveBeenCalledWith(undefined);
+      expect(mockQuizService.getGlobalLeaderboard).toHaveBeenCalledWith(30, 0, undefined);
       expect(mockResponse.json).toHaveBeenCalled();
     });
   });

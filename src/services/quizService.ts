@@ -866,12 +866,24 @@ export class QuizService extends BaseService {
   /**
    * Get global leaderboard (top 100 + user position)
    */
-  async getGlobalLeaderboard(userId?: number): Promise<{
+  async getGlobalLeaderboard(
+    limitParam = 30,
+    offsetParam = 0,
+    userId?: number
+  ): Promise<{
     topPlayers: GlobalLeaderboardEntry[];
-    userEntry?: GlobalLeaderboardEntry;
+    userEntry?: GlobalLeaderboardEntry & { isCurrentUser: true };
     totalPlayers: number;
+    page: {
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
   }> {
-    // Get top 100 players
+    const limit = Math.max(1, Math.min(limitParam, 100));
+    const offset = Math.max(0, offsetParam);
+
+    // Get aggregated players with pagination
     const topQuery = `
       WITH player_stats AS (
         SELECT 
@@ -885,18 +897,18 @@ export class QuizService extends BaseService {
         LEFT JOIN users u ON qa.user_id = u.id
         WHERE qa.user_id IS NOT NULL
         GROUP BY qa.user_id, u.username
-        ORDER BY total_rating DESC
-        LIMIT 100
       )
       SELECT 
         ROW_NUMBER() OVER (ORDER BY total_rating DESC) as rank,
-        *
+        player_stats.*
       FROM player_stats
+      ORDER BY total_rating DESC
+      LIMIT $1 OFFSET $2
     `;
 
-    const topResult = await this.executeQuery(topQuery, [], {
+    const topResult = await this.executeQuery(topQuery, [limit, offset], {
       action: 'getGlobalLeaderboard_topPlayers',
-      params: { userId },
+      params: { userId, limit, offset },
     });
 
     const topPlayers: GlobalLeaderboardEntry[] = topResult.rows.map(row => ({
@@ -923,7 +935,13 @@ export class QuizService extends BaseService {
 
     // Get user entry if userId provided and not in top 100
     let userEntry: GlobalLeaderboardEntry | undefined;
-    if (userId && !topPlayers.find(p => p.userId === userId)) {
+    const inCurrentPage = userId
+      ? topPlayers.find(p => p.userId === userId)
+      : undefined;
+
+    if (inCurrentPage) {
+      userEntry = inCurrentPage;
+    } else if (userId) {
       const userQuery = `
         WITH all_players AS (
           SELECT 
@@ -941,12 +959,12 @@ export class QuizService extends BaseService {
         ranked_players AS (
           SELECT 
             ROW_NUMBER() OVER (ORDER BY total_rating DESC) as rank,
-            *
+            all_players.*
           FROM all_players
         )
-        SELECT rank, user_id, username, full_name, total_attempts, total_correct_answers, 
-               total_questions, total_rating 
-        FROM ranked_players WHERE user_id = $1
+        SELECT rank, user_id, username, total_rating, games_played, average_score, best_score
+        FROM ranked_players
+        WHERE user_id = $1
       `;
       const userResult = await this.executeQuery(userQuery, [userId], {
         action: 'getGlobalLeaderboard_userEntry',
@@ -967,7 +985,20 @@ export class QuizService extends BaseService {
       }
     }
 
-    return { topPlayers, userEntry, totalPlayers };
+    const formattedUserEntry = userEntry
+      ? { ...userEntry, isCurrentUser: true as const }
+      : undefined;
+
+    return {
+      topPlayers,
+      userEntry: formattedUserEntry,
+      totalPlayers,
+      page: {
+        limit,
+        offset,
+        hasMore: offset + limit < totalPlayers,
+      },
+    };
   }
 
   /**

@@ -11,7 +11,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
  */
 
 // Создание connection pool для тестовой БД
-function createTestPool(): Pool {
+export function createTestPool(): Pool {
   const sslMode = (process.env.DB_SSL || '').toLowerCase();
   let ssl: boolean | { rejectUnauthorized: boolean } | undefined;
 

@@ -421,7 +421,7 @@ describe('QuizService', () => {
         .mockResolvedValueOnce(createQueryResult(topPlayersData))
         .mockResolvedValueOnce(createQueryResult([{ total: '150' }]));
 
-      const result = await quizService.getGlobalLeaderboard(undefined);
+      const result = await quizService.getGlobalLeaderboard();
 
       expect(result.topPlayers).toHaveLength(2);
       expect(result.topPlayers[0].rank).toBe(1);
@@ -429,6 +429,9 @@ describe('QuizService', () => {
       expect(result.topPlayers[1].rank).toBe(2);
       expect(result.totalPlayers).toBe(150);
       expect(result.userEntry).toBeUndefined();
+      expect(result.page.limit).toBe(30);
+      expect(result.page.offset).toBe(0);
+      expect(result.page.hasMore).toBe(true);
     });
 
     it('should include user entry if not in top 100', async () => {
@@ -461,11 +464,12 @@ describe('QuizService', () => {
           createQueryResult([{ ...userEntryData, rank: userEntryData.user_rank }])
         );
 
-      const result = await quizService.getGlobalLeaderboard(999);
+      const result = await quizService.getGlobalLeaderboard(30, 0, 999);
 
       expect(result.userEntry).not.toBeNull();
       expect(result.userEntry?.rank).toBe(120);
       expect(result.userEntry?.userId).toBe(999);
+      expect(result.userEntry?.isCurrentUser).toBe(true);
     });
   });
 
@@ -690,29 +694,36 @@ describe('QuizService', () => {
       expect(result.topPlayers).toEqual([]);
       expect(result.totalPlayers).toBe(0);
       expect(result.userEntry).toBeUndefined();
+      expect(result.page.hasMore).toBe(false);
     });
 
     it('should handle ties in ranking correctly', async () => {
       const playersWithTies = [
         {
           user_id: 1,
+          username: 'Tie1',
           total_rating: 100,
-          total_quizzes: 10,
-          avg_score: 90,
+          games_played: 10,
+          average_score: 90,
+          best_score: 95,
           rank: 1, // Changed from user_rank to rank
         },
         {
           user_id: 2,
+          username: 'Tie2',
           total_rating: 100, // Same rating
-          total_quizzes: 8,
-          avg_score: 92,
+          games_played: 8,
+          average_score: 92,
+          best_score: 96,
           rank: 1, // Same rank
         },
         {
           user_id: 3,
+          username: 'Player3',
           total_rating: 95,
-          total_quizzes: 12,
-          avg_score: 88,
+          games_played: 12,
+          average_score: 88,
+          best_score: 90,
           rank: 3,
         },
       ];
@@ -727,35 +738,42 @@ describe('QuizService', () => {
       expect(result.topPlayers[0].rank).toBe(1);
       expect(result.topPlayers[1].rank).toBe(1); // Tied for first
       expect(result.topPlayers[2].rank).toBe(3);
+      expect(result.page.hasMore).toBe(false);
     });
 
     it('should return user entry when user is outside top 100', async () => {
       const topPlayers = Array.from({ length: 100 }, (_, i) => ({
         user_id: i + 1,
+        username: `Player${i + 1}`,
         total_rating: 1000 - i,
-        total_quizzes: 50,
-        avg_score: 90 - i * 0.1,
-        user_rank: String(i + 1),
+        games_played: 50,
+        average_score: 90 - i * 0.1,
+        best_score: 95,
+        rank: i + 1,
       }));
 
       const userEntry = {
         user_id: 999,
+        username: 'CurrentUser',
         total_rating: 500,
-        total_quizzes: 20,
-        avg_score: 75,
-        user_rank: '150',
+        games_played: 20,
+        average_score: 75,
+        best_score: 85,
+        rank: '150',
       };
 
       mockPool.query
         .mockResolvedValueOnce(createQueryResult(topPlayers))
         .mockResolvedValueOnce(createQueryResult([{ total: '200' }]))
-        .mockResolvedValueOnce(createQueryResult([{ ...userEntry, rank: userEntry.user_rank }]));
+        .mockResolvedValueOnce(createQueryResult([{ ...userEntry, rank: userEntry.rank }]));
 
-      const result = await quizService.getGlobalLeaderboard(999);
+      const result = await quizService.getGlobalLeaderboard(30, 0, 999);
 
       expect(result.userEntry).toBeDefined();
       expect(result.userEntry?.rank).toBe(150);
       expect(result.userEntry?.userId).toBe(999);
+      expect(result.userEntry?.isCurrentUser).toBe(true);
+      expect(result.page.hasMore).toBe(true);
     });
   });
 

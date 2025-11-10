@@ -117,6 +117,11 @@ export interface GlobalLeaderboardEntry {
     averageScore: number;
     bestScore: number;
 }
+export interface LeaderboardPageInfo {
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+}
 export interface GlobalLeaderboardResponse {
     success: boolean;
     data: {
@@ -125,6 +130,7 @@ export interface GlobalLeaderboardResponse {
             isCurrentUser: true;
         };
         totalPlayers: number;
+        page: LeaderboardPageInfo;
     };
 }
 export interface UserStatsResponse {

@@ -8,7 +8,7 @@ export class QuizPage {
   readonly page: Page;
   
   // Локаторы setup экрана
-  readonly questionCountInput: Locator;
+  readonly questionCountButtons: Locator;
   readonly categoryCheckboxes: Locator;
   readonly startButton: Locator;
   
@@ -31,13 +31,13 @@ export class QuizPage {
     this.page = page;
     
     // Setup
-    this.questionCountInput = page.locator('[data-testid="question-count"], input[name="questionCount"]');
+    this.questionCountButtons = page.locator('.quiz-count-button, [data-testid="question-count-button"]');
     this.categoryCheckboxes = page.locator('[data-testid="category-checkbox"], input[type="checkbox"]');
     this.startButton = page.locator('button:has-text("Начать"), button:has-text("Start")');
     
     // Gameplay
-    this.questionText = page.locator('[data-testid="question-text"], .question-text');
-    this.answerOptions = page.locator('[data-testid="answer-option"], .answer-option');
+    this.questionText = page.locator('.quiz-question-container');
+    this.answerOptions = page.locator('.quiz-question-options button, .quiz-option');
     this.nextButton = page.locator('button:has-text("Далее"), button:has-text("Next"), button:has-text("Проверить")');
     this.progressBar = page.locator('[data-testid="progress-bar"], .progress-bar');
     this.questionCounter = page.locator('[data-testid="question-counter"], .question-counter');
@@ -63,7 +63,13 @@ export class QuizPage {
    */
   async startQuiz(settings?: QuizSettings): Promise<void> {
     if (settings?.questionCount) {
-      await this.questionCountInput.fill(settings.questionCount.toString());
+      const countButton = this.page.getByRole('button', { name: new RegExp(`^${settings.questionCount}$`) });
+      if (await countButton.count()) {
+        await countButton.click();
+      } else if (await this.questionCountButtons.count()) {
+        const fallbackButton = this.questionCountButtons.filter({ hasText: `${settings.questionCount}` }).first();
+        await fallbackButton.click();
+      }
     }
     
     if (settings?.categories) {
@@ -94,7 +100,10 @@ export class QuizPage {
   async answerSingleChoice(answerIndex: number): Promise<void> {
     const options = await this.answerOptions.all();
     await options[answerIndex].click();
-    await this.nextButton.click();
+    const nextVisible = await this.nextButton.isVisible().catch(() => false);
+    if (nextVisible) {
+      await this.nextButton.click();
+    }
   }
 
   /**
@@ -106,8 +115,11 @@ export class QuizPage {
     for (const index of answerIndices) {
       await options[index].click();
     }
-    
-    await this.nextButton.click();
+
+    const nextVisible = await this.nextButton.isVisible().catch(() => false);
+    if (nextVisible) {
+      await this.nextButton.click();
+    }
   }
 
   /**
@@ -116,7 +128,10 @@ export class QuizPage {
   async answerYearInput(year: number): Promise<void> {
     const yearInput = this.page.locator('input[type="number"], input[placeholder*="год"]');
     await yearInput.fill(year.toString());
-    await this.nextButton.click();
+    const nextVisible = await this.nextButton.isVisible().catch(() => false);
+    if (nextVisible) {
+      await this.nextButton.click();
+    }
   }
 
   /**
@@ -136,8 +151,11 @@ export class QuizPage {
    */
   async answerGuessPerson(personName: string): Promise<void> {
     const personOption = this.page.locator(`text="${personName}"`);
-    await personOption.click();
-    await this.nextButton.click();
+    await personOption.first().click();
+    const nextVisible = await this.nextButton.isVisible().catch(() => false);
+    if (nextVisible) {
+      await this.nextButton.click();
+    }
   }
 
   /**

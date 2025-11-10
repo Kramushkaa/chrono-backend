@@ -222,12 +222,19 @@ export interface GlobalLeaderboardEntry {
   bestScore: number;
 }
 
+export interface LeaderboardPageInfo {
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
 export interface GlobalLeaderboardResponse {
   success: boolean;
   data: {
     topPlayers: GlobalLeaderboardEntry[];
     userEntry?: GlobalLeaderboardEntry & { isCurrentUser: true };
     totalPlayers: number;
+    page: LeaderboardPageInfo;
   };
 }
 

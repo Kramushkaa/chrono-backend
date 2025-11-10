@@ -326,8 +326,13 @@ export class QuizController {
   getGlobalLeaderboard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user?.sub;
+      const rawLimit = parseInt(req.query.limit as string, 10);
+      const rawOffset = parseInt(req.query.offset as string, 10);
 
-      const result = await this.quizService.getGlobalLeaderboard(userId);
+      const limit = Number.isFinite(rawLimit) ? rawLimit : 30;
+      const offset = Number.isFinite(rawOffset) ? rawOffset : 0;
+
+      const result = await this.quizService.getGlobalLeaderboard(limit, offset, userId);
 
       res.json({
         success: true,

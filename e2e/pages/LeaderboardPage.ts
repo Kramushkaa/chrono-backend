@@ -5,73 +5,154 @@ import { Page, Locator, expect } from '@playwright/test';
  */
 export class LeaderboardPage {
   readonly page: Page;
-  readonly leaderboardTable: Locator;
+  readonly container: Locator;
   readonly leaderboardEntries: Locator;
+  readonly listEntries: Locator;
   readonly currentUserEntry: Locator;
-  readonly topScoreEntry: Locator;
+  readonly emptyState: Locator;
+  readonly totalPlayersLabel: Locator;
+  readonly paginationPrev: Locator;
+  readonly paginationNext: Locator;
+  readonly pageIndicator: Locator;
+  readonly divider: Locator;
+  readonly userLabel: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    
-    this.leaderboardTable = page.locator('[data-testid="leaderboard"], .leaderboard-table');
-    this.leaderboardEntries = page.locator('[data-testid="leaderboard-entry"], .leaderboard-entry, tbody tr');
-    this.currentUserEntry = page.locator('[data-testid="current-user-entry"], .current-user, .highlighted');
-    this.topScoreEntry = this.leaderboardEntries.first();
+
+    this.container = page.locator('.leaderboard-container');
+    this.leaderboardEntries = page.locator('.leaderboard-entry');
+    this.listEntries = page.locator('.leaderboard-list .leaderboard-entry');
+    this.currentUserEntry = page.locator('.leaderboard-entry-current');
+    this.emptyState = page.locator('.leaderboard-empty');
+    this.totalPlayersLabel = page.locator('.leaderboard-subtitle');
+    this.paginationPrev = page.locator('[data-testid="leaderboard-pagination-prev"]');
+    this.paginationNext = page.locator('[data-testid="leaderboard-pagination-next"]');
+    this.pageIndicator = page.locator('[data-testid="leaderboard-page-indicator"]');
+    this.divider = page.locator('.leaderboard-entry-divider');
+    this.userLabel = page.locator('.leaderboard-entry-label');
   }
 
   async goto(): Promise<void> {
     await this.page.goto('/quiz/leaderboard');
-    await this.page.waitForLoadState('networkidle');
+    await this.container.first().waitFor({ state: 'visible' });
   }
 
-  async expectUserInLeaderboard(username: string, position?: number): Promise<void> {
-    const entry = this.page.locator(`text=${username}`).first();
+  async getDisplayedUsernames(): Promise<string[]> {
+    return await this.listEntries.evaluateAll((elements) =>
+      elements.map((element) => {
+        const usernameContainer = element.querySelector('.leaderboard-username');
+        if (!usernameContainer) {
+          return '';
+        }
+        const parts: string[] = [];
+        usernameContainer.childNodes.forEach((node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent?.trim() ?? '';
+            if (text) {
+              parts.push(text);
+            }
+          }
+        });
+        return parts.join(' ').trim();
+      })
+    );
+  }
+
+  async getEntryCount(): Promise<number> {
+    return this.listEntries.count();
+  }
+
+  async getRanks(): Promise<number[]> {
+    const texts = await this.listEntries.locator('.leaderboard-rank').allTextContents();
+    return texts
+      .map((text) => text.trim())
+      .map((value) => parseInt(value, 10))
+      .filter((num) => !Number.isNaN(num));
+  }
+
+  async getTotalPlayers(): Promise<number | null> {
+    const text = await this.totalPlayersLabel.textContent();
+    const match = text?.match(/\d+/);
+    return match ? parseInt(match[0], 10) : null;
+  }
+
+  async expectUserPresent(username: string): Promise<void> {
+    const entry = this.leaderboardEntries.filter({ hasText: username }).first();
     await expect(entry).toBeVisible();
-    
-    if (position !== undefined) {
-      const positionText = await entry.locator('..').textContent();
-      expect(positionText).toContain(position.toString());
-    }
   }
 
-  async expectScore(username: string, minScore: number): Promise<void> {
-    const entry = this.page.locator(`[data-testid="leaderboard-entry"]:has-text("${username}")`);
-    const scoreText = await entry.textContent();
-    const scoreMatch = scoreText?.match(/\d+/);
-    const score = scoreMatch ? parseInt(scoreMatch[0]) : 0;
-    
-    expect(score).toBeGreaterThanOrEqual(minScore);
+  async expectSortedByRating(): Promise<void> {
+    const ratings = await this.listEntries
+      .locator('.leaderboard-rating')
+      .allTextContents();
+
+    const numbers = ratings
+      .map((text) => text.match(/\d+/)?.[0])
+      .filter(Boolean)
+      .map((value) => parseInt(value!, 10));
+
+    for (let i = 0; i < numbers.length - 1; i++) {
+      expect(numbers[i]).toBeGreaterThanOrEqual(numbers[i + 1]);
+    }
   }
 
   async expectCurrentUserHighlighted(): Promise<void> {
+    if (await this.currentUserEntry.count()) {
+      await expect(this.currentUserEntry.first()).toBeVisible();
+      return;
+    }
+    throw new Error('Current user entry not found in leaderboard');
+  }
+
+  async expectEmptyState(): Promise<void> {
+    await expect(this.emptyState).toBeVisible();
+  }
+
+  async expectUserEntryRank(rank: number): Promise<void> {
     await expect(this.currentUserEntry).toBeVisible();
+    const rankText = await this.currentUserEntry.locator('.leaderboard-rank').first().textContent();
+    expect(rankText?.trim()).toBe(String(rank));
   }
 
-  async getLeaderboardCount(): Promise<number> {
-    return await this.leaderboardEntries.count();
+  async expectUserLabel(text: string = 'Ваше место'): Promise<void> {
+    await expect(this.userLabel.first()).toHaveText(text);
   }
 
-  async expectMinimumEntries(minCount: number): Promise<void> {
-    const count = await this.getLeaderboardCount();
-    expect(count).toBeGreaterThanOrEqual(minCount);
-  }
-
-  async expectSortedByScore(): Promise<void> {
-    const entries = await this.leaderboardEntries.all();
-    const scores: number[] = [];
-    
-    for (const entry of entries) {
-      const text = await entry.textContent();
-      const match = text?.match(/\d+/);
-      if (match) {
-        scores.push(parseInt(match[0]));
+  async goToNextPage(expectedOffset?: number): Promise<void> {
+    const offsetParam = expectedOffset !== undefined ? `offset=${expectedOffset}` : undefined;
+    const waitForResponse = this.page.waitForResponse((response) => {
+      if (!response.url().includes('/api/quiz/leaderboard')) {
+        return false;
       }
-    }
-    
-    // Проверяем что массив отсортирован по убыванию
-    for (let i = 0; i < scores.length - 1; i++) {
-      expect(scores[i]).toBeGreaterThanOrEqual(scores[i + 1]);
-    }
+      if (offsetParam && !response.url().includes(offsetParam)) {
+        return false;
+      }
+      return response.request().method() === 'GET';
+    });
+    await Promise.all([waitForResponse, this.paginationNext.click()]);
+  }
+
+  async goToPrevPage(expectedOffset?: number): Promise<void> {
+    const offsetParam = expectedOffset !== undefined ? `offset=${expectedOffset}` : undefined;
+    const waitForResponse = this.page.waitForResponse((response) => {
+      if (!response.url().includes('/api/quiz/leaderboard')) {
+        return false;
+      }
+      if (offsetParam && !response.url().includes(offsetParam)) {
+        return false;
+      }
+      return response.request().method() === 'GET';
+    });
+    await Promise.all([waitForResponse, this.paginationPrev.click()]);
+  }
+
+  async expectPageIndicator(pageNumber: number): Promise<void> {
+    await expect(this.pageIndicator).toContainText(`Страница ${pageNumber}`);
+  }
+
+  async waitForEntries(): Promise<void> {
+    await this.listEntries.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   }
 }
 
