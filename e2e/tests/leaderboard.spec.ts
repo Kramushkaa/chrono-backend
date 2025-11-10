@@ -1,123 +1,238 @@
 import { test, expect } from '../fixtures/auth-fixtures';
 import { LeaderboardPage } from '../pages/LeaderboardPage';
-import { QuizPage } from '../pages/QuizPage';
+import { withLeaderboardData } from '../utils/leaderboard-fixtures';
+import { DEFAULT_TEST_USER } from '../helpers/auth-helper';
 
-test.describe('Таблица лидеров @regression', () => {
-  test.beforeEach(async ({ authenticatedPage }) => {
-    // Создаём результат квиза для тестов
-    const quizPage = new QuizPage(authenticatedPage);
-    await quizPage.goto();
-    await quizPage.startQuiz({ questionCount: 5 });
-    await quizPage.completeQuizQuickly(5);
+const NOW = new Date();
+
+function daysAgo(days: number): Date {
+  return new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
+test.describe('Глобальный лидерборд @regression', () => {
+  test('отображает топ игроков и общее количество', async ({ authenticatedPage }) => {
+    await withLeaderboardData({
+      users: [
+        { email: 'leaderboard-e2e-alpha@test.com', username: 'Игрок А' },
+        { email: 'leaderboard-e2e-beta@test.com', username: 'Игрок Б' },
+        { email: DEFAULT_TEST_USER.email, username: DEFAULT_TEST_USER.username },
+      ],
+      attempts: [
+        {
+          email: 'leaderboard-e2e-alpha@test.com',
+          correctAnswers: 9,
+          totalQuestions: 10,
+          totalTimeMs: 55_000,
+          ratingPoints: 5000,
+          createdAt: daysAgo(1),
+        },
+        {
+          email: 'leaderboard-e2e-beta@test.com',
+          correctAnswers: 8,
+          totalQuestions: 10,
+          totalTimeMs: 65_000,
+          ratingPoints: 4500,
+          createdAt: daysAgo(2),
+        },
+        {
+          email: DEFAULT_TEST_USER.email,
+          correctAnswers: 6,
+          totalQuestions: 10,
+          totalTimeMs: 80_000,
+          ratingPoints: 4000,
+          createdAt: daysAgo(3),
+        },
+      ],
+    }, async () => {
+      const leaderboardPage = new LeaderboardPage(authenticatedPage);
+      await leaderboardPage.goto();
+      await leaderboardPage.waitForEntries();
+
+      const usernames = await leaderboardPage.getDisplayedUsernames();
+      expect(usernames.slice(0, 3)).toEqual([
+        'Игрок А',
+        'Игрок Б',
+        DEFAULT_TEST_USER.username,
+      ]);
+
+      await leaderboardPage.expectSortedByRating();
+      const totalPlayers = await leaderboardPage.getTotalPlayers();
+      expect(totalPlayers).toBeGreaterThanOrEqual(3);
+      await leaderboardPage.expectCurrentUserHighlighted();
+      await leaderboardPage.expectUserEntryRank(3);
+      await leaderboardPage.expectUserLabel();
+    });
   });
 
-  test('отображение таблицы лидеров @smoke', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    await leaderboardPage.expectMinimumEntries(0);
-    
-    // Проверяем что таблица отображается
-    await expect(authenticatedPage.locator('[data-testid="leaderboard-table"]')).toBeVisible();
+  test('пагинация переключает страницы', async ({ authenticatedPage }) => {
+    const suffix = Date.now();
+    const players = Array.from({ length: 60 }, (_, index) => ({
+      email: `leaderboard-e2e-page-${suffix}-${index}@test.com`,
+      username: `Игрок ${index + 1} ${suffix}`,
+      ratingPoints: 2000 - index * 10,
+    }));
+
+    await withLeaderboardData({
+      users: [
+        ...players.map(({ email, username }) => ({ email, username })),
+        { email: DEFAULT_TEST_USER.email, username: DEFAULT_TEST_USER.username },
+      ],
+      attempts: [
+        {
+          email: DEFAULT_TEST_USER.email,
+          correctAnswers: 10,
+          totalQuestions: 10,
+          totalTimeMs: 20_000,
+          ratingPoints: 2600,
+          createdAt: daysAgo(0),
+        },
+        ...players.map(({ email, ratingPoints }, index) => ({
+          email,
+          correctAnswers: 10,
+          totalQuestions: 10,
+          totalTimeMs: 30_000 + index * 200,
+          ratingPoints,
+          createdAt: daysAgo(index % 14),
+        })),
+      ],
+    }, async () => {
+      const leaderboardPage = new LeaderboardPage(authenticatedPage);
+      await leaderboardPage.goto();
+      await leaderboardPage.waitForEntries();
+
+      await leaderboardPage.expectPageIndicator(1);
+      await leaderboardPage.expectCurrentUserHighlighted();
+      await leaderboardPage.expectUserEntryRank(1);
+      await leaderboardPage.expectUserLabel();
+      expect(await leaderboardPage.getEntryCount()).toBeLessThanOrEqual(30);
+
+      await leaderboardPage.goToNextPage(30);
+      await leaderboardPage.expectPageIndicator(2);
+      await leaderboardPage.waitForEntries();
+      const secondPageRanks = await leaderboardPage.getRanks();
+      expect(secondPageRanks[0]).toBe(31);
+      expect(secondPageRanks).toContain(1);
+      await expect(leaderboardPage.divider).toBeVisible();
+
+      await leaderboardPage.goToNextPage(60);
+      await leaderboardPage.expectPageIndicator(3);
+      await leaderboardPage.waitForEntries();
+      const thirdPageRanks = await leaderboardPage.getRanks();
+      expect(thirdPageRanks[0]).toBe(61);
+      const thirdPageUsernames = await leaderboardPage.getDisplayedUsernames();
+      expect(thirdPageRanks).toContain(1);
+      expect(thirdPageUsernames.length).toBeGreaterThan(0);
+    });
   });
 
-  test('фильтрация по периоду: неделя', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    await leaderboardPage.filterByPeriod('week');
-    
-    // Проверяем что фильтр применён
-    await expect(authenticatedPage.locator('[data-testid="period-filter"][data-value="week"]')).toHaveClass(/active/);
-    await leaderboardPage.expectMinimumEntries(0);
+  test('выносит текущего пользователя вне текущей страницы', async ({ authenticatedPage }) => {
+    const suffix = Date.now();
+    const players = Array.from({ length: 120 }, (_, index) => ({
+      email: `leaderboard-e2e-overflow-${suffix}-${index}@test.com`,
+      username: `Игрок ${index + 1} ${suffix}`,
+      ratingPoints: 2500 - index * 5,
+    }));
+
+    await withLeaderboardData({
+      users: [
+        ...players.map(({ email, username }) => ({ email, username })),
+        { email: DEFAULT_TEST_USER.email, username: DEFAULT_TEST_USER.username },
+      ],
+      attempts: [
+        ...players.map(({ email, ratingPoints }, index) => ({
+          email,
+          correctAnswers: 10,
+          totalQuestions: 10,
+          totalTimeMs: 28_000 + index * 150,
+          ratingPoints,
+          createdAt: daysAgo(index % 10),
+        })),
+        {
+          email: DEFAULT_TEST_USER.email,
+          correctAnswers: 4,
+          totalQuestions: 10,
+          totalTimeMs: 120_000,
+          ratingPoints: 100,
+          createdAt: daysAgo(1),
+        },
+      ],
+    }, async () => {
+      const leaderboardPage = new LeaderboardPage(authenticatedPage);
+      await leaderboardPage.goto();
+      await leaderboardPage.waitForEntries();
+
+      const entryCount = await leaderboardPage.getEntryCount();
+      expect(entryCount).toBeGreaterThanOrEqual(31);
+      await leaderboardPage.expectCurrentUserHighlighted();
+      await leaderboardPage.expectUserEntryRank(121);
+      await leaderboardPage.expectUserLabel();
+      await expect(leaderboardPage.divider).toBeVisible();
+    });
   });
 
-  test('фильтрация по периоду: месяц', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    await leaderboardPage.filterByPeriod('month');
-    
-    await expect(authenticatedPage.locator('[data-testid="period-filter"][data-value="month"]')).toHaveClass(/active/);
-    await leaderboardPage.expectMinimumEntries(0);
+  test('показывает пустое состояние при отсутствии данных', async ({ page }) => {
+    await withLeaderboardData({ attempts: [] }, async () => {
+      const leaderboardPage = new LeaderboardPage(page);
+      await leaderboardPage.goto();
+      await leaderboardPage.expectEmptyState();
+    });
   });
 
-  test('фильтрация по периоду: всё время', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    await leaderboardPage.filterByPeriod('all-time');
-    
-    await expect(authenticatedPage.locator('[data-testid="period-filter"][data-value="all-time"]')).toHaveClass(/active/);
-    await leaderboardPage.expectMinimumEntries(0);
-  });
+  test('отображает ошибку загрузки и позволяет повторить запрос', async ({ page }) => {
+    await withLeaderboardData({ attempts: [] }, async () => {
+      await page.addInitScript(() => {
+        const originalFetch = window.fetch.bind(window);
+        (window as any).__E2E_FORCE_LEADERBOARD__ = 'error';
 
-  test('отображение топ-10 игроков', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    
-    // Проверяем что отображается не более 10 записей
-    const entries = await authenticatedPage.locator('[data-testid="leaderboard-entry"]').count();
-    expect(entries).toBeLessThanOrEqual(10);
-  });
+        window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === 'string' ? input : input.toString();
 
-  test('сортировка по очкам (по убыванию)', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    await leaderboardPage.expectMinimumEntries(1);
-    
-    // Получаем очки первых двух записей
-    const scores = await authenticatedPage.locator('[data-testid="leaderboard-score"]').allTextContents();
-    
-    if (scores.length >= 2) {
-      const firstScore = parseInt(scores[0]);
-      const secondScore = parseInt(scores[1]);
-      
-      // Проверяем что сортировка по убыванию
-      expect(firstScore).toBeGreaterThanOrEqual(secondScore);
-    }
-  });
+          if (url.includes('/api/quiz/leaderboard')) {
+            const mode = (window as any).__E2E_FORCE_LEADERBOARD__;
+            if (mode === 'error') {
+              return new Response(JSON.stringify({ success: false, error: 'fail' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            }
 
-  test('отображение позиции текущего пользователя', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    
-    // Проверяем что текущий пользователь выделен
-    const currentUserEntry = authenticatedPage.locator('[data-testid="leaderboard-entry"][data-current="true"]');
-    await expect(currentUserEntry).toBeVisible();
-  });
+            if (mode === 'success') {
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  data: {
+                    topPlayers: [],
+                    userEntry: null,
+                    totalPlayers: 0,
+                    page: { limit: 30, offset: 0, hasMore: false },
+                  },
+                }),
+                {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json' },
+                }
+              );
+            }
+          }
 
-  test('пагинация таблицы лидеров', async ({ authenticatedPage }) => {
-    const leaderboardPage = new LeaderboardPage(authenticatedPage);
-    
-    await leaderboardPage.goto();
-    
-    // Если есть пагинация, проверяем что она работает
-    const nextButton = authenticatedPage.locator('[data-testid="leaderboard-next"]');
-    
-    if (await nextButton.isVisible()) {
-      await nextButton.click();
-      
-      // Проверяем что страница изменилась
-      await expect(authenticatedPage.locator('[data-testid="leaderboard-page"][data-value="2"]')).toHaveClass(/active/);
-    }
-  });
+          return originalFetch(input, init);
+        };
+      });
 
-  test('отображение пустого состояния', async ({ page }) => {
-    const leaderboardPage = new LeaderboardPage(page);
-    
-    await leaderboardPage.goto();
-    
-    // Для неавторизованного пользователя может быть пустое состояние
-    const emptyState = page.locator('[data-testid="leaderboard-empty"]');
-    const hasEntries = await page.locator('[data-testid="leaderboard-entry"]').count() > 0;
-    
-    if (!hasEntries) {
-      await expect(emptyState).toBeVisible();
-    }
+      const leaderboardPage = new LeaderboardPage(page);
+      await leaderboardPage.goto();
+      await page.waitForTimeout(500);
+      await expect(page.locator('.leaderboard-container')).toContainText('Ошибка загрузки', {
+        timeout: 15000,
+      });
+
+      await page.evaluate(() => {
+        (window as any).__E2E_FORCE_LEADERBOARD__ = 'success';
+      });
+
+      await page.getByTestId('leaderboard-error-retry').click();
+      await leaderboardPage.expectEmptyState();
+    });
   });
 });
 
