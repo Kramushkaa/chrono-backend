@@ -40,13 +40,13 @@ async function initTestSchema() {
       try {
         // Удаляем таблицу если существует (для повторных запусков)
         await pool.query(`DROP TABLE IF EXISTS test.${tableName} CASCADE`);
-        
+
         // Создаём таблицу со всеми constraint, индексами и default значениями
         await pool.query(`
           CREATE TABLE test.${tableName} 
           (LIKE public.${tableName} INCLUDING ALL)
         `);
-        
+
         console.log(`   ✅ ${tableName}`);
       } catch (error) {
         console.error(`   ❌ Ошибка при копировании ${tableName}:`, error);
@@ -54,7 +54,7 @@ async function initTestSchema() {
     }
 
     console.log('\n4️⃣ Восстановление внешних ключей...');
-    
+
     // Получаем все внешние ключи из public схемы
     const foreignKeysResult = await pool.query(`
       SELECT
@@ -84,7 +84,7 @@ async function initTestSchema() {
       try {
         const deleteRule = fk.delete_rule === 'NO ACTION' ? 'NO ACTION' : fk.delete_rule;
         const updateRule = fk.update_rule === 'NO ACTION' ? 'NO ACTION' : fk.update_rule;
-        
+
         await pool.query(`
           ALTER TABLE test.${fk.table_name}
           ADD CONSTRAINT ${fk.constraint_name}
@@ -93,7 +93,7 @@ async function initTestSchema() {
           ON DELETE ${deleteRule}
           ON UPDATE ${updateRule}
         `);
-        
+
         console.log(`   ✅ ${fk.table_name}.${fk.constraint_name}`);
       } catch (error) {
         // Игнорируем ошибки, так как некоторые FK могли быть скопированы с INCLUDING ALL
@@ -124,14 +124,14 @@ async function initTestSchema() {
         await pool.query(`
           CREATE SEQUENCE IF NOT EXISTS test.${seq.sequence_name}
         `);
-        
+
         // Связываем sequence с колонкой
         await pool.query(`
           ALTER TABLE test.${seq.table_name}
           ALTER COLUMN ${seq.column_name}
           SET DEFAULT nextval('test.${seq.sequence_name}'::regclass)
         `);
-        
+
         console.log(`   ✅ test.${seq.sequence_name} → ${seq.table_name}.${seq.column_name}`);
       } catch (error) {
         console.log(`   ⚠️  ${seq.sequence_name} (уже существует или ошибка)`);

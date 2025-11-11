@@ -1,6 +1,12 @@
 import { test, expect } from '../fixtures/auth-fixtures';
 import { ManagePage } from '../pages/ManagePage';
-import { createTestPerson, createTestAchievement, createTestPeriod } from '../utils/test-data-factory';
+import {
+  createTestPerson,
+  createTestAchievement,
+  createTestPeriod,
+  createTestAchievementForPerson,
+  createTestPeriodForPerson,
+} from '../utils/test-data-factory';
 import { loginUser, DEFAULT_TEST_USER } from '../helpers/auth-helper';
 
 const stubCategoriesResponse = {
@@ -32,10 +38,15 @@ const stubPersonSearchResponse = {
 };
 
 test.describe('Управление контентом', () => {
+  let seedPersonName: string = '';
+  let seedPerson: any = null;
+  let createAchievementCalls = 0;
+  let createPeriodCalls = 0;
+
   test.beforeEach(async ({ moderatorPage }) => {
     const loginResult = await loginUser(DEFAULT_TEST_USER);
-    if (!loginResult.success || !loginResult.tokens) {
-      throw new Error('Не удалось получить токен для подготовительного запроса');
+    if (!loginResult.success || !loginResult.tokens || !loginResult.user?.id) {
+      throw new Error('Не удалось получить токены для manage-db');
     }
 
     const personPayload = {
@@ -51,14 +62,43 @@ test.describe('Управление контентом', () => {
       saveAsDraft: true,
     };
 
-    await fetch('http://localhost:3001/api/persons/propose', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${loginResult.tokens.accessToken}`,
+    seedPersonName = personPayload.name;
+    seedPerson = {
+      id: personPayload.id,
+      name: personPayload.name,
+      birth_year: personPayload.birthYear,
+      death_year: personPayload.deathYear,
+      category: personPayload.category,
+    };
+
+    await moderatorPage.evaluate(
+      async ({ payload }) => {
+        const rawAuth = window.localStorage.getItem('auth');
+        if (!rawAuth) {
+          throw new Error('Не найден auth в localStorage');
+        }
+        const authState = JSON.parse(rawAuth);
+        const token = authState?.accessToken;
+        if (!token) {
+          throw new Error('Не найден accessToken для модератора');
+        }
+
+        const response = await fetch('http://localhost:3001/api/persons/propose', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(`Не удалось создать seed person: ${response.status} ${text}`);
+        }
       },
-      body: JSON.stringify(personPayload),
-    });
+      { payload: personPayload }
+    );
 
     await moderatorPage.addInitScript(() => {
       const personOptions = (window as any).__E2E_PERSON_OPTIONS__ ?? [];
@@ -90,7 +130,38 @@ test.describe('Управление контентом', () => {
       await fulfillJson(route, stubCountriesResponse);
     });
 
-    await moderatorPage.route('**/api/persons**', async (route) => {
+    await moderatorPage.route('**/api/persons/*/achievements', async route => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      const url = route.request().url();
+      console.log('[stub] POST', url);
+      const urlObj = new URL(url);
+      if (urlObj.pathname.includes('/achievements')) {
+        createAchievementCalls += 1;
+        await fulfillJson(route, { success: true, data: { id: Date.now() } });
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, message: 'Not found' }),
+      });
+    });
+
+    await moderatorPage.route('**/api/persons/*/periods', async route => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      const url = route.request().url();
+      console.log('[stub] POST', url);
+      createPeriodCalls += 1;
+      await fulfillJson(route, { success: true, data: { id: Date.now() } });
+    });
+
+    await moderatorPage.route('**/api/persons', async route => {
       if (route.request().method() !== 'GET') {
         await route.continue();
         return;
@@ -99,9 +170,7 @@ test.describe('Управление контентом', () => {
       if (url.pathname.endsWith('/api/persons')) {
         const responseBody = {
           success: true,
-          data: [
-            { id: personPayload.id, name: personPayload.name },
-          ],
+          data: [{ id: personPayload.id, name: personPayload.name }],
           meta: { limit: 10, offset: 0, hasMore: false, nextOffset: null },
         };
         await route.fulfill({
@@ -112,6 +181,46 @@ test.describe('Управление контентом', () => {
         return;
       }
       await route.continue();
+    });
+
+    await moderatorPage.route('**/api/achievements/mine**', async route => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await fulfillJson(route, {
+        success: true,
+        data: [],
+        meta: { limit: 10, offset: 0, hasMore: false, nextOffset: null },
+      });
+    });
+
+    await moderatorPage.route('**/api/achievements/mine?count=true**', async route => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await fulfillJson(route, { success: true, data: { count: 0 } });
+    });
+
+    await moderatorPage.route('**/api/periods/mine**', async route => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await fulfillJson(route, {
+        success: true,
+        data: [],
+        meta: { limit: 10, offset: 0, hasMore: false, nextOffset: null },
+      });
+    });
+
+    await moderatorPage.route('**/api/periods/mine?count=true**', async route => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await fulfillJson(route, { success: true, data: { count: 0 } });
     });
   });
 
@@ -126,19 +235,23 @@ test.describe('Управление контентом', () => {
 
   test('создание достижения @regression @manage', async ({ moderatorPage }) => {
     const managePage = new ManagePage(moderatorPage);
-    const achievement = createTestAchievement();
+
+    // Используем полное имя для точного поиска личности
+    const achievement = createTestAchievementForPerson(seedPerson);
 
     await managePage.goto();
-    await managePage.createAchievement(achievement);
+    await managePage.createAchievement(achievement, { personSearch: seedPersonName });
+    expect(createAchievementCalls).toBeGreaterThan(0);
   });
 
   test('создание периода жизни @regression @manage', async ({ moderatorPage }) => {
     const managePage = new ManagePage(moderatorPage);
-    const period = createTestPeriod();
+
+    // Используем полное имя для точного поиска личности
+    const period = createTestPeriodForPerson(seedPerson);
 
     await managePage.goto();
-    await managePage.createPeriod(period);
+    await managePage.createPeriod(period, { personSearch: seedPersonName });
+    expect(createPeriodCalls).toBeGreaterThan(0);
   });
 });
-
-

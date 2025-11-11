@@ -34,20 +34,30 @@ describe('PersonsService', () => {
 
       const user = createMockUser({ role: 'admin' });
 
-      mockPool.query.mockResolvedValueOnce(
-        createQueryResult([
-          {
-            id: 'test-person',
-            ...personData,
-            status: 'approved',
-          },
-        ])
-      );
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(createQueryResult([])) // BEGIN
+        .mockResolvedValueOnce(
+          createQueryResult([
+            {
+              id: 'test-person',
+              ...personData,
+              status: 'approved',
+            },
+          ])
+        )
+        .mockResolvedValueOnce(createQueryResult([])); // COMMIT
 
       const result = await personsService.createPerson(personData, user, false);
 
       expect(result.status).toBe('approved');
-      expect(mockPool.query).toHaveBeenCalledWith(
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('INSERT INTO persons'),
         expect.arrayContaining([
           expect.stringMatching(/test-person/),
@@ -62,6 +72,8 @@ describe('PersonsService', () => {
           user.sub,
         ])
       );
+      expect(mockPool.query).not.toHaveBeenCalled();
+      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should create a person with draft status when saveAsDraft is true', async () => {
@@ -75,9 +87,16 @@ describe('PersonsService', () => {
 
       const user = createMockUser();
 
-      mockPool.query.mockResolvedValueOnce(
-        createQueryResult([{ id: 'draft-person', status: 'draft' }])
-      );
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(createQueryResult([])) // BEGIN
+        .mockResolvedValueOnce(createQueryResult([{ id: 'draft-person', status: 'draft' }]))
+        .mockResolvedValueOnce(createQueryResult([])); // COMMIT
 
       const result = await personsService.createPerson(personData, user, true);
 
@@ -96,9 +115,16 @@ describe('PersonsService', () => {
 
       const user = createMockUser();
 
-      mockPool.query.mockResolvedValueOnce(
-        createQueryResult([{ id: 'pending-person', status: 'pending' }])
-      );
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(createQueryResult([])) // BEGIN
+        .mockResolvedValueOnce(createQueryResult([{ id: 'pending-person', status: 'pending' }]))
+        .mockResolvedValueOnce(createQueryResult([])); // COMMIT
 
       await personsService.createPerson(personData, user, false);
 
@@ -107,6 +133,46 @@ describe('PersonsService', () => {
         user.email,
         'pending',
         'pending-person'
+      );
+    });
+
+    it('should create life periods when provided', async () => {
+      const personData = {
+        name: 'Life Person',
+        birthYear: 1900,
+        deathYear: 1950,
+        category: 'Scientist',
+        description: 'Has life periods',
+        lifePeriods: [{ countryId: 2, start: 1900, end: 1950 }],
+      };
+
+      const user = createMockUser();
+
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValueOnce(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(createQueryResult([])) // BEGIN
+        .mockResolvedValueOnce(createQueryResult([{ id: 'life-person', status: 'pending' }]))
+        .mockResolvedValueOnce(createQueryResult([])) // DELETE periods
+        .mockResolvedValueOnce(createQueryResult([])) // INSERT period
+        .mockResolvedValueOnce(createQueryResult([])); // COMMIT
+
+      const result = await personsService.createPerson(personData, user, false);
+
+      expect(result.id).toBe('life-person');
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        3,
+        `DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`,
+        ['life-person']
+      );
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining('INSERT INTO periods'),
+        ['life-person', 1900, 1950, 2, 'pending', user.sub]
       );
     });
   });

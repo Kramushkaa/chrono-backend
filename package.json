@@ -18,7 +18,7 @@
     "migrate:add-wiki": "tsx src/db/migrate-add-wiki-link.ts",
     "views:update-wiki": "tsx src/db/update-views-add-wiki.ts",
     "init-test-schema": "tsx src/db/init-test-schema.ts",
-    "seed:test": "cross-env DB_SCHEMA=test tsx src/db/seed.ts",
+    "seed:test": "tsx seed-test-db.js",
     "dev:test": "cross-env DB_SCHEMA=test tsx watch src/server.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",

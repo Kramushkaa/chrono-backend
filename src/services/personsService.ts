@@ -1,5 +1,5 @@
-import { Pool } from 'pg';
-import { determineContentStatus, User } from '../utils/content-status';
+import { Pool, PoolClient } from 'pg';
+import { determineContentStatus, User, ContentStatus } from '../utils/content-status';
 import { errors } from '../utils/errors';
 import { paginateRows, parseLimitOffset, PaginationDefaults, mapApiPersonRow } from '../utils/api';
 import { TelegramService } from './telegramService';
@@ -18,6 +18,8 @@ export interface PersonCreateData {
   imageUrl?: string | null;
   wikiLink?: string | null;
 }
+
+type LifePeriodInput = { countryId: number; start: number; end: number };
 
 export interface PersonFilters {
   category?: string | string[];
@@ -87,11 +89,12 @@ export class PersonsService extends BaseService {
    * Создание личности
    */
   async createPerson(
-    data: PersonCreateData,
+    data: PersonCreateData & { lifePeriods?: LifePeriodInput[] },
     user: User,
     saveAsDraft: boolean = false
   ): Promise<PersonRow> {
     const { name, birthYear, deathYear, category, description, imageUrl, wikiLink } = data;
+    const lifePeriods = data.lifePeriods ?? [];
 
     // Генерация ID из имени
     const id = name
@@ -102,28 +105,39 @@ export class PersonsService extends BaseService {
 
     const status = determineContentStatus(user, saveAsDraft);
 
-    const result = await this.executeQuery<PersonRow>(
-      `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [
-        id,
-        name,
-        birthYear,
-        deathYear,
-        category,
-        description,
-        imageUrl ?? null,
-        wikiLink ?? null,
-        status,
-        user.sub,
-      ],
-      {
-        userId: user.sub,
-        action: 'createPerson',
-        params: { name, birthYear, deathYear, category },
+    const insertedPerson = await this.executeTransaction<PersonRow>(async client => {
+      const insertResult = await client.query<PersonRow>(
+        `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url, wiki_link, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [
+          id,
+          name,
+          birthYear,
+          deathYear,
+          category,
+          description,
+          imageUrl ?? null,
+          wikiLink ?? null,
+          status,
+          user.sub,
+        ]
+      );
+
+      if (lifePeriods.length > 0) {
+        await this.upsertLifePeriods(
+          client,
+          id,
+          lifePeriods,
+          birthYear,
+          deathYear,
+          status,
+          user.sub
+        );
       }
-    );
+
+      return insertResult.rows[0];
+    });
 
     // Invalidate metadata cache if approved
     if (status === 'approved') {
@@ -147,7 +161,7 @@ export class PersonsService extends BaseService {
       status,
     });
 
-    return result.rows[0];
+    return insertedPerson;
   }
 
   /**
@@ -670,7 +684,7 @@ export class PersonsService extends BaseService {
    */
   async getUserPersonsCount(userId: number): Promise<number> {
     const result = await this.executeQuery(
-      `SELECT COALESCE(persons_count, 0) AS cnt FROM v_user_content_counts WHERE created_by = $1`,
+      `SELECT COUNT(*)::int AS cnt FROM persons WHERE created_by = $1`,
       [userId],
       {
         action: 'getUserPersonsCount',
@@ -741,7 +755,7 @@ export class PersonsService extends BaseService {
       description: string;
       imageUrl?: string | null;
       wikiLink?: string | null;
-      lifePeriods: Array<{ countryId: number; start: number; end: number }>;
+      lifePeriods: LifePeriodInput[];
     },
     user: User,
     saveAsDraft: boolean
@@ -755,11 +769,11 @@ export class PersonsService extends BaseService {
       description,
       imageUrl,
       wikiLink,
-      lifePeriods,
+      lifePeriods = [],
     } = data;
 
     // Валидация: для не-черновиков требуются периоды
-    if (!saveAsDraft && (!lifePeriods || lifePeriods.length === 0)) {
+    if (!saveAsDraft && lifePeriods.length === 0) {
       throw errors.badRequest(
         'Для отправки на модерацию необходимо указать хотя бы один период жизни'
       );
@@ -799,38 +813,7 @@ export class PersonsService extends BaseService {
         ]
       );
 
-      // Обработка периодов жизни
-      if (lifePeriods && lifePeriods.length > 0) {
-        // Валидация периодов
-        for (const p of lifePeriods) {
-          if (!Number.isInteger(p.countryId) || p.countryId <= 0) {
-            throw errors.badRequest('Некорректная страна');
-          }
-          if (!Number.isInteger(p.start) || !Number.isInteger(p.end) || p.start > p.end) {
-            throw errors.badRequest('Некорректный период проживания');
-          }
-          if (p.start < birthYear || p.end > deathYear) {
-            throw errors.badRequest('Периоды должны быть в пределах годов жизни');
-          }
-        }
-
-        // Сортируем по году начала
-        const sortedPeriods = [...lifePeriods].sort((a, b) => a.start - b.start || a.end - b.end);
-
-        // Удаляем существующие периоды
-        await client.query(`DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`, [
-          id,
-        ]);
-
-        // Вставляем новые периоды
-        for (const p of sortedPeriods) {
-          await client.query(
-            `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by)
-             VALUES ($1, $2, $3, 'life', $4, $5, $6)`,
-            [id, p.start, p.end, p.countryId, status, user.sub]
-          );
-        }
-      }
+      await this.upsertLifePeriods(client, id, lifePeriods, birthYear, deathYear, status, user.sub);
 
       await client.query('COMMIT');
 
@@ -858,7 +841,7 @@ export class PersonsService extends BaseService {
     personId: string,
     userId: number,
     updates: Partial<PersonCreateData>,
-    lifePeriods?: Array<{ countryId: number; start: number; end: number }>
+    lifePeriods?: LifePeriodInput[]
   ): Promise<void> {
     const checkRes = await this.executeQuery(
       'SELECT created_by, status, birth_year, death_year FROM persons WHERE id = $1',
@@ -1288,6 +1271,50 @@ export class PersonsService extends BaseService {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  private async upsertLifePeriods(
+    client: PoolClient,
+    personId: string,
+    lifePeriods: LifePeriodInput[],
+    birthYear: number,
+    deathYear: number,
+    status: ContentStatus,
+    userId: number
+  ): Promise<void> {
+    if (!lifePeriods || lifePeriods.length === 0) {
+      return;
+    }
+
+    for (const period of lifePeriods) {
+      if (!Number.isInteger(period.countryId) || period.countryId <= 0) {
+        throw errors.badRequest('Некорректная страна');
+      }
+      if (
+        !Number.isInteger(period.start) ||
+        !Number.isInteger(period.end) ||
+        period.start > period.end
+      ) {
+        throw errors.badRequest('Некорректный период проживания');
+      }
+      if (period.start < birthYear || period.end > deathYear) {
+        throw errors.badRequest('Периоды должны быть в пределах годов жизни');
+      }
+    }
+
+    const sortedPeriods = [...lifePeriods].sort((a, b) => a.start - b.start || a.end - b.end);
+
+    await client.query(`DELETE FROM periods WHERE person_id = $1 AND period_type = 'life'`, [
+      personId,
+    ]);
+
+    for (const period of sortedPeriods) {
+      await client.query(
+        `INSERT INTO periods (person_id, start_year, end_year, period_type, country_id, status, created_by)
+         VALUES ($1, $2, $3, 'life', $4, $5, $6)`,
+        [personId, period.start, period.end, period.countryId, status, userId]
+      );
     }
   }
 }

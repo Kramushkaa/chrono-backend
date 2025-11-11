@@ -935,9 +935,7 @@ export class QuizService extends BaseService {
 
     // Get user entry if userId provided and not in top 100
     let userEntry: GlobalLeaderboardEntry | undefined;
-    const inCurrentPage = userId
-      ? topPlayers.find(p => p.userId === userId)
-      : undefined;
+    const inCurrentPage = userId ? topPlayers.find(p => p.userId === userId) : undefined;
 
     if (inCurrentPage) {
       userEntry = inCurrentPage;

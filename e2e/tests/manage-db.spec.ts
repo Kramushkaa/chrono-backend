@@ -1,7 +1,13 @@
 import { test, expect } from '../fixtures/auth-fixtures';
 import type { Route } from '@playwright/test';
 import { ManagePage } from '../pages/ManagePage';
-import { createTestPerson, createTestAchievement, createTestPeriod } from '../utils/test-data-factory';
+import {
+  createTestPerson,
+  createTestAchievement,
+  createTestPeriod,
+  createTestAchievementForPerson,
+  createTestPeriodForPerson,
+} from '../utils/test-data-factory';
 import { loginUser, DEFAULT_TEST_USER } from '../helpers/auth-helper';
 import { createTestPool } from '../utils/db-reset';
 import type { AuthTokens } from '../types';
@@ -105,42 +111,64 @@ test.describe('Проверка записей в БД при управлени
     apiTokens = loginResult.tokens;
     currentUserId = Number(loginResult.user.id);
 
-    const basePerson = {
+    const seedPerson = {
       id: `manage-db-base-${Date.now()}`,
       name: `Manage DB Base ${Date.now()}`,
       birthYear: 1900,
       deathYear: 1950,
       category: 'scientists',
-      description: 'Seed person для manage-db',
+      description: 'Seed person для manage-mine',
       imageUrl: null,
       wikiLink: null,
       lifePeriods: [],
       saveAsDraft: true,
     };
 
-    await fetch('http://localhost:3001/api/persons/propose', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiTokens.accessToken}`,
-      },
-      body: JSON.stringify(basePerson),
-    });
+    await moderatorPage.evaluate(
+      async ({ payload }) => {
+        const auth = window.localStorage.getItem('auth');
+        const token = auth ? JSON.parse(auth)?.accessToken : undefined;
+        if (!token) {
+          throw new Error('Не удалось получить токен модератора для seed person');
+        }
 
-    const option = { value: basePerson.id, label: basePerson.name };
+        const response = await fetch('http://localhost:3001/api/persons/propose', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(`Seed person failed: ${response.status} ${text}`);
+        }
+      },
+      { payload: seedPerson }
+    );
+
+    const option = { value: seedPerson.id, label: seedPerson.name };
     await moderatorPage.addInitScript(
-      ({ o }) => {
-        (window as any).__E2E_PERSON_OPTIONS__ = [o];
-        (window as any).__E2E_DEFAULT_PERSON__ = o.value;
+      ({ option }) => {
+        (window as any).__E2E_PERSON_OPTIONS__ = [option];
+        (window as any).__E2E_DEFAULT_PERSON__ = option.value;
       },
       { o: option }
     );
 
-    await moderatorPage.route('**/api/categories', route => fulfillJson(route, stubCategoriesResponse));
-    await moderatorPage.route('**/api/countries', route => fulfillJson(route, stubCountriesResponse));
-    await moderatorPage.route('**/api/countries/options', route => fulfillJson(route, stubCountryOptionsResponse));
+    await moderatorPage.route('**/api/categories', route =>
+      fulfillJson(route, stubCategoriesResponse)
+    );
+    await moderatorPage.route('**/api/countries', route =>
+      fulfillJson(route, stubCountriesResponse)
+    );
+    await moderatorPage.route('**/api/countries/options', route =>
+      fulfillJson(route, stubCountryOptionsResponse)
+    );
 
-    seededPerson = { id: basePerson.id, name: basePerson.name };
+    seededPerson = { id: seedPerson.id, name: seedPerson.name };
   });
 
   test('создание личности сохраняет запись и периоды жизни в БД @regression @db', async ({
@@ -214,7 +242,7 @@ test.describe('Проверка записей в БД при управлени
     moderatorPage,
   }) => {
     const managePage = new ManagePage(moderatorPage);
-    const achievement = createTestAchievement();
+    const achievement = createTestAchievementForPerson(seededPerson);
 
     await managePage.goto();
     await managePage.switchTab('achievements');
@@ -246,7 +274,7 @@ test.describe('Проверка записей в БД при управлени
     moderatorPage,
   }) => {
     const managePage = new ManagePage(moderatorPage);
-    const period = createTestPeriod();
+    const period = createTestPeriodForPerson(seededPerson);
 
     await managePage.goto();
     await managePage.switchTab('periods');

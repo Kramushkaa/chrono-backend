@@ -1254,12 +1254,12 @@ export async function seedDatabase() {
 
   try {
     await client.query('BEGIN');
-    await client.query('DELETE FROM persons');
+    await client.query(`DELETE FROM ${schema}.persons`);
 
     for (const person of sampleData) {
       // Вставка Личности без legacy полей достижений
       await client.query(
-        `INSERT INTO persons (id, name, birth_year, death_year, category, description, image_url)
+        `INSERT INTO ${schema}.persons (id, name, birth_year, death_year, category, description, image_url)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           person.id,
@@ -1279,7 +1279,7 @@ export async function seedDatabase() {
         const yr = years[i];
         if (typeof yr === 'number' && Number.isInteger(yr) && desc && desc.trim().length > 0) {
           await client.query(
-            `INSERT INTO achievements (person_id, year, description, wikipedia_url, image_url)
+            `INSERT INTO ${schema}.achievements (person_id, year, description, wikipedia_url, image_url)
              VALUES ($1, $2, $3, NULL, NULL)`,
             [person.id, yr, desc.trim()]
           );

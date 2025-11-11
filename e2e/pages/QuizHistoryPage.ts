@@ -25,8 +25,11 @@ export class QuizHistoryPage {
   }
 
   async waitForLoaded(): Promise<void> {
-    await this.page.waitForLoadState('networkidle');
-    await this.loadingState.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    const loading = this.loadingState.first();
+    if (await loading.isVisible().catch(() => false)) {
+      await loading.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    }
+    await this.page.waitForTimeout(200);
   }
 
   async expectAttemptInHistory(attemptData: { score?: number; date?: string }): Promise<void> {
@@ -59,8 +62,12 @@ export class QuizHistoryPage {
   }
 
   async expectMinimumEntries(minCount: number): Promise<void> {
-    const count = await this.historyEntries.count();
-    expect(count).toBeGreaterThanOrEqual(minCount);
+    await expect
+      .poll(async () => await this.historyEntries.count(), {
+        timeout: 10_000,
+        message: `Ожидалось минимум ${minCount} записей в истории`,
+      })
+      .toBeGreaterThanOrEqual(minCount);
   }
 
   async getHistoryCount(): Promise<number> {

@@ -6,19 +6,19 @@ import { QuizSettings } from '../types';
  */
 export class QuizPage {
   readonly page: Page;
-  
+
   // Локаторы setup экрана
   readonly questionCountButtons: Locator;
   readonly categoryCheckboxes: Locator;
   readonly startButton: Locator;
-  
+
   // Локаторы игрового экрана
   readonly questionText: Locator;
   readonly answerOptions: Locator;
   readonly nextButton: Locator;
   readonly progressBar: Locator;
   readonly questionCounter: Locator;
-  
+
   // Локаторы экрана результатов
   readonly scoreDisplay: Locator;
   readonly correctAnswersCount: Locator;
@@ -29,25 +29,33 @@ export class QuizPage {
 
   constructor(page: Page) {
     this.page = page;
-    
+
     // Setup
-    this.questionCountButtons = page.locator('.quiz-count-button, [data-testid="question-count-button"]');
-    this.categoryCheckboxes = page.locator('[data-testid="category-checkbox"], input[type="checkbox"]');
+    this.questionCountButtons = page.locator(
+      '.quiz-count-button, [data-testid="question-count-button"]'
+    );
+    this.categoryCheckboxes = page.locator(
+      '[data-testid="category-checkbox"], input[type="checkbox"]'
+    );
     this.startButton = page.locator('button:has-text("Начать"), button:has-text("Start")');
-    
+
     // Gameplay
     this.questionText = page.locator('.quiz-question-container');
     this.answerOptions = page.locator('.quiz-question-options button, .quiz-option');
-    this.nextButton = page.locator('button:has-text("Далее"), button:has-text("Next"), button:has-text("Проверить")');
+    this.nextButton = page.locator(
+      'button:has-text("Далее"), button:has-text("Next"), button:has-text("Проверить")'
+    );
     this.progressBar = page.locator('[data-testid="progress-bar"], .progress-bar');
     this.questionCounter = page.locator('[data-testid="question-counter"], .question-counter');
-    
+
     // Results
     this.scoreDisplay = page.locator('[data-testid="score"], .score');
     this.correctAnswersCount = page.locator('[data-testid="correct-answers"], .correct-answers');
     this.totalQuestionsCount = page.locator('[data-testid="total-questions"], .total-questions');
     this.shareButton = page.locator('button:has-text("Поделиться"), button:has-text("Share")');
-    this.playAgainButton = page.locator('button:has-text("Ещё раз"), button:has-text("Play again")');
+    this.playAgainButton = page.locator(
+      'button:has-text("Ещё раз"), button:has-text("Play again")'
+    );
     this.viewHistoryButton = page.locator('button:has-text("История"), button:has-text("History")');
   }
 
@@ -62,34 +70,59 @@ export class QuizPage {
    * Настройка и запуск квиза
    */
   async startQuiz(settings?: QuizSettings): Promise<void> {
+    // Ждём загрузки элементов настройки
+    await this.page.waitForTimeout(1000);
+
     if (settings?.questionCount) {
-      const countButton = this.page.getByRole('button', { name: new RegExp(`^${settings.questionCount}$`) });
+      const countButton = this.page.getByRole('button', {
+        name: new RegExp(`^${settings.questionCount}$`),
+      });
       if (await countButton.count()) {
         await countButton.click();
+        await this.page.waitForTimeout(300);
       } else if (await this.questionCountButtons.count()) {
-        const fallbackButton = this.questionCountButtons.filter({ hasText: `${settings.questionCount}` }).first();
-        await fallbackButton.click();
+        const fallbackButton = this.questionCountButtons
+          .filter({ hasText: `${settings.questionCount}` })
+          .first();
+        if (await fallbackButton.count()) {
+          await fallbackButton.click();
+          await this.page.waitForTimeout(300);
+        }
       }
     }
-    
+
     if (settings?.categories) {
       // Сначала снимаем все чекбоксы
       const allCheckboxes = await this.categoryCheckboxes.all();
       for (const checkbox of allCheckboxes) {
         if (await checkbox.isChecked()) {
           await checkbox.uncheck();
+          await this.page.waitForTimeout(100);
         }
       }
-      
+
       // Отмечаем нужные категории
       for (const category of settings.categories) {
         const checkbox = this.page.locator(`input[type="checkbox"][value="${category}"]`);
-        await checkbox.check();
+        if (await checkbox.count()) {
+          await checkbox.check();
+          await this.page.waitForTimeout(200);
+        }
       }
     }
-    
+
+    // Ждём появления кнопки и проверяем, что она не disabled
+    await this.startButton.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Проверяем, что кнопка не disabled, иначе ждём
+    for (let i = 0; i < 50; i++) {
+      const isDisabled = await this.startButton.evaluate(button => button.disabled);
+      if (!isDisabled) break;
+      await this.page.waitForTimeout(100);
+    }
+
     await this.startButton.click();
-    
+
     // Ждём загрузки первого вопроса
     await expect(this.questionText).toBeVisible({ timeout: 5000 });
   }
@@ -111,7 +144,7 @@ export class QuizPage {
    */
   async answerMultipleChoice(answerIndices: number[]): Promise<void> {
     const options = await this.answerOptions.all();
-    
+
     for (const index of answerIndices) {
       await options[index].click();
     }
@@ -141,7 +174,7 @@ export class QuizPage {
     const items = await this.page.locator('[draggable="true"], .draggable-item').all();
     const source = items[sourceIndex];
     const target = items[targetIndex];
-    
+
     await source.dragTo(target);
     await this.nextButton.click();
   }
@@ -165,11 +198,17 @@ export class QuizPage {
     for (let i = 0; i < questionsCount; i++) {
       // Ждём появления вопроса
       await expect(this.questionText).toBeVisible();
-      
+
       // Определяем тип вопроса и отвечаем
-      const hasOptions = await this.answerOptions.first().isVisible().catch(() => false);
-      const hasYearInput = await this.page.locator('input[type="number"]').isVisible().catch(() => false);
-      
+      const hasOptions = await this.answerOptions
+        .first()
+        .isVisible()
+        .catch(() => false);
+      const hasYearInput = await this.page
+        .locator('input[type="number"]')
+        .isVisible()
+        .catch(() => false);
+
       if (hasYearInput) {
         await this.answerYearInput(1900);
       } else if (hasOptions) {
@@ -178,7 +217,7 @@ export class QuizPage {
         // Если не можем определить тип, просто кликаем Next
         await this.nextButton.click();
       }
-      
+
       // Небольшая задержка между вопросами
       await this.page.waitForTimeout(300);
     }
@@ -189,7 +228,7 @@ export class QuizPage {
    */
   async expectResults(expectedScore?: number): Promise<void> {
     await expect(this.scoreDisplay).toBeVisible({ timeout: 5000 });
-    
+
     if (expectedScore !== undefined) {
       const scoreText = await this.scoreDisplay.textContent();
       expect(scoreText).toContain(expectedScore.toString());
@@ -218,11 +257,11 @@ export class QuizPage {
    */
   async shareQuiz(): Promise<string> {
     await this.shareButton.click();
-    
+
     // Ждём появления share кода
     const shareCodeElement = this.page.locator('[data-testid="share-code"], .share-code');
     await expect(shareCodeElement).toBeVisible();
-    
+
     const shareCode = await shareCodeElement.textContent();
     return shareCode || '';
   }
@@ -267,5 +306,3 @@ export class QuizPage {
     expect(counterText).toContain(`${total}`);
   }
 }
-
-

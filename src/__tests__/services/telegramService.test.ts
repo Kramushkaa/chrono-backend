@@ -40,21 +40,27 @@ describe('TelegramService', () => {
       new TelegramService('test-token', 'test-chat-id');
 
       expect(Telegraf).toHaveBeenCalledWith('test-token');
-      expect(logger.info).toHaveBeenCalledWith('Telegram notifications service initialized (Telegraf)');
+      expect(logger.info).toHaveBeenCalledWith(
+        'Telegram notifications service initialized (Telegraf)'
+      );
     });
 
     it('should not initialize when token is missing', () => {
       new TelegramService(undefined, 'test-chat-id');
 
       expect(Telegraf).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledWith('Telegram notifications disabled: missing token or chat ID');
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Telegram notifications disabled: missing token or chat ID'
+      );
     });
 
     it('should not initialize when chatId is missing', () => {
       new TelegramService('test-token', undefined);
 
       expect(Telegraf).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledWith('Telegram notifications disabled: missing token or chat ID');
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Telegram notifications disabled: missing token or chat ID'
+      );
     });
 
     it('should handle initialization errors', () => {
@@ -122,7 +128,7 @@ describe('TelegramService', () => {
     it('should handle sendMessage errors', async () => {
       mockTelegram.sendMessage.mockRejectedValue(new Error('Network error'));
       const service = new TelegramService('test-token', 'chat-123');
-      
+
       await service.notifyNewRegistration('user@test.com');
 
       expect(logger.error).toHaveBeenCalledWith(
@@ -164,7 +170,7 @@ describe('TelegramService', () => {
     it('should handle errors', async () => {
       mockTelegram.sendMessage.mockRejectedValue(new Error('Send error'));
       const service = new TelegramService('test-token', 'chat-123');
-      
+
       await service.notifyVerificationEmailSent('user@test.com');
 
       expect(logger.error).toHaveBeenCalledWith(
@@ -328,13 +334,8 @@ describe('TelegramService', () => {
     it('should truncate long descriptions', async () => {
       const service = new TelegramService('test-token', 'chat-123');
       const longDescription = 'A'.repeat(150);
-      
-      await service.notifyAchievementCreated(
-        longDescription,
-        2000,
-        'creator@test.com',
-        'approved'
-      );
+
+      await service.notifyAchievementCreated(longDescription, 2000, 'creator@test.com', 'approved');
 
       expect(mockTelegram.sendMessage).toHaveBeenCalledWith(
         'chat-123',
@@ -485,7 +486,7 @@ describe('TelegramService', () => {
 
     it('should use correct emoji for each severity', async () => {
       const service = new TelegramService('test-token', 'chat-123');
-      
+
       await service.sendSecurityAlert('test', {}, 'low');
       expect(mockTelegram.sendMessage).toHaveBeenCalledWith(
         'chat-123',
@@ -507,7 +508,7 @@ describe('TelegramService', () => {
       const service = new TelegramService('test-token', 'chat-123');
       const error = new Error('Test error');
       error.stack = 'Error: Test error\n  at line1\n  at line2\n  at line3\n  at line4';
-      
+
       await service.sendErrorAlert(error, { userId: '123', action: 'test' });
 
       expect(mockTelegram.sendMessage).toHaveBeenCalledWith(
@@ -531,7 +532,7 @@ describe('TelegramService', () => {
       const service = new TelegramService('test-token', 'chat-123');
       const longMessage = 'A'.repeat(300);
       const error = new Error(longMessage);
-      
+
       await service.sendErrorAlert(error, {});
 
       // Should truncate to 200 chars
@@ -544,7 +545,7 @@ describe('TelegramService', () => {
       mockTelegram.sendMessage.mockRejectedValue(new Error('Send failed'));
       const service = new TelegramService('test-token', 'chat-123');
       const error = new Error('Test error');
-      
+
       await service.sendErrorAlert(error, {});
 
       expect(logger.error).toHaveBeenCalledWith(
@@ -628,7 +629,7 @@ describe('TelegramService', () => {
       const error = new Error('Send failed');
       mockTelegram.sendMessage.mockRejectedValue(error);
       const service = new TelegramService('test-token', 'chat-123');
-      
+
       await expect(service.sendTestMessage()).rejects.toThrow('Send failed');
       expect(logger.error).toHaveBeenCalledWith(
         'Failed to send test Telegram message',
@@ -637,4 +638,3 @@ describe('TelegramService', () => {
     });
   });
 });
-

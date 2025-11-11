@@ -87,6 +87,28 @@ export function createTestAchievement(overrides?: Partial<TestAchievement>): Tes
 }
 
 /**
+ * Создание тестового достижения в диапазоне лет жизни личности
+ */
+export function createTestAchievementForPerson(
+  person: TestPerson,
+  overrides?: Partial<TestAchievement>
+): TestAchievement {
+  achievementCounter++;
+
+  // Генерируем год в диапазоне жизни личности
+  const lifeSpan = person.death_year - person.birth_year;
+  const yearOffset = Math.floor(Math.random() * Math.max(lifeSpan, 1));
+  const year = person.birth_year + yearOffset;
+
+  return {
+    year,
+    title: `Тестовое достижение ${achievementCounter}`,
+    description: `Описание тестового достижения ${achievementCounter}`,
+    ...overrides,
+  };
+}
+
+/**
  * Создание тестового периода жизни
  */
 export function createTestPeriod(overrides?: Partial<TestPeriod>): TestPeriod {
@@ -97,6 +119,35 @@ export function createTestPeriod(overrides?: Partial<TestPeriod>): TestPeriod {
   return {
     start_year: startYear,
     end_year: startYear + 5,
+    title: `Тестовый период ${periodCounter}`,
+    description: `Описание тестового периода ${periodCounter}`,
+    location: `Тестовая локация ${periodCounter}`,
+    ...overrides,
+  };
+}
+
+/**
+ * Создание тестового периода жизни в диапазоне лет жизни личности
+ */
+export function createTestPeriodForPerson(
+  person: TestPerson,
+  overrides?: Partial<TestPeriod>
+): TestPeriod {
+  periodCounter++;
+
+  // Генерируем период в диапазоне жизни личности
+  const lifeSpan = person.death_year - person.birth_year;
+  const maxPeriodLength = Math.min(10, Math.max(1, Math.floor(lifeSpan / 4))); // Максимум 10 лет или четверть жизни
+  const periodLength = Math.max(1, Math.floor(Math.random() * maxPeriodLength));
+
+  const maxStartYear = person.death_year - periodLength;
+  const startYear =
+    person.birth_year + Math.floor(Math.random() * (maxStartYear - person.birth_year));
+  const endYear = startYear + periodLength;
+
+  return {
+    start_year: startYear,
+    end_year: endYear,
     title: `Тестовый период ${periodCounter}`,
     description: `Описание тестового периода ${periodCounter}`,
     location: `Тестовая локация ${periodCounter}`,
@@ -129,11 +180,11 @@ export function createPersonWithRelations(overrides?: {
   const person = createTestPerson(overrides?.person);
 
   const achievements = Array.from({ length: overrides?.achievementsCount || 2 }, () =>
-    createTestAchievement({ person_id: person.id })
+    createTestAchievementForPerson(person, { person_id: person.id })
   );
 
   const periods = Array.from({ length: overrides?.periodsCount || 2 }, () =>
-    createTestPeriod({ person_id: person.id })
+    createTestPeriodForPerson(person, { person_id: person.id })
   );
 
   return { person, achievements, periods };

@@ -44,11 +44,25 @@ export async function clearTestData(): Promise<void> {
   try {
     await client.query('BEGIN');
 
-    const result = await client.query("SELECT tablename FROM pg_tables WHERE schemaname = 'test'");
-    const tables = result.rows.map((row: { tablename: string }) => row.tablename);
+    // Определяем порядок очистки таблиц (сначала дочерние, потом родительские)
+    const tablesOrder = [
+      'achievements',
+      'periods',
+      'persons',
+      'countries',
+      'users',
+      'lists',
+      'list_items',
+    ];
 
-    for (const table of tables) {
-      await client.query(`TRUNCATE TABLE test.${table} RESTART IDENTITY CASCADE`);
+    // Очищаем таблицы в правильном порядке
+    for (const tableName of tablesOrder) {
+      try {
+        await client.query(`DELETE FROM test.${tableName}`);
+      } catch (error) {
+        // Игнорируем ошибки для несуществующих таблиц
+        console.log(`⚠️  Таблица test.${tableName} не найдена или уже пуста`);
+      }
     }
 
     await client.query('COMMIT');
@@ -95,7 +109,10 @@ export async function seedTestData(): Promise<void> {
       await client.query(seedSQL);
       seededViaFile = true;
     } catch (seedError: any) {
-      console.warn('⚠️  Не удалось выполнить seed-data.sql, используем минимальный набор пользователей:', seedError.message || seedError);
+      console.warn(
+        '⚠️  Не удалось выполнить seed-data.sql, используем минимальный набор пользователей:',
+        seedError.message || seedError
+      );
       await createTestUsers(client);
     }
 

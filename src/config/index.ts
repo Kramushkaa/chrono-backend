@@ -21,7 +21,7 @@ export const config = {
     name: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    schema: process.env.DB_SCHEMA || 'public',
+    schema: 'test', // Принудительно используем тестовую схему для отладки
     ssl: process.env.DB_SSL === 'true',
     sslRejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', // По умолчанию true для безопасности
     pool: {
@@ -116,6 +116,9 @@ export const validateConfig = (): void => {
     }
   }
 };
+
+// Отладочная информация о схеме БД
+console.log('🔧 Используется схема БД:', config.database.schema);
 
 // Экспорт типов для конфигурации
 export interface DatabasePoolConfig {

@@ -41,15 +41,9 @@ describe('cleanup-quiz-sessions', () => {
 
       const result = await cleanupExpiredQuizSessions(mockPool);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM quiz_sessions')
-      );
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE expires_at < NOW()')
-      );
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND finished_at IS NULL')
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM quiz_sessions'));
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE expires_at < NOW()'));
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('AND finished_at IS NULL'));
       expect(result.deletedCount).toBe(5);
       expect(result.timestamp).toBeInstanceOf(Date);
       expect(logger.info).toHaveBeenCalledWith(
@@ -140,12 +134,8 @@ describe('cleanup-quiz-sessions', () => {
 
       const result = await cleanupOldFinishedQuizSessions(mockPool);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM quiz_sessions')
-      );
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("INTERVAL '90 days'")
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM quiz_sessions'));
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("INTERVAL '90 days'"));
       expect(result.deletedCount).toBe(10);
       expect(logger.info).toHaveBeenCalledWith(
         expect.stringContaining('Удалено старых завершённых quiz sessions: 10'),
@@ -165,9 +155,7 @@ describe('cleanup-quiz-sessions', () => {
 
       const result = await cleanupOldFinishedQuizSessions(mockPool, 30);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("INTERVAL '30 days'")
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("INTERVAL '30 days'"));
       expect(result.deletedCount).toBe(3);
       expect(logger.info).toHaveBeenCalledWith(
         expect.stringContaining('Удалено старых завершённых quiz sessions: 3'),
@@ -206,9 +194,7 @@ describe('cleanup-quiz-sessions', () => {
       const error = new Error('Query timeout');
       mockQuery.mockRejectedValue(error);
 
-      await expect(cleanupOldFinishedQuizSessions(mockPool, 90)).rejects.toThrow(
-        'Query timeout'
-      );
+      await expect(cleanupOldFinishedQuizSessions(mockPool, 90)).rejects.toThrow('Query timeout');
 
       expect(logger.error).toHaveBeenCalledWith(
         'Cleanup: Ошибка при очистке старых quiz sessions',
@@ -301,9 +287,7 @@ describe('cleanup-quiz-sessions', () => {
 
       await runQuizSessionsCleanup(mockPool, true, 45);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("INTERVAL '45 days'")
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("INTERVAL '45 days'"));
     });
 
     it('should handle errors in expired cleanup', async () => {
@@ -320,9 +304,7 @@ describe('cleanup-quiz-sessions', () => {
         })
         .mockRejectedValueOnce(new Error('Table lock error'));
 
-      await expect(runQuizSessionsCleanup(mockPool, true)).rejects.toThrow(
-        'Table lock error'
-      );
+      await expect(runQuizSessionsCleanup(mockPool, true)).rejects.toThrow('Table lock error');
     });
 
     it('should use default parameters correctly', async () => {
@@ -397,9 +379,7 @@ describe('cleanup-quiz-sessions', () => {
 
       const result = await cleanupOldFinishedQuizSessions(mockPool, 0);
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("INTERVAL '0 days'")
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("INTERVAL '0 days'"));
       expect(result.deletedCount).toBe(0);
     });
 
@@ -441,11 +421,8 @@ describe('cleanup-quiz-sessions', () => {
 
         await cleanupOldFinishedQuizSessions(mockPool, days);
 
-        expect(mockQuery).toHaveBeenCalledWith(
-          expect.stringContaining(`INTERVAL '${days} days'`)
-        );
+        expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining(`INTERVAL '${days} days'`));
       }
     });
   });
 });
-

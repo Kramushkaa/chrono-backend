@@ -149,14 +149,30 @@ test.describe('Раздел "Мои" на странице управления 
       saveAsDraft: true,
     };
 
-    await fetch('http://localhost:3001/api/persons/propose', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${loginResult.tokens.accessToken}`,
+    await moderatorPage.evaluate(
+      async ({ payload }) => {
+        const auth = window.localStorage.getItem('auth');
+        const token = auth ? JSON.parse(auth)?.accessToken : undefined;
+        if (!token) {
+          throw new Error('Не удалось получить токен модератора для manage-mine seed');
+        }
+
+        const response = await fetch('http://localhost:3001/api/persons/propose', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(`Seed person manage-mine failed: ${response.status} ${text}`);
+        }
       },
-      body: JSON.stringify(seedPerson),
-    });
+      { payload: seedPerson }
+    );
 
     const personOption = { value: seedPerson.id, label: seedPerson.name };
     await moderatorPage.addInitScript(
@@ -209,7 +225,7 @@ test.describe('Раздел "Мои" на странице управления 
 
   test('созданное достижение отображается среди "Моих" @regression', async ({ moderatorPage }) => {
     const managePage = new ManagePage(moderatorPage);
-    const achievement = createTestAchievement();
+    const achievement = createTestAchievementForPerson(seededPerson);
 
     await managePage.goto();
     await managePage.switchTab('achievements');
@@ -257,15 +273,7 @@ test.describe('Раздел "Мои" на странице управления 
     moderatorPage,
   }) => {
     const managePage = new ManagePage(moderatorPage);
-    const startYear = (seededPerson.birthYear ?? 1900) + 2;
-    const endYear = startYear + 3;
-    const periodTitle = `E2E период ${startYear}-${endYear}`;
-    const period = createTestPeriod({
-      start_year: startYear,
-      end_year: endYear,
-      title: periodTitle,
-      description: `Описание периода ${startYear}`,
-    });
+    const period = createTestPeriodForPerson(seededPerson);
 
     await managePage.goto();
     await managePage.switchTab('periods');
@@ -276,8 +284,8 @@ test.describe('Раздел "Мои" на странице управления 
       moderatorPage,
       'periods',
       item =>
-        String(item?.startYear ?? item?.start_year ?? '') === String(startYear) &&
-        String(item?.endYear ?? item?.end_year ?? '') === String(endYear)
+        String(item?.startYear ?? item?.start_year ?? '') === String(period.start_year) &&
+        String(item?.endYear ?? item?.end_year ?? '') === String(period.end_year)
     );
     await expect
       .poll(async () => await fetchMineCount(moderatorPage, 'periods'), { timeout: 15000 })
@@ -287,6 +295,6 @@ test.describe('Раздел "Мои" на странице управления 
     const list = moderatorPage.locator('.items-list');
     await expect(list).toBeVisible();
     await expect(list).toContainText(seededPerson.name);
-    await expect(list).toContainText(String(startYear));
+    await expect(list).toContainText(String(period.start_year));
   });
 });
