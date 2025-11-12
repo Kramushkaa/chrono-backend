@@ -5,9 +5,11 @@ import {
   createTestPerson,
   createTestAchievement,
   createTestPeriod,
+  createTestAchievementForPerson,
+  createTestPeriodForPerson,
 } from '../utils/test-data-factory';
-import { loginUser, DEFAULT_TEST_USER } from '../helpers/auth-helper';
-import type { AuthTokens } from '../types';
+import { loginUser } from '../helpers/auth-helper';
+import type { AuthTokens, TestPerson } from '../types';
 
 const stubCategoriesResponse = {
   success: true,
@@ -121,16 +123,22 @@ async function waitForMineItem(
     .toBeTruthy();
 }
 
-let seededPerson: {
-  id: string;
-  name: string;
-  birthYear: number;
-  deathYear: number;
-};
+let seededPerson: TestPerson;
 
 test.describe('Раздел "Мои" на странице управления @manage', () => {
-  test.beforeEach(async ({ moderatorPage }) => {
-    const loginResult = await loginUser(DEFAULT_TEST_USER);
+  test.beforeEach(async ({ browserName, moderatorPage, moderatorCredentials }) => {
+    apiTokens = null;
+    if (browserName === 'firefox' || browserName === 'mobile-safari') {
+      await moderatorPage.waitForTimeout(500);
+    }
+    await moderatorPage.waitForLoadState('networkidle').catch(async () => {
+      await moderatorPage.waitForTimeout(500);
+    });
+
+    const loginResult = await loginUser({
+      email: moderatorCredentials.email,
+      password: moderatorCredentials.password,
+    });
     if (!loginResult.success || !loginResult.tokens) {
       throw new Error('Не удалось получить токен для подготовки данных manage-mine');
     }
@@ -196,8 +204,11 @@ test.describe('Раздел "Мои" на странице управления 
     seededPerson = {
       id: seedPerson.id,
       name: seedPerson.name,
-      birthYear: seedPerson.birthYear,
-      deathYear: seedPerson.deathYear,
+      birth_year: seedPerson.birthYear,
+      death_year: seedPerson.deathYear,
+      category: seedPerson.category,
+      bio: seedPerson.description,
+      wiki_link: seedPerson.wikiLink ?? undefined,
     };
   });
 

@@ -49,6 +49,7 @@ export function createTestModerator(overrides?: Partial<TestUser>): TestUser {
 export function createTestPerson(overrides?: Partial<TestPerson>): TestPerson {
   personCounter++;
   const timestamp = Date.now();
+  const uniqueSuffix = `${personCounter}-${timestamp}`;
 
   const categories = ['scientists', 'politicians', 'writers', 'artists', 'entrepreneurs'];
   const countries = ['Россия', 'США', 'Германия', 'Великобритания', 'Франция'];
@@ -59,15 +60,15 @@ export function createTestPerson(overrides?: Partial<TestPerson>): TestPerson {
   const occupation = occupations[personCounter % occupations.length];
 
   return {
-    id: `test-person-${personCounter}-${timestamp}`,
-    name: `Тестовая Личность ${personCounter}`,
+    id: `test-person-${uniqueSuffix}`,
+    name: `Тестовая Личность ${uniqueSuffix}`,
     birth_year: 1800 + (personCounter % 200),
     death_year: 1850 + (personCounter % 200),
     category,
     country,
     occupation,
-    bio: `Биография тестовой личности ${personCounter}`,
-    wiki_link: `https://ru.wikipedia.org/wiki/Test_Person_${personCounter}`,
+    bio: `Биография тестовой личности ${uniqueSuffix}`,
+    wiki_link: `https://ru.wikipedia.org/wiki/Test_Person_${uniqueSuffix}`,
     ...overrides,
   };
 }
