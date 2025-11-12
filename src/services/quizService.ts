@@ -460,8 +460,16 @@ export class QuizService extends BaseService {
    */
   async getQuizSession(sessionToken: string): Promise<QuizSessionDB | null> {
     const query = `
-      SELECT id, session_token, user_id, created_at, expires_at, finished_at, 
-             setup_config, share_code, share_enabled
+      SELECT 
+        id,
+        shared_quiz_id,
+        user_id,
+        session_token,
+        answers,
+        started_at,
+        started_at AS created_at,
+        expires_at,
+        finished_at
       FROM quiz_sessions
       WHERE session_token = $1 
         AND expires_at > NOW() 
