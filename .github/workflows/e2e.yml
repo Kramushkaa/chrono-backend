@@ -43,7 +43,7 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/chronoline-frontend
           path: frontend
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.FRONTEND_REPO_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -148,7 +148,7 @@ jobs:
           script: |
             const fs = require('fs');
             const reportPath = 'backend/e2e-results.json';
-            
+
             if (fs.existsSync(reportPath)) {
               const results = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
               const { passed, failed, skipped } = results.stats;
@@ -169,9 +169,3 @@ jobs:
                 body: comment
               });
             }
-
-
-
-
-
-
