@@ -110,11 +110,55 @@ export function createPublicPersonRoutes(
 
       // Преобразуем периоды из frontend формата
       const rawLifePeriods = req.body?.lifePeriods || [];
-      const lifePeriods = rawLifePeriods.map((lp: any) => ({
-        countryId: Number(lp.countryId),
-        start: Number(lp.start),
-        end: Number(lp.end),
-      }));
+      
+      // Фильтруем и преобразуем только валидные периоды
+      const lifePeriods = rawLifePeriods
+        .filter((lp: any) => {
+          // Пропускаем только полностью заполненные периоды
+          if (!lp.countryId || lp.countryId === '') {
+            logger.warn('Период отброшен: пустой countryId', { lp, body: req.body });
+            return false;
+          }
+          if (lp.start === '' || lp.end === '' || lp.start == null || lp.end == null) {
+            logger.warn('Период отброшен: пустые годы', { lp, body: req.body });
+            return false;
+          }
+          const countryId = Number(lp.countryId);
+          const start = Number(lp.start);
+          const end = Number(lp.end);
+          if (!Number.isInteger(countryId) || countryId <= 0) {
+            logger.warn('Период отброшен: невалидный countryId', { lp, countryId, body: req.body });
+            return false;
+          }
+          if (!Number.isInteger(start) || !Number.isInteger(end)) {
+            logger.warn('Период отброшен: невалидные числа', { lp, start, end, body: req.body });
+            return false;
+          }
+          if (start > end) {
+            logger.warn('Период отброшен: start > end', { lp, start, end, body: req.body });
+            return false;
+          }
+          return true;
+        })
+        .map((lp: any) => ({
+          countryId: Number(lp.countryId),
+          start: Number(lp.start),
+          end: Number(lp.end),
+        }));
+      
+      if (rawLifePeriods.length > 0 && lifePeriods.length === 0) {
+        logger.warn('Все периоды были отфильтрованы', { 
+          raw: rawLifePeriods, 
+          filtered: lifePeriods,
+          body: req.body 
+        });
+      } else if (lifePeriods.length > 0) {
+        logger.info('Периоды жизни обработаны', { 
+          rawCount: rawLifePeriods.length, 
+          filteredCount: lifePeriods.length,
+          periods: lifePeriods 
+        });
+      }
 
       const user = {
         sub: (req as any).user!.sub,
