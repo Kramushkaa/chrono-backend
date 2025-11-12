@@ -8,9 +8,9 @@ import {
   createTestAchievementForPerson,
   createTestPeriodForPerson,
 } from '../utils/test-data-factory';
-import { loginUser, DEFAULT_TEST_USER } from '../helpers/auth-helper';
+import { loginUser } from '../helpers/auth-helper';
 import { createTestPool } from '../utils/db-reset';
-import type { AuthTokens } from '../types';
+import type { TestPerson } from '../types';
 
 const stubCategoriesResponse = {
   success: true,
@@ -38,20 +38,13 @@ function fulfillJson(route: Route, body: unknown, status = 200): Promise<void> {
   });
 }
 
-interface SeededPerson {
-  id: string;
-  name: string;
-}
-
 type LifePeriodRow = {
   start_year: number;
   end_year: number;
   country_id: number | null;
 };
 
-let seededPerson: SeededPerson;
-let apiTokens: AuthTokens;
-let currentUserId: number;
+let seededPerson: TestPerson;
 let countriesSeedPromise: Promise<void> | null = null;
 
 async function ensureCountriesSeeded(): Promise<void> {
@@ -100,16 +93,8 @@ async function ensureCountriesSeeded(): Promise<void> {
 }
 
 test.describe('Проверка записей в БД при управлении контентом @regression @db', () => {
-  test.beforeEach(async ({ moderatorPage }) => {
+  test.beforeEach(async ({ moderatorPage, moderatorCredentials }) => {
     await ensureCountriesSeeded();
-
-    const loginResult = await loginUser(DEFAULT_TEST_USER);
-    if (!loginResult.success || !loginResult.tokens || !loginResult.user?.id) {
-      throw new Error('Не удалось получить токены для manage-db');
-    }
-
-    apiTokens = loginResult.tokens;
-    currentUserId = Number(loginResult.user.id);
 
     const seedPerson = {
       id: `manage-db-base-${Date.now()}`,
@@ -155,7 +140,7 @@ test.describe('Проверка записей в БД при управлени
         (window as any).__E2E_PERSON_OPTIONS__ = [option];
         (window as any).__E2E_DEFAULT_PERSON__ = option.value;
       },
-      { o: option }
+      { option }
     );
 
     await moderatorPage.route('**/api/categories', route =>
@@ -168,12 +153,35 @@ test.describe('Проверка записей в БД при управлени
       fulfillJson(route, stubCountryOptionsResponse)
     );
 
-    seededPerson = { id: seedPerson.id, name: seedPerson.name };
+    seededPerson = {
+      id: seedPerson.id,
+      name: seedPerson.name,
+      birth_year: seedPerson.birthYear,
+      death_year: seedPerson.deathYear,
+      category: seedPerson.category,
+      bio: seedPerson.description,
+      wiki_link: seedPerson.wikiLink ?? undefined,
+    };
   });
 
   test('создание личности сохраняет запись и периоды жизни в БД @regression @db', async ({
+    browserName,
     moderatorPage,
+    moderatorCredentials,
   }) => {
+    if (browserName === 'firefox' || browserName === 'mobile-safari') {
+      await moderatorPage.waitForTimeout(500);
+    }
+
+    const loginResult = await loginUser({
+      email: moderatorCredentials.email,
+      password: moderatorCredentials.password,
+    });
+    if (!loginResult.success || !loginResult.user?.id) {
+      throw new Error('Не удалось получить данные пользователя manage-db');
+    }
+    const currentUserId = Number(loginResult.user.id);
+
     const managePage = new ManagePage(moderatorPage);
     const person = createTestPerson();
 
@@ -192,6 +200,20 @@ test.describe('Проверка записей в БД при управлени
          LIMIT 1`,
         [currentUserId, person.name]
       );
+
+      if (personRow.rowCount === 0) {
+        // Если запись не найдена, проверим все записи этого пользователя для отладки
+        const allRows = await pool.query(
+          `SELECT id, name, birth_year, death_year, created_by, created_at
+           FROM persons
+           WHERE created_by = $1
+           ORDER BY created_at DESC
+           LIMIT 5`,
+          [currentUserId]
+        );
+        console.log(`Найдено записей пользователя ${currentUserId}:`, allRows.rows);
+        console.log(`Ищем имя: "${person.name}"`);
+      }
 
       expect(personRow.rowCount).toBe(1);
       const dbPerson = personRow.rows[0];
@@ -240,7 +262,17 @@ test.describe('Проверка записей в БД при управлени
 
   test('создание достижения фиксируется в таблице achievements @regression @db', async ({
     moderatorPage,
+    moderatorCredentials,
   }) => {
+    const loginResult = await loginUser({
+      email: moderatorCredentials.email,
+      password: moderatorCredentials.password,
+    });
+    if (!loginResult.success || !loginResult.user?.id) {
+      throw new Error('Не удалось получить данные пользователя для achievements');
+    }
+    const currentUserId = Number(loginResult.user.id);
+
     const managePage = new ManagePage(moderatorPage);
     const achievement = createTestAchievementForPerson(seededPerson);
 
@@ -272,7 +304,17 @@ test.describe('Проверка записей в БД при управлени
 
   test('создание периода добавляет запись о периоде в БД @regression @db', async ({
     moderatorPage,
+    moderatorCredentials,
   }) => {
+    const loginResult = await loginUser({
+      email: moderatorCredentials.email,
+      password: moderatorCredentials.password,
+    });
+    if (!loginResult.success || !loginResult.user?.id) {
+      throw new Error('Не удалось получить данные пользователя для periods');
+    }
+    const currentUserId = Number(loginResult.user.id);
+
     const managePage = new ManagePage(moderatorPage);
     const period = createTestPeriodForPerson(seededPerson);
 

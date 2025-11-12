@@ -26,7 +26,8 @@ module.exports = [
       parserOptions: {
         ecmaVersion: 2024,
         sourceType: 'module',
-        project: './tsconfig.json',
+        project: './tsconfig.e2e.json',
+        tsconfigRootDir: __dirname,
       },
       globals: {
         console: 'readonly',

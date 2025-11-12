@@ -14,9 +14,16 @@ export const DEFAULT_TEST_USER: TestUser = {
   password: 'Test123!'
 };
 
+export const DEFAULT_ADMIN_USER: TestUser = {
+  username: 'admin',
+  email: 'admin@chrononinja.test',
+  password: 'admin123',
+  role: 'admin',
+};
+
 const PASSWORD_HASH_CACHE = new Map<string, string>();
 
-async function ensureTestUserInDb(user: TestUser): Promise<void> {
+export async function ensureTestUserInDb(user: TestUser): Promise<void> {
   const pool = createTestPool();
   const client = await pool.connect();
 

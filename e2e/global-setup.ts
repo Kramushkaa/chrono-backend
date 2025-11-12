@@ -4,6 +4,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 import { chromium, FullConfig } from '@playwright/test';
 import { resetDatabase, seedTestData } from './utils/db-reset';
 import * as fs from 'fs';
+import { ensureTestUserInDb, DEFAULT_ADMIN_USER, DEFAULT_TEST_USER } from './helpers/auth-helper';
 
 /**
  * Global setup для E2E тестов
@@ -81,6 +82,17 @@ async function globalSetup(config: FullConfig) {
     console.log('✅ Seed данные загружены');
   } catch (error) {
     console.error('❌ Ошибка при загрузке seed данных:', error);
+    throw error;
+  }
+
+  // 5. Создаём базовые учётные записи
+  console.log('👤 Создание базовых тестовых пользователей (user, admin)...');
+  try {
+    await ensureTestUserInDb(DEFAULT_TEST_USER);
+    await ensureTestUserInDb(DEFAULT_ADMIN_USER);
+    console.log('✅ Базовые пользователи готовы (testuser / admin)');
+  } catch (error) {
+    console.error('❌ Ошибка при создании пользователей:', error);
     throw error;
   }
 

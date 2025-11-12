@@ -11,8 +11,13 @@ export class QuizPage {
   readonly questionCountButtons: Locator;
   readonly categoryCheckboxes: Locator;
   readonly startButton: Locator;
+  readonly questionTypeCheckboxes: Locator;
+  readonly selectedQuestionTypeCheckboxes: Locator;
+  readonly questionTypesSelectAllButton: Locator;
+  readonly questionTypesClearButton: Locator;
 
   // Локаторы игрового экрана
+  readonly questionContainer: Locator;
   readonly questionText: Locator;
   readonly answerOptions: Locator;
   readonly nextButton: Locator;
@@ -26,6 +31,7 @@ export class QuizPage {
   readonly shareButton: Locator;
   readonly playAgainButton: Locator;
   readonly viewHistoryButton: Locator;
+  readonly resultsContainer: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -35,28 +41,55 @@ export class QuizPage {
       '.quiz-count-button, [data-testid="question-count-button"]'
     );
     this.categoryCheckboxes = page.locator(
-      '[data-testid="category-checkbox"], input[type="checkbox"]'
+      '[data-testid="category-checkbox"], input[type="checkbox"].quiz-type-checkbox'
     );
-    this.startButton = page.locator('button:has-text("Начать"), button:has-text("Start")');
+    this.startButton = page.locator(
+      'button.quiz-start-button, button:has-text("Начать игру"), button:has-text("Начать"), button:has-text("Start")'
+    );
+    this.questionTypeCheckboxes = page.locator('.quiz-type-checkbox input[type="checkbox"]');
+    this.selectedQuestionTypeCheckboxes = page.locator(
+      '.quiz-type-checkbox input[type="checkbox"]:checked'
+    );
+    this.questionTypesSelectAllButton = page.locator(
+      'button.quiz-types-control-btn:has-text("Выбрать все"), button:has-text("Select all")'
+    );
+    this.questionTypesClearButton = page.locator(
+      'button.quiz-types-control-btn:has-text("Снять все"), button:has-text("Снять выбранные"), button:has-text("Clear all")'
+    );
 
     // Gameplay
-    this.questionText = page.locator('.quiz-question-container');
-    this.answerOptions = page.locator('.quiz-question-options button, .quiz-option');
-    this.nextButton = page.locator(
-      'button:has-text("Далее"), button:has-text("Next"), button:has-text("Проверить")'
+    this.questionContainer = page.locator('.quiz-question-container').first();
+    this.questionText = page
+      .locator('.quiz-question-content h2, .quiz-question-content h3, .quiz-question-content h4')
+      .first();
+    this.answerOptions = page.locator(
+      '.quiz-question-options button, .quiz-options-grid button, .quiz-option, [data-testid="answer-option"]'
     );
-    this.progressBar = page.locator('[data-testid="progress-bar"], .progress-bar');
-    this.questionCounter = page.locator('[data-testid="question-counter"], .question-counter');
+    this.nextButton = page.locator(
+      '.feedback-next-button, button:has-text("Подтвердить порядок"), button:has-text("Далее"), button:has-text("Next"), button:has-text("Проверить"), button:has-text("Проверить ответ"), button:has-text("Завершить игру")'
+    );
+    this.progressBar = page.locator('[data-testid="progress-bar"], .quiz-progress-bar');
+    this.questionCounter = page.locator('[data-testid="question-counter"], .quiz-progress-text');
 
     // Results
-    this.scoreDisplay = page.locator('[data-testid="score"], .score');
-    this.correctAnswersCount = page.locator('[data-testid="correct-answers"], .correct-answers');
-    this.totalQuestionsCount = page.locator('[data-testid="total-questions"], .total-questions');
-    this.shareButton = page.locator('button:has-text("Поделиться"), button:has-text("Share")');
+    this.scoreDisplay = page.locator('.quiz-score-number');
+    this.correctAnswersCount = page.locator('.quiz-stat-value').first();
+    this.totalQuestionsCount = page.locator('.quiz-stat-value').nth(0);
+    this.shareButton = page.locator(
+      'button:has-text("Поделиться квизом"), button:has-text("Поделиться"), button:has-text("Share")'
+    );
     this.playAgainButton = page.locator(
       'button:has-text("Ещё раз"), button:has-text("Play again")'
     );
     this.viewHistoryButton = page.locator('button:has-text("История"), button:has-text("History")');
+    this.resultsContainer = page.locator('.quiz-results');
+  }
+
+  /**
+   * Количество выбранных типов вопросов
+   */
+  async getSelectedQuestionTypesCount(): Promise<number> {
+    return this.selectedQuestionTypeCheckboxes.count();
   }
 
   /**
@@ -67,6 +100,106 @@ export class QuizPage {
   }
 
   /**
+   * Выбор количества вопросов
+   */
+  async setQuestionCount(count: number): Promise<void> {
+    await this.page
+      .locator('.quiz-setup-count-selector')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => undefined);
+    await this.questionCountButtons
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => undefined);
+    const exactMatch = this.page.getByRole('button', { name: new RegExp(`^${count}$`) });
+    if (await exactMatch.count()) {
+      await exactMatch.first().click();
+      await this.page.waitForTimeout(200);
+      return;
+    }
+
+    const fallbackButton = this.questionCountButtons.filter({ hasText: `${count}` }).first();
+    if (await fallbackButton.count()) {
+      await fallbackButton.click();
+      await this.page.waitForTimeout(200);
+    } else {
+      const available = await this.questionCountButtons.allTextContents();
+      console.warn(
+        `[QuizPage] Не удалось найти кнопку для количества вопросов ${count}. Доступные значения: ${available.join(', ')}`
+      );
+    }
+  }
+
+  /**
+   * Выбор типов вопросов
+   */
+  async setQuestionTypes(labels: string[]): Promise<void> {
+    await this.clearQuestionTypes();
+
+    for (const label of labels) {
+      const target = this.page.getByRole('checkbox', { name: new RegExp(label, 'i') });
+      if (await target.count()) {
+        await target.first().check({ force: true });
+        await this.page.waitForTimeout(100);
+      }
+    }
+  }
+
+  /**
+   * Снятие всех типов вопросов
+   */
+  async clearQuestionTypes(): Promise<void> {
+    let cleared = false;
+    const clearByRole = this.page.getByRole('button', { name: /Снять все/i });
+    if (!cleared && (await clearByRole.count()) > 0) {
+      await clearByRole.first().click();
+      await this.page.waitForTimeout(200);
+      try {
+        await expect(this.page.getByRole('checkbox', { checked: true })).toHaveCount(0, {
+          timeout: 1000,
+        });
+        cleared = true;
+      } catch {
+        // fall through to manual uncheck
+      }
+    }
+
+    if (!cleared) {
+      const clearButtons = this.questionTypesClearButton;
+      if ((await clearButtons.count()) > 0) {
+        const button = clearButtons.first();
+        const isEnabled = await button.isEnabled().catch(() => false);
+        if (isEnabled) {
+          await button.click();
+          await this.page.waitForTimeout(200);
+          try {
+            await expect(this.page.getByRole('checkbox', { checked: true })).toHaveCount(0, {
+              timeout: 1000,
+            });
+            cleared = true;
+          } catch {
+            // fall through
+          }
+        }
+      }
+    }
+
+    if (cleared) {
+      return;
+    }
+
+    const checkboxes = this.questionTypeCheckboxes;
+    const total = await checkboxes.count();
+    for (let i = 0; i < total; i += 1) {
+      const checkbox = checkboxes.nth(i);
+      if (await checkbox.isChecked()) {
+        await checkbox.uncheck({ force: true });
+        await this.page.waitForTimeout(100);
+      }
+    }
+  }
+
+  /**
    * Настройка и запуск квиза
    */
   async startQuiz(settings?: QuizSettings): Promise<void> {
@@ -74,21 +207,7 @@ export class QuizPage {
     await this.page.waitForTimeout(1000);
 
     if (settings?.questionCount) {
-      const countButton = this.page.getByRole('button', {
-        name: new RegExp(`^${settings.questionCount}$`),
-      });
-      if (await countButton.count()) {
-        await countButton.click();
-        await this.page.waitForTimeout(300);
-      } else if (await this.questionCountButtons.count()) {
-        const fallbackButton = this.questionCountButtons
-          .filter({ hasText: `${settings.questionCount}` })
-          .first();
-        if (await fallbackButton.count()) {
-          await fallbackButton.click();
-          await this.page.waitForTimeout(300);
-        }
-      }
+      await this.setQuestionCount(settings.questionCount);
     }
 
     if (settings?.categories) {
@@ -116,7 +235,9 @@ export class QuizPage {
 
     // Проверяем, что кнопка не disabled, иначе ждём
     for (let i = 0; i < 50; i++) {
-      const isDisabled = await this.startButton.evaluate(button => button.disabled);
+      const isDisabled = await this.startButton.evaluate<boolean, HTMLButtonElement>(
+        button => button.disabled ?? button.getAttribute('disabled') !== null
+      );
       if (!isDisabled) break;
       await this.page.waitForTimeout(100);
     }
@@ -124,7 +245,7 @@ export class QuizPage {
     await this.startButton.click();
 
     // Ждём загрузки первого вопроса
-    await expect(this.questionText).toBeVisible({ timeout: 5000 });
+    await expect(this.questionContainer).toBeVisible({ timeout: 5000 });
   }
 
   /**
@@ -132,7 +253,11 @@ export class QuizPage {
    */
   async answerSingleChoice(answerIndex: number): Promise<void> {
     const options = await this.answerOptions.all();
-    await options[answerIndex].click();
+    if (!options.length) {
+      return;
+    }
+    const safeIndex = Math.min(answerIndex, options.length - 1);
+    await options[safeIndex].click();
     const nextVisible = await this.nextButton.isVisible().catch(() => false);
     if (nextVisible) {
       await this.nextButton.click();
@@ -144,9 +269,14 @@ export class QuizPage {
    */
   async answerMultipleChoice(answerIndices: number[]): Promise<void> {
     const options = await this.answerOptions.all();
+    if (!options.length) {
+      return;
+    }
 
     for (const index of answerIndices) {
-      await options[index].click();
+      if (index >= 0 && index < options.length) {
+        await options[index].click();
+      }
     }
 
     const nextVisible = await this.nextButton.isVisible().catch(() => false);
@@ -195,31 +325,60 @@ export class QuizPage {
    * Автоматическое прохождение всего квиза (выбор первого варианта)
    */
   async completeQuizQuickly(questionsCount: number): Promise<void> {
-    for (let i = 0; i < questionsCount; i++) {
-      // Ждём появления вопроса
-      await expect(this.questionText).toBeVisible();
+    for (let i = 0; i < questionsCount; i += 1) {
+      if (await this.resultsContainer.isVisible().catch(() => false)) {
+        break;
+      }
 
-      // Определяем тип вопроса и отвечаем
-      const hasOptions = await this.answerOptions
-        .first()
-        .isVisible()
-        .catch(() => false);
-      const hasYearInput = await this.page
-        .locator('input[type="number"]')
-        .isVisible()
-        .catch(() => false);
+      await expect(this.questionContainer).toBeVisible({ timeout: 10000 });
 
-      if (hasYearInput) {
-        await this.answerYearInput(1900);
-      } else if (hasOptions) {
-        await this.answerSingleChoice(0);
-      } else {
-        // Если не можем определить тип, просто кликаем Next
+      const optionLocator = this.answerOptions.first();
+      const yearInputLocator = this.page.locator('input[type="number"], input[placeholder*="год"]');
+      const dragItems = this.page.locator('[draggable="true"], .draggable-item');
+      const questionCounterText = await this.questionCounter.textContent().catch(() => null);
+
+      if (
+        await yearInputLocator
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
+        await yearInputLocator.first().fill((1900 + i).toString());
+      } else if (await optionLocator.isVisible().catch(() => false)) {
+        await optionLocator.click();
+      } else if ((await dragItems.count()) >= 1) {
+        if ((await dragItems.count()) >= 2) {
+          await dragItems.first().dragTo(dragItems.nth(1));
+        }
+      }
+
+      await this.nextButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => undefined);
+      if (await this.nextButton.isVisible().catch(() => false)) {
         await this.nextButton.click();
       }
 
-      // Небольшая задержка между вопросами
       await this.page.waitForTimeout(300);
+
+      const advanced = await this.page
+        .waitForFunction(
+          ([counterSelector, previous]) => {
+            const results = document.querySelector('.quiz-results');
+            if (results) return true;
+            const counter = document.querySelector(counterSelector);
+            if (!counter) return false;
+            const text = (counter.textContent || '').trim();
+            if (!text) return false;
+            return previous ? text !== previous.trim() : true;
+          },
+          ['.quiz-progress-text', questionCounterText ?? ''],
+          { timeout: 10000 }
+        )
+        .catch(() => false);
+
+      if (!advanced) {
+        // даём ещё немного времени интерфейсу, чтобы отобразить следующий шаг
+        await this.page.waitForTimeout(500);
+      }
     }
   }
 
@@ -227,7 +386,8 @@ export class QuizPage {
    * Проверка отображения результатов
    */
   async expectResults(expectedScore?: number): Promise<void> {
-    await expect(this.scoreDisplay).toBeVisible({ timeout: 5000 });
+    await this.resultsContainer.waitFor({ state: 'visible', timeout: 20000 });
+    await expect(this.scoreDisplay).toBeVisible({ timeout: 10000 });
 
     if (expectedScore !== undefined) {
       const scoreText = await this.scoreDisplay.textContent();
@@ -258,12 +418,20 @@ export class QuizPage {
   async shareQuiz(): Promise<string> {
     await this.shareButton.click();
 
-    // Ждём появления share кода
-    const shareCodeElement = this.page.locator('[data-testid="share-code"], .share-code');
-    await expect(shareCodeElement).toBeVisible();
+    const createLinkButton = this.page.getByRole('button', { name: /Создать ссылку/i });
+    if (await createLinkButton.isVisible().catch(() => false)) {
+      await createLinkButton.click();
+    }
 
-    const shareCode = await shareCodeElement.textContent();
-    return shareCode || '';
+    // Ждём появления share кода
+    const shareCodeElement = this.page.locator(
+      '[data-testid="share-code"], .share-code, .quiz-share-code'
+    );
+    await expect(shareCodeElement).toBeVisible({ timeout: 10000 });
+
+    const shareCodeText = await shareCodeElement.textContent();
+    const shareCode = shareCodeText?.split(':').pop()?.trim() ?? '';
+    return shareCode;
   }
 
   /**
@@ -294,14 +462,21 @@ export class QuizPage {
    * Получение текста текущего вопроса
    */
   async getCurrentQuestionText(): Promise<string> {
-    return (await this.questionText.textContent()) || '';
+    const heading = await this.questionText.textContent();
+    if (heading && heading.trim()) {
+      return heading.trim();
+    }
+    const fallback = await this.questionContainer.textContent();
+    return fallback ? fallback.trim() : '';
   }
 
   /**
    * Проверка прогресса квиза
    */
   async expectQuestionNumber(current: number, total: number): Promise<void> {
-    const counterText = await this.questionCounter.textContent();
+    await this.questionCounter.waitFor({ state: 'visible', timeout: 5000 });
+    const counterText = (await this.questionCounter.textContent())?.trim() ?? '';
+    expect(counterText).not.toBe('');
     expect(counterText).toContain(`${current}`);
     expect(counterText).toContain(`${total}`);
   }

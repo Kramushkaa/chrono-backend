@@ -24,6 +24,11 @@ type AuthFixtures = {
   
   // Создание пользовательской авторизованной страницы
   createAuthenticatedPage: (user: TestUser) => Promise<Page>;
+
+  // Данные текущего модератора (для использования в тестах)
+  moderatorCredentials: TestUser;
+  // Данные текущего администратора (при необходимости)
+  adminCredentials: TestUser;
 };
 
 export const test = base.extend<AuthFixtures>({
@@ -51,14 +56,18 @@ export const test = base.extend<AuthFixtures>({
   /**
    * Fixture для авторизованного модератора
    */
-  moderatorPage: async ({ browser }, use) => {
+  moderatorCredentials: async ({}, use) => {
+    const moderator = createTestModerator();
+    await use(moderator);
+  },
+
+  moderatorPage: async ({ browser, moderatorCredentials }, use) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     
-    const moderator = createTestModerator();
     const apiUrl = process.env.BACKEND_URL || 'http://localhost:3001';
     
-    const result = await setupAuthenticatedUser(page, moderator, apiUrl);
+    const result = await setupAuthenticatedUser(page, moderatorCredentials, apiUrl);
     
     if (!result.success) {
       throw new Error(`Failed to setup moderator: ${result.error}`);
@@ -74,14 +83,18 @@ export const test = base.extend<AuthFixtures>({
   /**
    * Fixture для авторизованного администратора
    */
-  adminPage: async ({ browser }, use) => {
+  adminCredentials: async ({}, use) => {
+    const admin = createTestAdmin();
+    await use(admin);
+  },
+
+  adminPage: async ({ browser, adminCredentials }, use) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     
-    const admin = createTestAdmin();
     const apiUrl = process.env.BACKEND_URL || 'http://localhost:3001';
     
-    const result = await setupAuthenticatedUser(page, admin, apiUrl);
+    const result = await setupAuthenticatedUser(page, adminCredentials, apiUrl);
     
     if (!result.success) {
       throw new Error(`Failed to setup admin: ${result.error}`);
