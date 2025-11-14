@@ -54,10 +54,3 @@ export class ModerationPage {
     await this.page.locator('button:has-text("Отправить")').click();
   }
 }
-
-
-
-
-
-
-

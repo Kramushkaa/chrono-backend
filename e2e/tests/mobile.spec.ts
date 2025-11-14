@@ -18,10 +18,3 @@ test.describe('Мобильная версия', () => {
     await timelinePage.filterByCategory('scientists');
   });
 });
-
-
-
-
-
-
-

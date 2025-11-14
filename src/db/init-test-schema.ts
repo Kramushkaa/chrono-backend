@@ -152,8 +152,3 @@ async function initTestSchema() {
 }
 
 initTestSchema();
-
-
-
-
-

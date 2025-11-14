@@ -16,10 +16,3 @@ test.describe('Админ функции', () => {
     // Approve person test
   });
 });
-
-
-
-
-
-
-

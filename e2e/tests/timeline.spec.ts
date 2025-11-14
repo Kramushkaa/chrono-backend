@@ -117,10 +117,3 @@ test.describe('Timeline', () => {
     expect(afterResetCount).toBe(initialCount);
   });
 });
-
-
-
-
-
-
-

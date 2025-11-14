@@ -180,10 +180,3 @@ export class TimelinePage {
     await expect(emptyMessage).toBeVisible();
   }
 }
-
-
-
-
-
-
-

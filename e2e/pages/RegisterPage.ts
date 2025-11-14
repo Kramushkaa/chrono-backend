@@ -142,10 +142,3 @@ export class RegisterPage {
     await expect(this.registerButton).toBeEnabled();
   }
 }
-
-
-
-
-
-
-
