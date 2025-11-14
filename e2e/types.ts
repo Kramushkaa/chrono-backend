@@ -78,6 +78,11 @@ export interface QuizSettings {
   questionCount?: number;
   categories?: string[];
   countries?: string[];
+  /**
+   * Список человекочитаемых названий типов вопросов (как на клиенте)
+   * Например: "Угадай год рождения"
+   */
+  questionTypes?: string[];
 }
 
 // Результат квиза

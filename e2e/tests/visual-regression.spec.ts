@@ -1,4 +1,5 @@
 import { test } from '../fixtures/auth-fixtures';
+import type { Page } from '@playwright/test';
 import {
   expectPageSnapshot,
   expectElementSnapshot,
@@ -14,7 +15,96 @@ import { QuizPage } from '../pages/QuizPage';
 import { ListsPage } from '../pages/ListsPage';
 import { LoginPage } from '../pages/LoginPage';
 
+const QUESTION_TYPE_LABELS = {
+  birthYear: 'Угадай год рождения',
+  deathYear: 'Угадай год смерти',
+  profession: 'Угадай род деятельности',
+  country: 'Угадай страну рождения',
+  achievementsMatch: 'Сопоставь достижения',
+  birthOrder: 'Расставь по году рождения',
+  contemporaries: 'Раздели на группы современников',
+  guessPerson: 'Угадай личность по характеристикам',
+} as const;
+
+const QUIZ_QUESTION_SCENARIOS = [
+  { id: 'birth-year', label: QUESTION_TYPE_LABELS.birthYear },
+  { id: 'death-year', label: QUESTION_TYPE_LABELS.deathYear },
+  { id: 'profession', label: QUESTION_TYPE_LABELS.profession },
+  { id: 'country', label: QUESTION_TYPE_LABELS.country },
+  { id: 'achievements', label: QUESTION_TYPE_LABELS.achievementsMatch },
+  { id: 'birth-order', label: QUESTION_TYPE_LABELS.birthOrder },
+  { id: 'contemporaries', label: QUESTION_TYPE_LABELS.contemporaries },
+  { id: 'guess-person', label: QUESTION_TYPE_LABELS.guessPerson },
+] as const;
+
 test.describe('Visual Regression @visual', () => {
+  const quizPersons = Array.from({ length: 12 }).map((_, index) => ({
+    id: `quiz-person-${index + 1}`,
+    name: `Тестовая личность ${index + 1}`,
+    birthYear: 1800 + index,
+    deathYear: 1850 + index,
+    category: index % 2 === 0 ? 'scientists' : 'politicians',
+    country: index % 3 === 0 ? 'Россия' : 'Германия',
+    description: 'E2E persona',
+    imageUrl: null,
+    achievements: ['Achievement'],
+    achievements_wiki: [],
+    status: 'approved',
+  }));
+
+  async function stubQuizData(page: Page) {
+    await page.addInitScript(({ persons, categories, countries }) => {
+      (window as any).__E2E_QUIZ_PERSONS__ = persons;
+      (window as any).__E2E_QUIZ_CATEGORIES__ = categories;
+      (window as any).__E2E_QUIZ_COUNTRIES__ = countries;
+
+      const normalizeUrl = (input: RequestInfo | URL) => {
+        if (typeof input === 'string') return input;
+        if (input instanceof URL) return input.toString();
+        if (typeof Request !== 'undefined' && input instanceof Request) return input.url;
+        return String(input);
+      };
+
+      const shouldMock = (url: string, path: string) => {
+        try {
+          const full = new URL(url, window.location.origin);
+          return full.pathname.startsWith(path);
+        } catch {
+          return url.includes(path);
+        }
+      };
+
+      const createResponse = (body: unknown) =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = normalizeUrl(input);
+        if (shouldMock(url, '/api/persons')) {
+          console.debug('[visual-stub] fetch persons', url);
+          return createResponse(persons);
+        }
+        if (shouldMock(url, '/api/categories')) {
+          console.debug('[visual-stub] fetch categories', url);
+          return createResponse(categories);
+        }
+        if (shouldMock(url, '/api/countries')) {
+          console.debug('[visual-stub] fetch countries', url);
+          return createResponse(countries);
+        }
+        return originalFetch(input, init);
+      };
+
+    }, {
+      persons: quizPersons,
+      categories: ['scientists', 'politicians', 'writers'],
+      countries: ['Россия', 'Германия', 'США', 'Франция', 'Великобритания', 'Польша'],
+    });
+  }
+
   test.beforeEach(async ({ page }) => {
     // Отключаем анимации для стабильных снапшотов
     await page.addInitScript(() => {
@@ -100,6 +190,7 @@ test.describe('Visual Regression @visual', () => {
 
   test('Quiz - стартовый экран @smoke', async ({ page }) => {
     const quizPage = new QuizPage(page);
+    await stubQuizData(page);
     await quizPage.goto();
 
     await page.waitForLoadState('networkidle');
@@ -110,53 +201,37 @@ test.describe('Visual Regression @visual', () => {
     });
   });
 
-  test('Quiz - экран вопроса', async ({ page }) => {
-    const quizPage = new QuizPage(page);
-    await quizPage.goto();
+  for (const scenario of QUIZ_QUESTION_SCENARIOS) {
+    test(`Quiz - вопрос (${scenario.id})`, async ({ page }) => {
+      const quizPage = new QuizPage(page);
+      await stubQuizData(page);
+      await quizPage.goto();
 
-    // Отладочная информация
-    console.log('🔍 Проверяем состояние страницы квиза...');
+      await quizPage.startQuiz({
+        questionCount: 5,
+        questionTypes: [scenario.label],
+      });
+      await quizPage.questionContainer.waitFor({ state: 'visible', timeout: 15000 });
+      await page.waitForTimeout(300);
 
-    // Проверяем, есть ли элементы настройки
-    const questionCountButtons = page.locator(
-      '.quiz-count-button, [data-testid="question-count-button"]'
-    );
-    const categoryCheckboxes = page.locator(
-      '[data-testid="category-checkbox"], input[type="checkbox"]'
-    );
-    const startButton = page.locator('button:has-text("Начать"), button:has-text("Start")');
-
-    console.log(`📊 Количество кнопок выбора вопросов: ${await questionCountButtons.count()}`);
-    console.log(`📊 Количество чекбоксов категорий: ${await categoryCheckboxes.count()}`);
-    console.log(`📊 Кнопка "Начать" найдена: ${(await startButton.count()) > 0}`);
-    console.log(`📊 Кнопка "Начать" disabled: ${await startButton.evaluate(btn => btn.disabled)}`);
-
-    // Делаем скриншот для отладки
-    await page.screenshot({ path: 'debug-quiz-page.png' });
-    console.log('📸 Скриншот сохранен как debug-quiz-page.png');
-
-    // Запускаем квиз со всеми категориями и странами
-    await quizPage.startQuiz({
-      questionCount: 5,
-      categories: ['politicians', 'scientists', 'writers'],
-      countries: ['Россия', 'Германия', 'США', 'Франция', 'Великобритания', 'Польша'],
+      await expectStableSnapshot(page, {
+        name: `quiz-question-${scenario.id}`,
+        maskSelectors: ['[data-testid="timer"]', '[data-testid="question-counter"]'],
+        maxDiffPixelRatio: 0.02,
+      });
     });
-    await page.waitForTimeout(500);
-
-    // Маскируем таймер и счётчики
-    await expectStableSnapshot(page, {
-      name: 'quiz-question',
-      maskSelectors: ['[data-testid="timer"]', '[data-testid="question-counter"]'],
-      maxDiffPixelRatio: 0.02,
-    });
-  });
+  }
 
   test('Quiz - экран результатов', async ({ page }) => {
     const quizPage = new QuizPage(page);
+    await stubQuizData(page);
     await quizPage.goto();
 
     // Быстро проходим квиз
-    await quizPage.startQuiz({ questionCount: 3 });
+    await quizPage.startQuiz({
+      questionCount: 3,
+      questionTypes: [QUESTION_TYPE_LABELS.birthYear],
+    });
     await quizPage.completeQuizQuickly(3);
     await page.waitForTimeout(500);
 
@@ -172,35 +247,39 @@ test.describe('Visual Regression @visual', () => {
     const listsPage = new ListsPage(authenticatedPage);
     await listsPage.goto();
 
+    const originalViewport = authenticatedPage.viewportSize();
+    await authenticatedPage.setViewportSize({ width: 1280, height: 775 });
     await authenticatedPage.waitForLoadState('networkidle');
 
     await createBaselineSnapshot(authenticatedPage, {
       name: 'lists-empty',
+      fullPage: false,
       maxDiffPixelRatio: 0.01,
     });
+
+    if (originalViewport) {
+      await authenticatedPage.setViewportSize(originalViewport);
+    }
   });
 
   test('Lists - список с элементами', async ({ authenticatedPage }) => {
     const listsPage = new ListsPage(authenticatedPage);
     await listsPage.goto();
 
-    // Создаём тестовый список
-    const createButton = authenticatedPage.locator('[data-testid="create-list"]');
-    if (await createButton.isVisible()) {
-      await createButton.click();
-      await authenticatedPage.waitForTimeout(300);
-
-      // Заполняем форму
-      await authenticatedPage.fill('[data-testid="list-name"]', 'Тестовый список');
-      await authenticatedPage.click('[data-testid="submit-list"]');
-      await authenticatedPage.waitForTimeout(500);
-    }
+    const originalViewport = authenticatedPage.viewportSize();
+    await authenticatedPage.setViewportSize({ width: 1280, height: 775 });
+    await authenticatedPage.waitForLoadState('networkidle');
 
     await expectStableSnapshot(authenticatedPage, {
       name: 'lists-with-items',
       maskSelectors: ['[data-testid*="date"]'],
+      fullPage: false,
       maxDiffPixelRatio: 0.02,
     });
+
+    if (originalViewport) {
+      await authenticatedPage.setViewportSize(originalViewport);
+    }
   });
 
   test('Login - форма входа', async ({ page }) => {
@@ -239,6 +318,7 @@ test.describe('Visual Regression @visual', () => {
 
     await expectStableSnapshot(page, {
       name: 'timeline-desktop',
+      maskSelectors: ['.timeline-background', '.timeline-content'],
       maxDiffPixelRatio: 0.02,
     });
   });

@@ -23,8 +23,7 @@ test.describe('Пользовательские списки', () => {
 
     await createListViaApi(authenticatedPage, list.title);
     await listsPage.goto();
-    const locator = await listsPage.waitForList(list.title);
-    await expect(locator).toContainText(list.title);
+    await listsPage.expectListPresent(list.title);
   });
 
   test('создание share code для списка @regression @lists', async ({ authenticatedPage }) => {
@@ -33,8 +32,17 @@ test.describe('Пользовательские списки', () => {
 
     await createListViaApi(authenticatedPage, list.title);
     await listsPage.goto();
-    const locator = await listsPage.waitForList(list.title);
-    await listsPage.shareListByLocator(locator);
+    await listsPage.expectListPresent(list.title);
+    const shareResponse = await listsPage.clickShareButton(list.title);
+    expect(shareResponse).not.toBeNull();
+    expect(shareResponse!.ok()).toBeTruthy();
+    const sharePayload = await shareResponse!.json().catch(() => ({}));
+    const shareCode =
+      sharePayload?.code ||
+      sharePayload?.data?.code ||
+      sharePayload?.data?.shareCode ||
+      sharePayload?.data?.share_code;
+    expect(shareCode).toBeTruthy();
   });
 
   test('просмотр публичных списков @regression @lists', async ({ page }) => {
@@ -56,7 +64,7 @@ test.describe('Пользовательские списки', () => {
     expect(listId).toBeDefined();
 
     await listsPage.goto();
-    await listsPage.waitForList(list.title);
+    await listsPage.expectListPresent(list.title);
 
     const authState = await authenticatedPage.evaluate(() => localStorage.getItem('auth'));
     expect(authState).not.toBeNull();
@@ -74,17 +82,14 @@ test.describe('Пользовательские списки', () => {
 
     const guestContext = await browser.newContext();
     const guestPage = await guestContext.newPage();
+    const guestListsPage = new ListsPage(guestPage);
     await guestPage.goto(`/lists?share=${encodeURIComponent(shareCode)}`);
     await guestPage.waitForLoadState('networkidle');
 
-    const sharedListButton = guestPage
-      .getByRole('button', { name: new RegExp(`🔒\\s*${list.title}`) })
-      .first();
-    await expect(sharedListButton).toBeVisible({ timeout: 15000 });
-
-    await expect(sharedListButton.locator('button[title="Поделиться"]')).toHaveCount(0);
-    const copyButton = sharedListButton.locator('button[title="Скопировать себе"]');
-    await expect(copyButton).toBeVisible();
+    await guestListsPage.expectListPresent(list.title);
+    await guestListsPage.selectList(list.title);
+    const copyButton = guestPage.locator('button[title="Скопировать себе"]').first();
+    await expect(copyButton).toBeVisible({ timeout: 15000 });
 
     await copyButton.click();
     const toast = guestPage.locator('.toast-message', { hasText: /нужно войти/i });
@@ -97,25 +102,43 @@ test.describe('Пользовательские списки', () => {
     const listsPage = new ListsPage(authenticatedPage);
     const list = createTestList();
 
-    await createListViaApi(authenticatedPage, list.title);
+    const listId = await createListViaApi(authenticatedPage, list.title);
+    expect(listId).toBeDefined();
     await listsPage.goto();
-    const listEntry = await listsPage.waitForList(list.title);
+    await listsPage.expectListPresent(list.title);
 
-    await authenticatedPage.route(
-      '**/api/lists/**/share',
-      async route => {
-        await route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'fail' }),
-        });
-      },
-      { times: 1 }
-    );
+    await authenticatedPage.evaluate(activeListId => {
+      const originalFetch = window.fetch.bind(window);
+      (window as unknown as { __e2eOriginalFetch__?: typeof window.fetch }).__e2eOriginalFetch__ = originalFetch;
+      window.fetch = ((input: unknown, init?: RequestInit) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : (input as { url?: string })?.url ?? '';
+        if (url.includes(`/api/lists/${activeListId}/share`)) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ message: 'fail' }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          );
+        }
+        return originalFetch(input, init);
+      }) as typeof window.fetch;
+    }, listId);
 
-    await listEntry.locator('button[title="Поделиться"]').click();
-    const toast = authenticatedPage.locator('.toast-message', { hasText: /ошибка создания ссылки/i });
-    await expect(toast).toBeVisible({ timeout: 5000 });
+    await listsPage.clickShareButton(list.title, { waitForResponse: false });
+    await listsPage.expectToast(/ошибка создания ссылки/i);
+
+    await authenticatedPage.evaluate(() => {
+      const win = window as unknown as { __e2eOriginalFetch__?: typeof window.fetch };
+      if (win.__e2eOriginalFetch__) {
+        window.fetch = win.__e2eOriginalFetch__;
+        delete win.__e2eOriginalFetch__;
+      }
+    });
   });
 });
 

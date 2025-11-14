@@ -3,8 +3,6 @@ import type { Page, Route } from '@playwright/test';
 import { ManagePage } from '../pages/ManagePage';
 import {
   createTestPerson,
-  createTestAchievement,
-  createTestPeriod,
   createTestAchievementForPerson,
   createTestPeriodForPerson,
 } from '../utils/test-data-factory';
@@ -38,6 +36,7 @@ function fulfillJson(route: Route, body: unknown, status = 200): Promise<void> {
 }
 
 type MineResource = 'persons' | 'achievements' | 'periods';
+type PersonOption = { value: string; label: string };
 const API_BASE_URL = process.env.BACKEND_URL ?? 'http://localhost:3001';
 let apiTokens: AuthTokens | null = null;
 
@@ -126,9 +125,9 @@ async function waitForMineItem(
 let seededPerson: TestPerson;
 
 test.describe('Раздел "Мои" на странице управления @manage', () => {
-  test.beforeEach(async ({ browserName, moderatorPage, moderatorCredentials }) => {
+  test.beforeEach(async ({ browserName, moderatorPage, moderatorCredentials }, testInfo) => {
     apiTokens = null;
-    if (browserName === 'firefox' || browserName === 'mobile-safari') {
+    if (browserName === 'firefox' || testInfo.project.name === 'mobile-safari') {
       await moderatorPage.waitForTimeout(500);
     }
     await moderatorPage.waitForLoadState('networkidle').catch(async () => {
@@ -182,11 +181,15 @@ test.describe('Раздел "Мои" на странице управления 
       { payload: seedPerson }
     );
 
-    const personOption = { value: seedPerson.id, label: seedPerson.name };
+    const personOption: PersonOption = { value: seedPerson.id, label: seedPerson.name };
     await moderatorPage.addInitScript(
       ({ option }) => {
-        (window as any).__E2E_PERSON_OPTIONS__ = [option];
-        (window as any).__E2E_DEFAULT_PERSON__ = option.value;
+        const globalWindow = window as Window & {
+          __E2E_PERSON_OPTIONS__?: PersonOption[];
+          __E2E_DEFAULT_PERSON__?: string;
+        };
+        globalWindow.__E2E_PERSON_OPTIONS__ = [option];
+        globalWindow.__E2E_DEFAULT_PERSON__ = option.value;
       },
       { option: personOption }
     );

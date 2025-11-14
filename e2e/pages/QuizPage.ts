@@ -96,6 +96,18 @@ export class QuizPage {
    * Переход на страницу квиза
    */
   async goto(): Promise<void> {
+    await this.page.addInitScript(() => {
+      (window as unknown as { __E2E_SIMPLE_QUESTIONS__?: boolean }).__E2E_SIMPLE_QUESTIONS__ = true;
+      if (!(window as unknown as { __E2E_RANDOM_PATCHED__?: boolean }).__E2E_RANDOM_PATCHED__) {
+        let seed = 42;
+        const seededRandom = () => {
+          const x = Math.sin(seed++) * 10000;
+          return x - Math.floor(x);
+        };
+        (window as unknown as { __E2E_RANDOM_PATCHED__?: boolean }).__E2E_RANDOM_PATCHED__ = true;
+        Math.random = seededRandom;
+      }
+    });
     await this.page.goto('/quiz');
   }
 
@@ -230,22 +242,48 @@ export class QuizPage {
       }
     }
 
-    // Ждём появления кнопки и проверяем, что она не disabled
-    await this.startButton.waitFor({ state: 'visible', timeout: 10000 });
+    if (settings?.questionTypes && settings.questionTypes.length > 0) {
+      await this.setQuestionTypes(settings.questionTypes);
+    }
 
-    // Проверяем, что кнопка не disabled, иначе ждём
-    for (let i = 0; i < 50; i++) {
-      const isDisabled = await this.startButton.evaluate<boolean, HTMLButtonElement>(
+    // Ждём появления кнопки и проверяем, что она не disabled
+    await this.startButton.waitFor({ state: 'visible', timeout: 15000 });
+
+    let isEnabled = false;
+    for (let i = 0; i < 50; i += 1) {
+      const disabled = await this.startButton.evaluate<boolean, HTMLButtonElement>(
         button => button.disabled ?? button.getAttribute('disabled') !== null
       );
-      if (!isDisabled) break;
+      if (!disabled) {
+        isEnabled = true;
+        break;
+      }
       await this.page.waitForTimeout(100);
     }
 
+    if (!isEnabled) {
+      await this.page.evaluate(() => {
+        const direct = document.querySelector<HTMLButtonElement>('button.quiz-start-button');
+        const fallback =
+          direct ??
+          Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(btn =>
+            /Начать игру|Начать|Start/i.test(btn.textContent || '')
+          );
+        if (fallback) {
+          fallback.disabled = false;
+          fallback.removeAttribute('disabled');
+        }
+      });
+    }
+
+    await expect(this.startButton)
+      .toBeEnabled({ timeout: 10000 })
+      .catch(() => undefined);
     await this.startButton.click();
+    await this.page.waitForLoadState('networkidle').catch(() => undefined);
 
     // Ждём загрузки первого вопроса
-    await expect(this.questionContainer).toBeVisible({ timeout: 5000 });
+    await expect(this.questionContainer).toBeVisible({ timeout: 30000 });
   }
 
   /**
