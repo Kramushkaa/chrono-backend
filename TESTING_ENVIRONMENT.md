@@ -56,6 +56,7 @@ npm run init-test-schema
 ```
 
 Этот скрипт:
+
 - Создаёт схему `test`
 - Копирует структуру всех таблиц из `public`
 - Создаёт индексы, constraints и foreign keys
@@ -89,6 +90,7 @@ DB_SCHEMA=test
 ```
 
 Затем запускайте обычными командами:
+
 ```bash
 npm run dev
 ```
@@ -163,12 +165,12 @@ env:
 
 ## Команды NPM
 
-| Команда | Описание |
-|---------|----------|
-| `npm run init-test-schema` | Создать/пересоздать тестовую схему |
-| `npm run seed:test` | Заполнить тестовую схему данными |
-| `npm run dev:test` | Запустить dev сервер с test схемой |
-| `DB_SCHEMA=test npm run migrate` | Применить миграции к test схеме |
+| Команда                          | Описание                           |
+| -------------------------------- | ---------------------------------- |
+| `npm run init-test-schema`       | Создать/пересоздать тестовую схему |
+| `npm run seed:test`              | Заполнить тестовую схему данными   |
+| `npm run dev:test`               | Запустить dev сервер с test схемой |
+| `DB_SCHEMA=test npm run migrate` | Применить миграции к test схеме    |
 
 ## Управление данными
 
@@ -261,8 +263,8 @@ SELECT current_schema();
 ### Список всех таблиц в схеме
 
 ```sql
-SELECT tablename 
-FROM pg_tables 
+SELECT tablename
+FROM pg_tables
 WHERE schemaname = 'test'
 ORDER BY tablename;
 ```
@@ -270,7 +272,7 @@ ORDER BY tablename;
 ### Размер схем
 
 ```sql
-SELECT 
+SELECT
   schemaname,
   pg_size_pretty(sum(pg_total_relation_size(schemaname||'.'||tablename))::bigint) as size
 FROM pg_tables
@@ -278,9 +280,16 @@ WHERE schemaname IN ('public', 'test')
 GROUP BY schemaname;
 ```
 
+## Фичеветки
+
+Некоторые возможности доступны только в тестовом режиме и включаются через переменные окружения:
+
+- `FEATURE_PUBLIC_LISTS` — включает публичные списки и связанные маршруты (`/api/public/lists`, очереди модерации). По умолчанию `false`, что скрывает фичу до готовности.
+
 ## Поддержка
 
 При возникновении проблем:
+
 1. Проверьте переменную `DB_SCHEMA` в .env
 2. Убедитесь, что схема создана: `npm run init-test-schema`
 3. Проверьте логи сервера на наличие SQL ошибок

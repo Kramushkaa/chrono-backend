@@ -99,6 +99,7 @@
   "overrides": {
     "form-data": "^2.5.4",
     "tough-cookie": "^4.1.4",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "js-yaml": "^4.1.1"
   }
 }

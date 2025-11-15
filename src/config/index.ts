@@ -73,6 +73,11 @@ export const config = {
     version: APP_VERSION,
     description: 'Backend API для проекта Хроно ниндзя',
   },
+
+  // Фичеветки
+  features: {
+    publicLists: process.env.FEATURE_PUBLIC_LISTS === 'true',
+  },
 };
 
 // Проверка обязательных переменных окружения
@@ -150,4 +155,8 @@ export interface ServerConfig {
   port: number;
   host: string;
   nodeEnv: string;
+}
+
+export interface FeaturesConfig {
+  publicLists: boolean;
 }

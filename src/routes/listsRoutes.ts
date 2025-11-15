@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { authenticateToken, rateLimit, requireRoleMiddleware } from '../middleware/auth';
+import { ensureFeatureEnabled } from '../middleware/featureFlags';
 import { asyncHandler, errors } from '../utils/errors';
 import { ListsService, ListModerationStatus } from '../services/listsService';
 import {
@@ -187,6 +188,7 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   router.post(
     '/lists/:listId/publish-request',
     authenticateToken,
+    ensureFeatureEnabled('publicLists', { statusCode: 403 }),
     validateParams(listsSchemas.listId),
     validateBody(listsSchemas.publishRequest),
     asyncHandler(async (req: Request, res: Response) => {
@@ -231,6 +233,7 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
     '/admin/lists/moderation',
     authenticateToken,
     requireRoleMiddleware(['admin', 'moderator']),
+    ensureFeatureEnabled('publicLists', { statusCode: 403 }),
     validateQuery(moderationListQuerySchema),
     asyncHandler(async (req: Request, res: Response) => {
       const status = (req.query.status as ListModerationStatus | undefined) || 'pending';
@@ -264,6 +267,7 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
     '/admin/lists/:listId/review',
     authenticateToken,
     requireRoleMiddleware(['admin', 'moderator']),
+    ensureFeatureEnabled('publicLists', { statusCode: 403 }),
     validateParams(listsSchemas.listId),
     validateBody(listsSchemas.reviewList),
     asyncHandler(async (req: Request, res: Response) => {
@@ -302,6 +306,7 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   // Public lists index
   router.get(
     '/public/lists',
+    ensureFeatureEnabled('publicLists'),
     validateQuery(publicListQuerySchema),
     asyncHandler(async (req: Request, res: Response) => {
       const { limitParam, offsetParam } = parseLimitOffset(
@@ -328,6 +333,7 @@ export function createListsRoutes(pool: Pool, listsService: ListsService): Route
   // Public list detail by slug
   router.get(
     '/public/lists/:slug',
+    ensureFeatureEnabled('publicLists'),
     asyncHandler(async (req: Request, res: Response) => {
       const { slug } = req.params as { slug: string };
       const data = await listsService.getPublicList(slug);
