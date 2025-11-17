@@ -1140,7 +1140,7 @@ export class QuizService extends BaseService {
         LEFT JOIN users u ON qa.user_id = u.id
         WHERE qa.shared_quiz_id = $1
       )
-      SELECT rank, user_id, username, correct_answers, total_time_ms
+      SELECT rank, user_id, username, correct_answers, total_questions, total_time_ms, created_at
       FROM ranked_attempts
       ORDER BY rank
       LIMIT 100
@@ -1187,7 +1187,7 @@ export class QuizService extends BaseService {
           LEFT JOIN users u ON qa.user_id = u.id
           WHERE qa.shared_quiz_id = $1
         )
-        SELECT rank, user_id, username, correct_answers, total_time_ms
+        SELECT rank, user_id, username, correct_answers, total_questions, total_time_ms, created_at
         FROM ranked_attempts WHERE user_id = $2
       `;
       const userResult = await this.executeQuery(userQuery, [quiz.id, userId], {
