@@ -19,3 +19,4 @@ ALTER TABLE lists
 CREATE UNIQUE INDEX IF NOT EXISTS lists_public_slug_unique
   ON lists (public_slug)
   WHERE public_slug IS NOT NULL;
+

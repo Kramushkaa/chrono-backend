@@ -252,10 +252,7 @@ export const errorHandler = (
 
 // Middleware для ограничения запросов (rate limiting)
 export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number = 100) => {
-  const isDisabled =
-    process.env.RATE_LIMIT_DISABLED === 'true' ||
-    process.env.NODE_ENV === 'test' ||
-    (process.env.DB_SCHEMA && process.env.DB_SCHEMA.toLowerCase() === 'test');
+  const isDisabled = process.env.RATE_LIMIT_DISABLED === 'true';
 
   if (isDisabled) {
     return (_req: Request, _res: Response, next: NextFunction): void => {

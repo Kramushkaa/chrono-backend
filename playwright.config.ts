@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
 
 /**
  * Конфигурация Playwright для E2E тестов Хронониндзя
@@ -112,21 +113,25 @@ export default defineConfig({
   // Global setup - выполняется перед всеми тестами
   globalSetup: require.resolve('./e2e/global-setup.ts'),
 
-  // Web server для локального запуска (опционально)
-  // Раскомментировать если нужно автоматически запускать фронтенд/бэкенд
-  // webServer: [
-  //   {
-  //     command: 'npm run dev:test',
-  //     port: 3001,
-  //     timeout: 120 * 1000,
-  //     reuseExistingServer: !process.env.CI,
-  //   },
-  //   {
-  //     command: 'cd ../chronoline-frontend && npm run dev',
-  //     port: 3000,
-  //     timeout: 120 * 1000,
-  //     reuseExistingServer: !process.env.CI,
-  //   },
-  // ],
+  // Автоматический запуск фронтенда и бэкенда перед тестами
+  webServer: [
+    {
+      command: 'npm run dev:test',
+      port: 3001,
+      cwd: __dirname,
+      timeout: 120 * 1000,
+      reuseExistingServer: !process.env.CI,
+      env: {
+        DB_SCHEMA: 'test',
+      },
+    },
+    {
+      command: 'npm run dev',
+      port: 3000,
+      cwd: path.resolve(__dirname, '../chronoline-frontend'),
+      timeout: 120 * 1000,
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 });
 

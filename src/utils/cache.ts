@@ -1,10 +1,20 @@
+import crypto from 'crypto';
+
 /**
- * Простой in-memory cache с TTL поддержкой
+ * Простой in-memory cache с TTL поддержкой и вспомогательными метаданными
  */
+
+export interface CacheMetadata {
+  etag?: string;
+  ttlMs?: number;
+  generatedAt?: string;
+  [key: string]: unknown;
+}
 
 interface CacheItem<T = any> {
   value: T;
   expiresAt: number;
+  metadata?: CacheMetadata;
 }
 
 class SimpleCache {
@@ -13,11 +23,15 @@ class SimpleCache {
   /**
    * Установить значение в кэш
    */
-  set<T>(key: string, value: T, ttlMs: number): void {
+  set<T>(key: string, value: T, ttlMs: number, metadata?: CacheMetadata): void {
     const expiresAt = Date.now() + ttlMs;
     this.cache.set(key, {
       value,
       expiresAt,
+      metadata: {
+        ttlMs,
+        ...metadata,
+      },
     });
   }
 
@@ -25,19 +39,29 @@ class SimpleCache {
    * Получить значение из кэша
    */
   get<T>(key: string): T | null {
+    const entry = this.getEntry<T>(key);
+    if (!entry) {
+      return null;
+    }
+    return entry.value as T;
+  }
+
+  /**
+   * Получить полную запись из кэша
+   */
+  getEntry<T>(key: string): CacheItem<T> | null {
     const item = this.cache.get(key);
 
     if (!item) {
       return null;
     }
 
-    // Проверяем, не истек ли TTL
     if (Date.now() > item.expiresAt) {
       this.cache.delete(key);
       return null;
     }
 
-    return item.value as T;
+    return item as CacheItem<T>;
   }
 
   /**
@@ -55,10 +79,9 @@ class SimpleCache {
   }
 
   /**
-   * Получить размер кэша
+   * Количество валидных записей в кэше
    */
   size(): number {
-    // Очищаем истекшие элементы перед подсчетом
     this.cleanup();
     return this.cache.size;
   }
@@ -81,12 +104,30 @@ class SimpleCache {
   getStats(): {
     size: number;
     keys: string[];
+    entries: Array<{
+      key: string;
+      expiresInMs: number;
+      metadata?: CacheMetadata;
+    }>;
   } {
     this.cleanup();
+    const now = Date.now();
     return {
       size: this.cache.size,
       keys: Array.from(this.cache.keys()),
+      entries: Array.from(this.cache.entries()).map(([key, item]) => ({
+        key,
+        expiresInMs: Math.max(item.expiresAt - now, 0),
+        metadata: item.metadata,
+      })),
     };
+  }
+
+  /**
+   * Утилита для вычисления ETag
+   */
+  computeEtag(payload: unknown): string {
+    return crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
   }
 }
 

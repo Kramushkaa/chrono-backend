@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "Backend API for Хронониндзя - Interactive timeline of historical figures",
   "main": "src/server.ts",
+  "workspaces": [
+    "shared-dto"
+  ],
   "scripts": {
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "npm run build --workspace=shared-dto && tsc",
+    "build:dto": "npm run build --workspace=shared-dto",
     "start:prod": "node dist/server.js",
     "seed": "tsx src/db/seed.ts",
     "migrate": "tsx src/db/migrate.ts",
@@ -20,6 +24,7 @@
     "init-test-schema": "tsx src/db/init-test-schema.ts",
     "seed:test": "tsx seed-test-db.js",
     "dev:test": "cross-env DB_SCHEMA=test tsx watch src/server.ts",
+    "cache:inspect": "tsx scripts/cache-inspect.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "lint:e2e": "eslint e2e --ext .ts",
@@ -57,7 +62,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@chrononinja/dto": "file:./shared-dto",
+    "@chrononinja/dto": "workspace:*",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

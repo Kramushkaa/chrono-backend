@@ -102,10 +102,6 @@ jobs:
           npm ci
           npm run build
 
-      - name: Copy DTO to Frontend
-        working-directory: backend/shared-dto
-        run: node copy-to-frontend.js
-
       - name: Check DTO Synchronization
         working-directory: backend
         run: node ../check-dto-sync.js
@@ -467,10 +463,17 @@ ps aux | grep vite
 ### DTO не синхронизирован
 
 ```bash
-# Пересобрать shared-dto
+# Пересобрать shared-dto и обновить локальный пакет
 cd shared-dto
 npm run build
-node copy-to-frontend.js
+
+# В корне backend переустановить зависимости (подтянет свежий dist)
+cd ..
+npm install
+
+# Во фронтенде выполните npm install, чтобы обновить @chrononinja/dto
+cd ../chronoline-frontend
+npm install
 ```
 
 ## Best Practices
@@ -572,3 +575,4 @@ jobs:
 - ✅ Оптимизацию через кэширование
 
 Для внедрения скопируйте workflow файл в `.github/workflows/e2e.yml` и настройте secrets.
+

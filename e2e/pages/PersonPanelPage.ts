@@ -195,3 +195,4 @@ export class PersonPanelPage {
     await expect(this.panel).toContainText(text);
   }
 }
+

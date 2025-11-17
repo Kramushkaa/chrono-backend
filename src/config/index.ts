@@ -9,7 +9,7 @@ dotenv.config({ override: false });
 export const config = {
   // Настройки сервера
   server: {
-    port: process.env.PORT || 3001,
+    port: parseInt(process.env.PORT || '3001', 10),
     host: process.env.HOST || 'localhost',
     nodeEnv: process.env.NODE_ENV || 'development',
   },
@@ -21,7 +21,7 @@ export const config = {
     name: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    schema: 'test', // Принудительно используем тестовую схему для отладки
+    schema: process.env.DB_SCHEMA || 'public',
     ssl: process.env.DB_SSL === 'true',
     sslRejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', // По умолчанию true для безопасности
     pool: {
@@ -40,10 +40,7 @@ export const config = {
   },
 
   // Настройки CORS
-  cors: {
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  },
+  cors: createCorsConfig(),
 
   // Настройки email (для будущего использования)
   email: {
@@ -111,11 +108,7 @@ export const validateConfig = (): void => {
     }
 
     // Проверка CORS в продакшене
-    if (
-      process.env.CORS === '*' ||
-      process.env.CORS_ORIGIN === '*' ||
-      process.env.CORS_ORIGINS === '*'
-    ) {
+    if (config.cors.allowedOrigins.includes('*')) {
       logger.error('ОШИБКА: CORS не может быть "*" в продакшене!');
       process.exit(1);
     }
@@ -123,7 +116,8 @@ export const validateConfig = (): void => {
 };
 
 // Отладочная информация о схеме БД
-console.log('🔧 Используется схема БД:', config.database.schema);
+const schemaSource = process.env.DB_SCHEMA ? 'из DB_SCHEMA' : 'по умолчанию (public)';
+console.log('🔧 Используется схема БД:', config.database.schema, `(${schemaSource})`);
 
 // Экспорт типов для конфигурации
 export interface DatabasePoolConfig {
@@ -159,4 +153,25 @@ export interface ServerConfig {
 
 export interface FeaturesConfig {
   publicLists: boolean;
+}
+
+export interface CorsConfig {
+  credentials: boolean;
+  allowedOrigins: string[];
+  raw: string;
+}
+
+function createCorsConfig(): CorsConfig {
+  const rawOrigins = process.env.CORS || process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
+
+  const allowedOrigins = rawOrigins
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  return {
+    credentials: true,
+    allowedOrigins: allowedOrigins.length > 0 ? allowedOrigins : ['*'],
+    raw: rawOrigins,
+  };
 }

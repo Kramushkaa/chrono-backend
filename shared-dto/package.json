@@ -4,6 +4,9 @@
   "description": "Shared DTO schemas and types for Chrononinja FE/BE",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -13,12 +16,22 @@
       "types": "./dist/schemas.d.ts",
       "default": "./dist/schemas.js"
     },
-    "./types": "./dist/types.d.ts"
+    "./types": "./dist/types.d.ts",
+    "./dtoDescriptors": {
+      "types": "./dist/dtoDescriptors.d.ts",
+      "default": "./dist/dtoDescriptors.js"
+    },
+    "./quiz-types": {
+      "types": "./dist/quiz-types.d.ts",
+      "default": "./dist/quiz-types.js"
+    },
+    "./package.json": "./package.json"
   },
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p .",
     "postbuild": "node copy-to-frontend.js",
+    "prepare": "npm run build",
     "clean": "rimraf dist"
   },
   "dependencies": {

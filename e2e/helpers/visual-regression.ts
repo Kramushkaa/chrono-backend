@@ -388,3 +388,4 @@ export async function createBaselineSnapshot(
   // Делаем снапшот
   await expectPageSnapshot(page, options);
 }
+
