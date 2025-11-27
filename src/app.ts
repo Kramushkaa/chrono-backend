@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Pool } from 'pg';
@@ -13,7 +13,6 @@ import { UserService } from './services/userService';
 import { AuthController } from './controllers/authController';
 import { createAuthRoutes } from './routes/authRoutes';
 import { logRequest, errorHandler } from './middleware/auth';
-import { asyncHandler } from './utils/errors';
 import { createPersonRoutes } from './routes/persons';
 import { createListsRoutes } from './routes/listsRoutes';
 import { createAchievementsRoutes } from './routes/achievementsRoutes';
@@ -112,70 +111,6 @@ export function createApp({ pool }: CreateAppOptions) {
   app.use('/api', createListsRoutes(pool, listsService));
   app.use('/api', createQuizRoutes(pool));
 
-  app.get(
-    '/api/backend-info',
-    asyncHandler(async (_req: Request, res: Response) => {
-      res.json({
-        success: true,
-        data: {
-          name: 'Хронониндзя API',
-          version: APP_VERSION,
-          environment: config.server.nodeEnv,
-          timestamp: new Date().toISOString(),
-          endpoints: {
-            auth: '/api/auth',
-            persons: '/api/persons',
-            achievements: '/api/achievements',
-            periods: '/api/periods',
-            lists: '/api/lists',
-            quiz: '/api/quiz',
-            quizHistory: '/api/quiz/history',
-            quizLeaderboard: '/api/quiz/leaderboard',
-            stats: '/api/stats',
-            health: '/api/health',
-            categories: '/api/categories',
-            countries: '/api/countries',
-          },
-        },
-      });
-    })
-  );
-
-  app.post(
-    '/api/backend-switch',
-    asyncHandler(async (req: Request, res: Response) => {
-      const { backendUrl } = req.body;
-
-      if (!backendUrl || typeof backendUrl !== 'string') {
-        res.status(400).json({
-          success: false,
-          error: 'Invalid backend URL',
-          message: "Необходимо указать URL backend'а",
-        });
-        return;
-      }
-
-      try {
-        new URL(backendUrl);
-
-        res.json({
-          success: true,
-          data: {
-            message: 'Backend URL updated',
-            backendUrl,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      } catch {
-        res.status(400).json({
-          success: false,
-          error: 'Invalid URL format',
-          message: 'Неверный формат URL',
-        });
-      }
-    })
-  );
-
   app.get('/', (_req, res) => {
     res.json({
       message: 'Хронониндзя API',
@@ -204,5 +139,3 @@ export function createApp({ pool }: CreateAppOptions) {
 
   return app;
 }
-
-export default createApp;

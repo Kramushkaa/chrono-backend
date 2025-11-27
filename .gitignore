@@ -30,6 +30,11 @@ yarn-error.log*
 dist/
 build/
 
+# Test results
+test-results/
+e2e-report/
+e2e-results.json
+
 # Logs
 logs/
 *.log

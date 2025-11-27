@@ -31,7 +31,32 @@ function getClientIp(req: Request): string {
     return socket.remoteAddress;
   }
 
-  return 'unknown';
+  // Если IP не определён, используем комбинацию заголовков для уникальности
+  // Это помогает избежать проблем с rate limiting, когда все запросы имеют один IP 'unknown'
+  const forwarded = req.headers['x-forwarded-for'];
+  const realIp = req.headers['x-real-ip'];
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  
+  // Пытаемся извлечь IP из заголовков
+  if (forwarded) {
+    const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim();
+    if (ips) return ips;
+  }
+  
+  if (realIp) {
+    const ip = Array.isArray(realIp) ? realIp[0] : realIp;
+    if (ip) return ip;
+  }
+  
+  // Последний fallback: используем комбинацию для уникальности в rate limiting
+  // Это не идеально, но лучше чем все запросы с одним IP
+  const fallbackId = `${userAgent.substring(0, 20)}-${Date.now() % 10000}`;
+  logger.warn('Не удалось определить IP адрес клиента', {
+    endpoint: req.path,
+    fallbackId,
+  });
+  
+  return `unknown-${fallbackId}`;
 }
 
 // Middleware для аутентификации
@@ -252,9 +277,12 @@ export const errorHandler = (
 
 // Middleware для ограничения запросов (rate limiting)
 export const rateLimit = (windowMs: number = 15 * 60 * 1000, maxRequests: number = 100) => {
-  const isDisabled = process.env.RATE_LIMIT_DISABLED === 'true';
+  const env = (process.env.NODE_ENV || '').toLowerCase();
+  const schema = (process.env.DB_SCHEMA || '').toLowerCase();
+  const isDisabledEnv =
+    process.env.RATE_LIMIT_DISABLED === 'true' || env === 'test' || schema === 'test';
 
-  if (isDisabled) {
+  if (isDisabledEnv) {
     return (_req: Request, _res: Response, next: NextFunction): void => {
       next();
     };

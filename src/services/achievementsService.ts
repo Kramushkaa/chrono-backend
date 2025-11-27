@@ -477,4 +477,154 @@ export class AchievementsService extends BaseService {
     );
     return result.rows[0]?.cnt || 0;
   }
+
+  /**
+   * Предложение изменений для опубликованного достижения
+   */
+  async proposeEdit(
+    achievementId: number,
+    payload: Partial<AchievementCreateData>,
+    userId: number
+  ): Promise<any> {
+    // Проверяем существование достижения и его статус
+    const achievementRes = await this.executeQuery(
+      'SELECT id, status FROM achievements WHERE id = $1',
+      [achievementId],
+      {
+        action: 'proposeEdit_check',
+        params: { achievementId },
+      }
+    );
+    if (achievementRes.rowCount === 0) {
+      throw errors.notFound('Достижение не найдено');
+    }
+
+    const achievement = achievementRes.rows[0];
+    if (achievement.status !== 'approved') {
+      throw errors.badRequest('Можно предлагать изменения только для опубликованных достижений');
+    }
+
+    // Санитизация payload
+    const sanitized: Record<string, unknown> = {};
+    const allowedFields = ['year', 'description', 'wikipediaUrl', 'imageUrl', 'personId', 'countryId'];
+    for (const [key, value] of Object.entries(payload)) {
+      if (allowedFields.includes(key)) {
+        sanitized[key] = value;
+      }
+    }
+
+    const result = await this.executeQuery(
+      `INSERT INTO achievement_edits (achievement_id, proposer_user_id, payload, status)
+       VALUES ($1, $2, $3, 'pending')
+       RETURNING *`,
+      [achievementId, userId, JSON.stringify(sanitized)],
+      {
+        action: 'proposeEdit_insert',
+        params: { achievementId, userId },
+      }
+    );
+
+    return result.rows[0];
+  }
+
+  /**
+   * Модерация изменений достижения
+   */
+  async reviewEdit(
+    editId: number,
+    action: 'approve' | 'reject',
+    reviewerId: number,
+    comment?: string
+  ): Promise<any> {
+    const editRes = await this.executeQuery(
+      'SELECT id, achievement_id, payload, status FROM achievement_edits WHERE id = $1',
+      [editId],
+      {
+        action: 'reviewEdit_get',
+        params: { editId },
+      }
+    );
+
+    if (editRes.rowCount === 0) {
+      throw errors.notFound('Правка не найдена');
+    }
+
+    const edit = editRes.rows[0];
+
+    if (edit.status !== 'pending') {
+      throw errors.badRequest('Можно модерировать только правки в статусе pending');
+    }
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+    // Обновляем статус правки
+    await this.executeQuery(
+      `UPDATE achievement_edits
+       SET status = $1, reviewed_by = $2, review_comment = $3
+       WHERE id = $4`,
+      [newStatus, reviewerId, comment ?? null, editId],
+      {
+        action: 'reviewEdit_update',
+        params: { editId, action, reviewerId },
+      }
+    );
+
+    // Если approved - применяем изменения к достижению
+    if (action === 'approve') {
+      await this.applyPayloadToAchievement(edit.achievement_id, edit.payload, reviewerId);
+    }
+
+    // Возвращаем обновлённую правку
+    const result = await this.executeQuery(
+      `SELECT id, achievement_id, payload, status, reviewed_by, review_comment, created_at 
+       FROM achievement_edits WHERE id = $1`,
+      [editId],
+      {
+        action: 'reviewEdit_get_result',
+        params: { editId },
+      }
+    );
+    return result.rows[0];
+  }
+
+  /**
+   * Применение payload к достижению
+   */
+  private async applyPayloadToAchievement(
+    achievementId: number,
+    payload: any,
+    reviewerUserId: number
+  ): Promise<void> {
+    const fields: string[] = [];
+    const values: SqlValue[] = [];
+    let idx = 1;
+
+    const mapping: Record<string, string> = {
+      year: 'year',
+      description: 'description',
+      wikipediaUrl: 'wikipedia_url',
+      imageUrl: 'image_url',
+      personId: 'person_id',
+      countryId: 'country_id',
+    };
+
+    for (const [k, v] of Object.entries(payload)) {
+      const column = mapping[k];
+      if (!column) continue;
+      fields.push(`${column} = $${idx++}`);
+      values.push(v as SqlValue);
+    }
+
+    // Always update status on approve
+    fields.push(`status = 'approved'`);
+    fields.push(`updated_by = $${idx++}`);
+    values.push(reviewerUserId);
+
+    const sql = `UPDATE achievements SET ${fields.join(', ')} WHERE id = $${idx}`;
+    values.push(achievementId);
+    await this.executeQuery(sql, values, {
+      action: 'applyPayloadToAchievement',
+      params: { achievementId, reviewerUserId },
+    });
+  }
 }

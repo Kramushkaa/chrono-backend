@@ -29,40 +29,33 @@ export class QuizService extends BaseService {
   /**
    * Calculate rating points based on quiz performance
    * Formula: Σ(QuestionPoints × DifficultyMultiplier × TimeBonus) for each correct answer
+   * Requires detailed answers for accurate calculation
    */
   calculateRatingPoints(
     correctAnswers: number,
     totalQuestions: number,
     totalTimeMs: number,
     questionTypes: QuizQuestionType[],
-    detailedAnswers?: Array<{
+    detailedAnswers: Array<{
       isCorrect: boolean;
       timeSpent: number;
       questionType: QuizQuestionType;
     }>
   ): number {
-    // Если есть детальная информация, используем её
-    if (detailedAnswers && detailedAnswers.length === questionTypes.length) {
-      return this.calculateDetailedRatingPoints(detailedAnswers, totalQuestions);
+    // Детальная информация обязательна для точного расчёта рейтинга
+    if (!detailedAnswers || detailedAnswers.length === 0) {
+      throw new Error(
+        'Детальная информация об ответах обязательна для расчёта рейтинга. detailedAnswers не может быть пустым.'
+      );
     }
 
-    // Fallback на старый алгоритм если детальной информации нет
-    const baseScore = (correctAnswers / totalQuestions) * 100;
-    const questionCountBonus = (totalQuestions - 5) * 0.1;
-    const typeDifficulty = this.calculateTypeDifficulty(questionTypes);
-    const difficultyMultiplier = 1 + questionCountBonus + typeDifficulty;
-
-    let timeBonus = 1.0;
-    if (correctAnswers > 0) {
-      const avgTimePerQuestion = totalTimeMs / totalQuestions;
-      const rawBonus = Math.min(1.5, 1 + (30000 - avgTimePerQuestion) / 60000);
-      const cappedBonus = Math.max(1.0, rawBonus);
-      const correctRatio = correctAnswers / totalQuestions;
-      timeBonus = 1.0 + (cappedBonus - 1.0) * correctRatio;
+    if (detailedAnswers.length !== questionTypes.length) {
+      throw new Error(
+        `Количество детальных ответов (${detailedAnswers.length}) не соответствует количеству типов вопросов (${questionTypes.length})`
+      );
     }
 
-    const ratingPoints = baseScore * difficultyMultiplier * timeBonus;
-    return Math.round(ratingPoints * 100) / 100;
+    return this.calculateDetailedRatingPoints(detailedAnswers, totalQuestions);
   }
 
   /**
@@ -136,6 +129,7 @@ export class QuizService extends BaseService {
 
   /**
    * Get difficulty value for a single question type
+   * Throws error if question type is unknown
    */
   private getQuestionTypeDifficulty(questionType: QuizQuestionType): number {
     const difficultyMap: Record<QuizQuestionType, number> = {
@@ -149,26 +143,15 @@ export class QuizService extends BaseService {
       contemporaries: 0.2,
     };
 
-    return difficultyMap[questionType] || 0;
+    if (!(questionType in difficultyMap)) {
+      throw new Error(
+        `Неизвестный тип вопроса: ${questionType}. Добавьте его в difficultyMap.`
+      );
+    }
+
+    return difficultyMap[questionType];
   }
 
-  /**
-   * Calculate difficulty bonus based on question types
-   */
-  private calculateTypeDifficulty(questionTypes: QuizQuestionType[]): number {
-    const difficultyMap: Record<QuizQuestionType, number> = {
-      birthYear: 0.0,
-      deathYear: 0.0,
-      profession: 0.0,
-      country: 0.0,
-      achievementsMatch: 0.1,
-      guessPerson: 0.1,
-      birthOrder: 0.2,
-      contemporaries: 0.2,
-    };
-
-    return questionTypes.reduce((sum, type) => sum + (difficultyMap[type] || 0), 0);
-  }
 
   // ============================================================================
   // Regular Quiz Attempts
@@ -184,7 +167,7 @@ export class QuizService extends BaseService {
     totalTimeMs: number,
     config: QuizSetupConfig,
     questionTypes: QuizQuestionType[],
-    detailedAnswers?: Array<{
+    detailedAnswers: Array<{
       questionId: string;
       answer: QuizAnswer;
       isCorrect: boolean;
@@ -193,8 +176,15 @@ export class QuizService extends BaseService {
     }>,
     questions?: QuizQuestion[]
   ): Promise<{ attemptId: number; ratingPoints: number }> {
+    // Детальная информация об ответах обязательна для расчёта рейтинга
+    if (!detailedAnswers || detailedAnswers.length === 0) {
+      throw new Error(
+        'Детальная информация об ответах обязательна для сохранения попытки квиза'
+      );
+    }
+
     // Prepare detailed answers for rating calculation (without questionId and answer)
-    const answersForRating = detailedAnswers?.map(a => ({
+    const answersForRating = detailedAnswers.map(a => ({
       isCorrect: a.isCorrect,
       timeSpent: a.timeSpent,
       questionType: a.questionType,
@@ -221,7 +211,7 @@ export class QuizService extends BaseService {
       totalTimeMs,
       ratingPoints,
       config,
-      detailedAnswers ? JSON.stringify(detailedAnswers) : null,
+      JSON.stringify(detailedAnswers),
       questions ? JSON.stringify(questions) : null,
     ];
 
@@ -325,13 +315,25 @@ export class QuizService extends BaseService {
       if (creatorAttempt) {
         const questionTypes = questions.map(q => q.type);
 
+        // Детальная информация об ответах обязательна для расчёта рейтинга
+        if (!creatorAttempt.answers || creatorAttempt.answers.length === 0) {
+          throw new Error(
+            'Детальная информация об ответах обязательна для сохранения попытки создателя квиза'
+          );
+        }
+
         // Prepare detailed answers with question types
-        const detailedAnswers = creatorAttempt.answers?.map(answer => {
+        const detailedAnswers = creatorAttempt.answers.map(answer => {
           const question = questions.find(q => q.id === answer.questionId);
+          if (!question) {
+            throw new Error(
+              `Вопрос с ID ${answer.questionId} не найден в списке вопросов квиза`
+            );
+          }
           return {
             isCorrect: answer.isCorrect,
             timeSpent: answer.timeSpent,
-            questionType: question!.type,
+            questionType: question.type,
           };
         });
 
@@ -622,10 +624,15 @@ export class QuizService extends BaseService {
     // Prepare detailed answers with question types
     const detailedAnswers = session.answers.map(answer => {
       const question = questions.find(q => q.id === answer.questionId);
+      if (!question) {
+        throw new Error(
+          `Вопрос с ID ${answer.questionId} не найден в сессии квиза`
+        );
+      }
       return {
         isCorrect: answer.isCorrect,
         timeSpent: answer.timeSpent,
-        questionType: question!.type,
+        questionType: question.type,
       };
     });
 

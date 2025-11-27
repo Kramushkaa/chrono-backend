@@ -6,6 +6,19 @@ import { APP_VERSION } from '../version';
 // override: false - не перезаписываем существующие переменные (для Amvera и других PaaS)
 dotenv.config({ override: false });
 
+// Helper функция для получения обязательных переменных окружения
+// Критичные переменные должны быть установлены всегда, без fallback-ов
+function getRequiredEnv(key: string): string {
+  const value = process.env[key];
+
+  if (!value) {
+    logger.error(`ОШИБКА: ${key} должен быть установлен! Это критичная переменная окружения.`);
+    process.exit(1);
+  }
+
+  return value;
+}
+
 export const config = {
   // Настройки сервера
   server: {
@@ -20,7 +33,8 @@ export const config = {
     port: parseInt(process.env.DB_PORT || '5432'),
     name: process.env.DB_NAME || 'chrononinja',
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'password',
+    // Критичная переменная - должна быть установлена всегда
+    password: getRequiredEnv('DB_PASSWORD'),
     schema: process.env.DB_SCHEMA || 'public',
     ssl: process.env.DB_SSL === 'true',
     sslRejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', // По умолчанию true для безопасности
@@ -34,7 +48,8 @@ export const config = {
 
   // Настройки JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
+    // Критичная переменная - должна быть установлена всегда
+    secret: getRequiredEnv('JWT_SECRET'),
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
     refreshExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
   },
@@ -42,19 +57,11 @@ export const config = {
   // Настройки CORS
   cors: createCorsConfig(),
 
-  // Настройки email (для будущего использования)
-  email: {
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT || '587'),
-    secure: process.env.EMAIL_SECURE === 'true',
-    user: process.env.EMAIL_USER || '',
-    password: process.env.EMAIL_PASSWORD || '',
-  },
-
   // Настройки Telegram бота для уведомлений
+  // Критичные переменные - должны быть установлены всегда
   telegram: {
-    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-    adminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || '',
+    botToken: getRequiredEnv('TELEGRAM_BOT_TOKEN'),
+    adminChatId: getRequiredEnv('TELEGRAM_ADMIN_CHAT_ID'),
   },
 
   // Настройки безопасности
@@ -117,7 +124,7 @@ export const validateConfig = (): void => {
 
 // Отладочная информация о схеме БД
 const schemaSource = process.env.DB_SCHEMA ? 'из DB_SCHEMA' : 'по умолчанию (public)';
-console.log('🔧 Используется схема БД:', config.database.schema, `(${schemaSource})`);
+logger.info('Используется схема БД', { schema: config.database.schema, source: schemaSource });
 
 // Экспорт типов для конфигурации
 export interface DatabasePoolConfig {
@@ -162,16 +169,29 @@ export interface CorsConfig {
 }
 
 function createCorsConfig(): CorsConfig {
-  const rawOrigins = process.env.CORS || process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '*';
+  // Критичная переменная - должна быть установлена всегда
+  const rawOrigins = process.env.CORS || process.env.CORS_ORIGIN || process.env.CORS_ORIGINS;
+
+  if (!rawOrigins) {
+    logger.error(
+      'ОШИБКА: CORS должен быть установлен! Установите CORS, CORS_ORIGIN или CORS_ORIGINS'
+    );
+    process.exit(1);
+  }
 
   const allowedOrigins = rawOrigins
     .split(',')
     .map(origin => origin.trim())
     .filter(Boolean);
 
+  if (allowedOrigins.length === 0) {
+    logger.error('ОШИБКА: CORS должен содержать хотя бы один валидный origin!');
+    process.exit(1);
+  }
+
   return {
     credentials: true,
-    allowedOrigins: allowedOrigins.length > 0 ? allowedOrigins : ['*'],
+    allowedOrigins,
     raw: rawOrigins,
   };
 }

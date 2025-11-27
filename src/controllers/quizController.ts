@@ -50,6 +50,33 @@ export class QuizController {
         return;
       }
 
+      if (!Array.isArray(data.questionTypes) || data.questionTypes.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid question types',
+          message: 'Список типов вопросов обязателен',
+        });
+        return;
+      }
+
+      if (!Array.isArray(data.answers) || data.answers.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid answers',
+          message: 'Детальные ответы обязательны для сохранения попытки',
+        });
+        return;
+      }
+
+      if (data.answers.length !== data.questionTypes.length) {
+        res.status(400).json({
+          success: false,
+          error: 'Mismatched answers',
+          message: 'Количество ответов должно совпадать с количеством типов вопросов',
+        });
+        return;
+      }
+
       const result = await this.quizService.saveQuizAttempt(
         userId,
         data.correctAnswers,

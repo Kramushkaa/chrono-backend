@@ -267,22 +267,35 @@ export class ManagePage {
 
   async switchTab(tab: 'persons' | 'achievements' | 'periods'): Promise<void> {
     const tabButton = await this.getTabButton(tab);
-    await tabButton.click({ timeout: 10000 });
+    await tabButton.waitFor({ state: 'visible', timeout: 15000 });
 
-    // Wait for tab to be active with multiple fallbacks
+    // Ensure the tab is within viewport before clicking
+    await tabButton.scrollIntoViewIfNeeded().catch(() => {});
+
+    // Try standard click first, then fall back to forced click if layout blocks actionability
     try {
-      await expect(tabButton).toHaveClass(/--active/, { timeout: 5000 });
+      await tabButton.click({ timeout: 10000 });
     } catch (error) {
+      await tabButton.click({ timeout: 10000, force: true });
+    }
+
+    try {
+      await expect(tabButton).toHaveClass(/--active/, { timeout: 3000 });
+    } catch {
       try {
-        await expect(tabButton).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
-      } catch (error) {
-        // If neither check works, just wait a bit for the tab to load
-        await this.page.waitForTimeout(1000);
+        await expect(tabButton).toHaveAttribute('aria-selected', 'true', { timeout: 3000 });
+      } catch {
+        await this.page.waitForTimeout(500);
       }
     }
 
-    // Wait for tab content to load
-    await this.page.waitForTimeout(1000);
+    const targetSection =
+      tab === 'persons'
+        ? '#manage-persons-section'
+        : tab === 'achievements'
+          ? '#manage-achievements-section'
+          : '#manage-periods-section';
+    await expect(this.page.locator(targetSection)).toBeVisible({ timeout: 15000 });
   }
 
   private async getTabButton(tab: 'persons' | 'achievements' | 'periods'): Promise<Locator> {
@@ -290,6 +303,11 @@ export class ManagePage {
       tab === 'persons' ? 'Личности' : tab === 'achievements' ? 'Достижения' : 'Периоды';
     const labelEn =
       tab === 'persons' ? 'Persons' : tab === 'achievements' ? 'Achievements' : 'Periods';
+
+    const idCandidate = this.page.locator(`#manage-tab-${tab}`);
+    if (await idCandidate.count()) {
+      return idCandidate.first();
+    }
 
     const mobileCandidate = this.page.locator('.mobile-tabs__tab').filter({ hasText: labelRu });
     if (await mobileCandidate.count()) {
@@ -542,5 +560,47 @@ export class ManagePage {
     const item = this.page.locator(`[data-testid="item"]:has-text("${itemName}")`);
     const statusBadge = item.locator(`[data-status="${status}"], text=${status}`);
     await expect(statusBadge).toBeVisible();
+  }
+
+  getItemCardById(id: string | number): Locator {
+    return this.page.locator(`#item-card-${id}`);
+  }
+
+  async openEditModalById(
+    id: string | number,
+    options: { type: 'person' | 'achievement' | 'period' }
+  ): Promise<Locator> {
+    const card = this.getItemCardById(id);
+    await expect(card).toBeVisible({ timeout: 15000 });
+
+    const editButton = card.locator(
+      '[aria-label*="редактировать" i], button[title*="Редактировать" i], button:has-text("✏️")'
+    );
+    await expect(editButton.first()).toBeVisible({ timeout: 5000 });
+    await editButton.first().click();
+
+    const titlePattern =
+      options.type === 'achievement'
+        ? /Редактирование достижения/i
+        : options.type === 'period'
+          ? /Редактирование периода/i
+          : /Редактирование личности/i;
+    const modal = this.page.locator('[role="dialog"]').filter({ hasText: titlePattern }).first();
+    await expect(modal).toBeVisible({ timeout: 15000 });
+    return modal;
+  }
+
+  async searchInTab(tab: 'persons' | 'achievements' | 'periods', query: string): Promise<void> {
+    const inputId =
+      tab === 'persons'
+        ? 'person-search-input'
+        : tab === 'achievements'
+          ? 'achievement-search-input'
+          : 'period-search-input';
+
+    const searchInput = this.page.locator(`#${inputId}`);
+    await expect(searchInput).toBeVisible({ timeout: 5000 });
+    await searchInput.fill(query);
+    await this.page.waitForTimeout(300);
   }
 }

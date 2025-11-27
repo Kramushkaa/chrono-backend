@@ -6,22 +6,30 @@ export class TelegramService {
   private adminChatId: string;
   private isEnabled: boolean = false;
 
-  constructor(botToken?: string, adminChatId?: string) {
-    this.adminChatId = adminChatId || '';
+  constructor(botToken: string, adminChatId: string) {
+    // Токены обязательны, проверяем их наличие
+    if (!botToken || !adminChatId) {
+      throw new Error(
+        'TELEGRAM_BOT_TOKEN и TELEGRAM_ADMIN_CHAT_ID должны быть установлены! Это обязательные переменные окружения.'
+      );
+    }
 
-    if (botToken && adminChatId) {
-      try {
-        this.bot = new Telegraf(botToken);
-        this.isEnabled = true;
-        logger.info('Telegram notifications service initialized (Telegraf)');
-      } catch (error) {
-        logger.error('Telegram service initialization failed', {
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-        this.isEnabled = false;
-      }
-    } else {
-      logger.warn('Telegram notifications disabled: missing token or chat ID');
+    this.adminChatId = adminChatId;
+
+    try {
+      this.bot = new Telegraf(botToken);
+      this.isEnabled = true;
+      logger.info('Telegram notifications service initialized (Telegraf)');
+    } catch (error) {
+      logger.error('Telegram service initialization failed', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      // Если инициализация не удалась, выбрасываем ошибку вместо молчаливого отключения
+      throw new Error(
+        `Не удалось инициализировать Telegram сервис: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
@@ -337,6 +345,43 @@ ${emoji} <b>Достижение ${actionText}</b>
   }
 
   /**
+   * Отправка уведомления о предложении изменений в достижении
+   */
+  async notifyAchievementEditProposed(
+    personId: string | null,
+    proposerEmail: string,
+    achievementId: number
+  ): Promise<void> {
+    if (!this.isEnabled || !this.bot) return;
+
+    const personLine = personId ? `\n👤 Личность ID: ${personId}` : '';
+    const message = `
+✏️ <b>Предложены изменения в достижении</b>
+
+🆔 ID достижения: ${achievementId}${personLine}
+📧 Автор правок: ${proposerEmail}
+
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+`.trim();
+
+    try {
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      logger.info('Telegram notification sent: achievement edit proposed', {
+        personId,
+        proposerEmail,
+        achievementId,
+      });
+    } catch (error) {
+      logger.error('Failed to send Telegram notification (achievement edit proposed)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        personId,
+        proposerEmail,
+        achievementId,
+      });
+    }
+  }
+
+  /**
    * Отправка уведомления о создании периода
    */
   async notifyPeriodCreated(
@@ -382,6 +427,43 @@ ${emoji} <b>Новый период ${statusText}</b>
         creatorEmail,
         status,
         personName,
+      });
+    }
+  }
+
+  /**
+   * Отправка уведомления о предложении изменений в периоде
+   */
+  async notifyPeriodEditProposed(
+    personId: string | null,
+    proposerEmail: string,
+    periodId: number
+  ): Promise<void> {
+    if (!this.isEnabled || !this.bot) return;
+
+    const personLine = personId ? `\n👤 Личность ID: ${personId}` : '';
+    const message = `
+✏️ <b>Предложены изменения в периоде</b>
+
+🆔 ID периода: ${periodId}${personLine}
+📧 Автор правок: ${proposerEmail}
+
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+`.trim();
+
+    try {
+      await this.bot.telegram.sendMessage(this.adminChatId, message, { parse_mode: 'HTML' });
+      logger.info('Telegram notification sent: period edit proposed', {
+        personId,
+        proposerEmail,
+        periodId,
+      });
+    } catch (error) {
+      logger.error('Failed to send Telegram notification (period edit proposed)', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        personId,
+        proposerEmail,
+        periodId,
       });
     }
   }

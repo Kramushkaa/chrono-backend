@@ -45,22 +45,18 @@ describe('TelegramService', () => {
       );
     });
 
-    it('should not initialize when token is missing', () => {
-      new TelegramService(undefined, 'test-chat-id');
-
-      expect(Telegraf).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledWith(
-        'Telegram notifications disabled: missing token or chat ID'
+    it('should throw when token is missing', () => {
+      expect(() => new TelegramService(undefined as unknown as string, 'test-chat-id')).toThrow(
+        'TELEGRAM_BOT_TOKEN'
       );
+      expect(Telegraf).not.toHaveBeenCalled();
     });
 
-    it('should not initialize when chatId is missing', () => {
-      new TelegramService('test-token', undefined);
-
-      expect(Telegraf).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledWith(
-        'Telegram notifications disabled: missing token or chat ID'
+    it('should throw when chatId is missing', () => {
+      expect(() => new TelegramService('test-token', undefined as unknown as string)).toThrow(
+        'TELEGRAM_BOT_TOKEN'
       );
+      expect(Telegraf).not.toHaveBeenCalled();
     });
 
     it('should handle initialization errors', () => {
@@ -69,8 +65,9 @@ describe('TelegramService', () => {
         throw error;
       });
 
-      new TelegramService('invalid-token', 'test-chat-id');
-
+      expect(() => new TelegramService('invalid-token', 'test-chat-id')).toThrow(
+        'Не удалось инициализировать Telegram сервис'
+      );
       expect(logger.error).toHaveBeenCalledWith('Telegram service initialization failed', {
         error,
       });
@@ -119,7 +116,9 @@ describe('TelegramService', () => {
     });
 
     it('should not send notification when service is disabled', async () => {
-      const service = new TelegramService(); // No token/chatId
+      const service = new TelegramService('test-token', 'chat-123');
+      (service as any).isEnabled = false;
+      (service as any).bot = null;
       await service.notifyNewRegistration('user@test.com');
 
       expect(mockTelegram.sendMessage).not.toHaveBeenCalled();
@@ -618,7 +617,9 @@ describe('TelegramService', () => {
     });
 
     it('should log warning when service is disabled', async () => {
-      const service = new TelegramService(); // No token/chatId
+      const service = new TelegramService('test-token', 'chat-123');
+      (service as any).isEnabled = false;
+      (service as any).bot = null;
       await service.sendTestMessage();
 
       expect(mockTelegram.sendMessage).not.toHaveBeenCalled();

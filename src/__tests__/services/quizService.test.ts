@@ -3,6 +3,30 @@ import { QuizService } from '../../services/quizService';
 import { createMockPool, createQueryResult } from '../mocks';
 import type { QuizQuestionType } from '@chrononinja/dto';
 
+const buildDetailedAnswers = (
+  questionTypes: QuizQuestionType[],
+  correctAnswers: number,
+  timePerQuestion = 10000
+) =>
+  questionTypes.map((type, index) => ({
+    isCorrect: index < correctAnswers,
+    timeSpent: timePerQuestion,
+    questionType: type,
+  }));
+
+const buildDetailedAnswersPayload = (
+  questionTypes: QuizQuestionType[],
+  correctAnswers: number,
+  timePerQuestion = 10000
+) =>
+  questionTypes.map((type, index) => ({
+    questionId: `question-${index + 1}`,
+    answer: 'test',
+    isCorrect: index < correctAnswers,
+    timeSpent: timePerQuestion,
+    questionType: type,
+  }));
+
 describe('QuizService', () => {
   let quizService: QuizService;
   let mockPool: any;
@@ -22,11 +46,19 @@ describe('QuizService', () => {
 
   describe('calculateRatingPoints', () => {
     it('should calculate base rating correctly', () => {
+      const questionTypes: QuizQuestionType[] = [
+        'birthYear',
+        'deathYear',
+        'profession',
+        'country',
+        'achievementsMatch',
+      ];
       const rating = quizService.calculateRatingPoints(
         5, // correct
         10, // total
         60000, // 1 min total
-        ['birthYear', 'deathYear', 'profession', 'country', 'achievementsMatch']
+        questionTypes,
+        buildDetailedAnswers(questionTypes, 5)
       );
 
       expect(rating).toBeGreaterThan(0);
@@ -43,8 +75,20 @@ describe('QuizService', () => {
         'achievementsMatch',
       ];
 
-      const rating5 = quizService.calculateRatingPoints(5, 5, 30000, questionTypes);
-      const rating3 = quizService.calculateRatingPoints(3, 5, 30000, questionTypes);
+      const rating5 = quizService.calculateRatingPoints(
+        5,
+        5,
+        30000,
+        questionTypes,
+        buildDetailedAnswers(questionTypes, 5)
+      );
+      const rating3 = quizService.calculateRatingPoints(
+        3,
+        5,
+        30000,
+        questionTypes,
+        buildDetailedAnswers(questionTypes, 3)
+      );
 
       expect(rating5).toBeGreaterThan(rating3);
     });
@@ -52,8 +96,20 @@ describe('QuizService', () => {
     it('should give time bonus for faster completion', () => {
       const questionTypes: QuizQuestionType[] = ['birthYear', 'deathYear', 'profession'];
 
-      const ratingFast = quizService.calculateRatingPoints(3, 3, 15000, questionTypes); // 5 sec avg
-      const ratingSlow = quizService.calculateRatingPoints(3, 3, 90000, questionTypes); // 30 sec avg
+      const ratingFast = quizService.calculateRatingPoints(
+        3,
+        3,
+        15000,
+        questionTypes,
+        buildDetailedAnswers(questionTypes, 3, 5000)
+      ); // 5 sec avg
+      const ratingSlow = quizService.calculateRatingPoints(
+        3,
+        3,
+        90000,
+        questionTypes,
+        buildDetailedAnswers(questionTypes, 3, 30000)
+      ); // 30 sec avg
 
       expect(ratingFast).toBeGreaterThan(ratingSlow);
     });
@@ -66,8 +122,20 @@ describe('QuizService', () => {
         'contemporaries',
       ];
 
-      const ratingSimple = quizService.calculateRatingPoints(3, 3, 30000, simpleTypes);
-      const ratingComplex = quizService.calculateRatingPoints(3, 3, 30000, complexTypes);
+      const ratingSimple = quizService.calculateRatingPoints(
+        3,
+        3,
+        30000,
+        simpleTypes,
+        buildDetailedAnswers(simpleTypes, 3)
+      );
+      const ratingComplex = quizService.calculateRatingPoints(
+        3,
+        3,
+        30000,
+        complexTypes,
+        buildDetailedAnswers(complexTypes, 3)
+      );
 
       expect(ratingComplex).toBeGreaterThan(ratingSimple);
     });
@@ -96,11 +164,14 @@ describe('QuizService', () => {
     });
 
     it('should return 0 for no correct answers', () => {
-      const rating = quizService.calculateRatingPoints(0, 5, 60000, [
-        'birthYear',
-        'deathYear',
-        'profession',
-      ]);
+      const types: QuizQuestionType[] = ['birthYear', 'deathYear', 'profession'];
+      const rating = quizService.calculateRatingPoints(
+        0,
+        5,
+        60000,
+        types,
+        buildDetailedAnswers(types, 0)
+      );
 
       expect(rating).toBe(0);
     });
@@ -120,8 +191,20 @@ describe('QuizService', () => {
         'deathYear',
       ];
 
-      const rating3 = quizService.calculateRatingPoints(3, 3, 30000, types3);
-      const rating10 = quizService.calculateRatingPoints(10, 10, 100000, types10);
+      const rating3 = quizService.calculateRatingPoints(
+        3,
+        3,
+        30000,
+        types3,
+        buildDetailedAnswers(types3, 3)
+      );
+      const rating10 = quizService.calculateRatingPoints(
+        10,
+        10,
+        100000,
+        types10,
+        buildDetailedAnswers(types10, 10)
+      );
 
       expect(rating10).toBeGreaterThan(rating3);
     });
@@ -129,8 +212,20 @@ describe('QuizService', () => {
     it('should cap time bonus appropriately', () => {
       // Very fast answer should have bonus, but not infinite
       const types: QuizQuestionType[] = ['birthYear'];
-      const veryFast = quizService.calculateRatingPoints(1, 1, 100, types); // 100ms
-      const normal = quizService.calculateRatingPoints(1, 1, 10000, types); // 10s
+      const veryFast = quizService.calculateRatingPoints(
+        1,
+        1,
+        100,
+        types,
+        buildDetailedAnswers(types, 1, 100)
+      ); // 100ms
+      const normal = quizService.calculateRatingPoints(
+        1,
+        1,
+        10000,
+        types,
+        buildDetailedAnswers(types, 1, 10000)
+      ); // 10s
 
       expect(veryFast).toBeGreaterThan(normal);
       expect(veryFast).toBeLessThan(normal * 3); // Should be capped reasonably
@@ -138,7 +233,13 @@ describe('QuizService', () => {
 
     it('should handle perfect score correctly', () => {
       const types: QuizQuestionType[] = ['birthYear', 'deathYear', 'profession'];
-      const perfect = quizService.calculateRatingPoints(3, 3, 30000, types);
+      const perfect = quizService.calculateRatingPoints(
+        3,
+        3,
+        30000,
+        types,
+        buildDetailedAnswers(types, 3)
+      );
 
       expect(perfect).toBeGreaterThan(100); // Perfect score with multipliers
       expect(typeof perfect).toBe('number');
@@ -290,7 +391,13 @@ describe('QuizService', () => {
     it('should save quiz attempt with rating calculation', async () => {
       const config = {
         questionCount: 5,
-        questionTypes: ['birthYear', 'deathYear', 'profession'] as QuizQuestionType[],
+        questionTypes: [
+          'birthYear',
+          'deathYear',
+          'profession',
+          'country',
+          'achievementsMatch',
+        ] as QuizQuestionType[],
         selectedCategories: [],
         selectedCountries: [],
         timeRange: { start: -800, end: 2000 },
@@ -304,13 +411,16 @@ describe('QuizService', () => {
         ])
       );
 
+      const detailedAnswers = buildDetailedAnswersPayload(config.questionTypes, 3);
+
       const result = await quizService.saveQuizAttempt(
         1,
         3,
         5,
         60000,
         config,
-        config.questionTypes
+        config.questionTypes,
+        detailedAnswers
       );
 
       expect(result.attemptId).toBe(123);
@@ -324,7 +434,7 @@ describe('QuizService', () => {
     it('should handle guest users (null userId)', async () => {
       const config = {
         questionCount: 3,
-        questionTypes: ['birthYear'] as QuizQuestionType[],
+        questionTypes: ['birthYear', 'deathYear', 'profession'] as QuizQuestionType[],
         selectedCategories: [],
         selectedCountries: [],
         timeRange: { start: -800, end: 2000 },
@@ -332,13 +442,16 @@ describe('QuizService', () => {
 
       mockPool.query.mockResolvedValueOnce(createQueryResult([{ id: 456 }]));
 
+      const detailedAnswers = buildDetailedAnswersPayload(config.questionTypes, 2);
+
       const result = await quizService.saveQuizAttempt(
         null,
         2,
         3,
         30000,
         config,
-        config.questionTypes
+        config.questionTypes,
+        detailedAnswers
       );
 
       expect(result.attemptId).toBe(456);
@@ -365,6 +478,13 @@ describe('QuizService', () => {
           timeSpent: 5000,
           questionType: 'birthYear' as QuizQuestionType,
         },
+        {
+          questionId: '2',
+          answer: 'Marco Polo',
+          isCorrect: false,
+          timeSpent: 8000,
+          questionType: 'achievementsMatch' as QuizQuestionType,
+        },
       ];
 
       const questions = [
@@ -373,6 +493,13 @@ describe('QuizService', () => {
           type: 'birthYear' as QuizQuestionType,
           question: 'Test?',
           correctAnswer: '1900',
+          data: {},
+        },
+        {
+          id: '2',
+          type: 'achievementsMatch' as QuizQuestionType,
+          question: 'Achievement?',
+          correctAnswer: 'Answer',
           data: {},
         },
       ];

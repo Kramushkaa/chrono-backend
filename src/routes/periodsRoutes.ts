@@ -10,6 +10,7 @@ import { asyncHandler, errors } from '../utils/errors';
 import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { PeriodsService } from '../services/periodsService';
+import { logger } from '../utils/logger';
 import {
   validateQuery,
   validateBody,
@@ -182,6 +183,52 @@ export function createPeriodsRoutes(
     })
   );
 
+  // User: propose an edit for an existing approved period (uses period_edits table)
+  router.post(
+    '/periods/:id/edits',
+    authenticateToken,
+    requireVerifiedEmail,
+    validateParams(periodsSchemas.periodId),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { id } = req.params as unknown as { id: number };
+      const rawPayload = req.body?.payload || req.body;
+      if (!rawPayload || typeof rawPayload !== 'object') {
+        throw errors.badRequest('payload обязателен');
+      }
+
+      const payload = {
+        startYear: rawPayload.startYear || rawPayload.start_year,
+        endYear: rawPayload.endYear || rawPayload.end_year,
+        periodType: rawPayload.periodType || rawPayload.period_type,
+        countryId: rawPayload.countryId || rawPayload.country_id,
+        comment: rawPayload.comment || rawPayload.description,
+        personId: rawPayload.personId || rawPayload.person_id,
+      };
+
+      const userId = req.user!.sub;
+      const result = await periodsService.proposeEdit(id, payload, userId);
+
+      // Отправка уведомления в Telegram (неблокирующее)
+      const userEmail = req.user?.email || 'unknown';
+      const periodRes = await pool.query('SELECT person_id, start_year, end_year FROM periods WHERE id = $1', [id]);
+      const periodData = periodRes.rows[0];
+
+      telegramService
+        .notifyPeriodEditProposed(periodData?.person_id ?? null, userEmail, id)
+        .catch((err: unknown) =>
+          logger.warn('Telegram notification failed (period edit proposed)', {
+            error: err instanceof Error ? err : new Error(String(err)),
+          })
+        );
+
+      res.status(201).json({
+        success: true,
+        message: 'Предложение изменений отправлено на модерацию',
+        data: result,
+      });
+    })
+  );
+
   // Delete period (author of draft only)
   router.delete(
     '/periods/:id',
@@ -251,6 +298,30 @@ export function createPeriodsRoutes(
       }
 
       const result = await periodsService.reviewPeriod(
+        parseInt(id),
+        action,
+        req.user!.sub,
+        comment
+      );
+
+      res.json({ success: true, data: result });
+    })
+  );
+
+  // Admin/Moderator: review period edit (approve / reject)
+  router.post(
+    '/admin/periods/edits/:id/review',
+    authenticateToken,
+    requireRoleMiddleware(['moderator', 'admin']),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { id } = req.params;
+      const { action, comment } = req.body || {};
+
+      if (!action || (action !== 'approve' && action !== 'reject')) {
+        throw errors.badRequest('action должен быть approve или reject');
+      }
+
+      const result = await periodsService.reviewEdit(
         parseInt(id),
         action,
         req.user!.sub,

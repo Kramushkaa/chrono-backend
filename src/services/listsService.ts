@@ -141,7 +141,12 @@ export class ListsService extends BaseService {
 
   constructor(pool: Pool, telegramService: TelegramService) {
     super(pool);
-    this.jwtSecret = process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET || 'dev-secret';
+    // Критичная переменная - должна быть установлена всегда
+    const jwtSecret = process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET;
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET или JWT_ACCESS_SECRET должен быть установлен! Это критичная переменная окружения.');
+    }
+    this.jwtSecret = jwtSecret;
     this.telegramService = telegramService;
   }
 

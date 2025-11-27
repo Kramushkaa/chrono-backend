@@ -10,6 +10,7 @@ import { asyncHandler, errors } from '../utils/errors';
 import { UserRole } from '../utils/content-status';
 import { TelegramService } from '../services/telegramService';
 import { AchievementsService } from '../services/achievementsService';
+import { logger } from '../utils/logger';
 import { AchievementPersonSchema } from '@chrononinja/dto';
 import {
   validateQuery,
@@ -211,6 +212,52 @@ export function createAchievementsRoutes(
     })
   );
 
+  // User: propose an edit for an existing approved achievement (uses achievement_edits table)
+  router.post(
+    '/achievements/:id/edits',
+    authenticateToken,
+    requireVerifiedEmail,
+    validateParams(achievementsSchemas.achievementId),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { id } = req.params as unknown as { id: number };
+      const rawPayload = req.body?.payload || req.body;
+      if (!rawPayload || typeof rawPayload !== 'object') {
+        throw errors.badRequest('payload обязателен');
+      }
+
+      const payload = {
+        year: rawPayload.year,
+        description: rawPayload.description,
+        wikipediaUrl: rawPayload.wikipediaUrl || rawPayload.wikipedia_url,
+        imageUrl: rawPayload.imageUrl || rawPayload.image_url,
+        personId: rawPayload.personId || rawPayload.person_id,
+        countryId: rawPayload.countryId || rawPayload.country_id,
+      };
+
+      const userId = req.user!.sub;
+      const result = await achievementsService.proposeEdit(id, payload, userId);
+
+      // Отправка уведомления в Telegram (неблокирующее)
+      const userEmail = req.user?.email || 'unknown';
+      const achievementRes = await pool.query('SELECT person_id, year, description FROM achievements WHERE id = $1', [id]);
+      const achievementData = achievementRes.rows[0];
+
+      telegramService
+        .notifyAchievementEditProposed(achievementData?.person_id ?? null, userEmail, id)
+        .catch((err: unknown) =>
+          logger.warn('Telegram notification failed (achievement edit proposed)', {
+            error: err instanceof Error ? err : new Error(String(err)),
+          })
+        );
+
+      res.status(201).json({
+        success: true,
+        message: 'Предложение изменений отправлено на модерацию',
+        data: result,
+      });
+    })
+  );
+
   // Get user's drafts
   router.get(
     '/achievements/drafts',
@@ -288,6 +335,30 @@ export function createAchievementsRoutes(
       }
 
       const result = await achievementsService.reviewAchievement(
+        parseInt(id),
+        action,
+        req.user!.sub,
+        comment
+      );
+
+      res.json({ success: true, data: result });
+    })
+  );
+
+  // Admin/Moderator: review achievement edit (approve / reject)
+  router.post(
+    '/admin/achievements/edits/:id/review',
+    authenticateToken,
+    requireRoleMiddleware(['moderator', 'admin']),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { id } = req.params;
+      const { action, comment } = req.body || {};
+
+      if (!action || (action !== 'approve' && action !== 'reject')) {
+        throw errors.badRequest('action должен быть approve или reject');
+      }
+
+      const result = await achievementsService.reviewEdit(
         parseInt(id),
         action,
         req.user!.sub,

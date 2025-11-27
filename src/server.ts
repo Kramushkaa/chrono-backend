@@ -70,5 +70,3 @@ process.on('SIGTERM', async () => {
   logger.info('Подключения к базе данных закрыты');
   process.exit(0);
 });
-
-export default app;
